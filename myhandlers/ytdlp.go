@@ -111,9 +111,9 @@ func (y *YtDlKey) Download() (string, func(), error) {
 	defer cancel()
 	config, prog, uid := y.makeConfig(ctx)
 	ytDlpMap.Store(uid, prog)
-	defer ytDlpMap.Delete(uid)
 	prog.wg.Add(1)
 	clean = func() {
+		ytDlpMap.Delete(uid)
 		downloading.Delete(*y)
 		prog.wg.Done()
 		prog.wg.Wait()
@@ -191,6 +191,11 @@ func saveFileToDb(key *YtDlKey, sent *gotgbot.Message) error {
 	if fileId == "" {
 		return nil
 	}
+	res := globalcfg.GetDb().Where(key).Take(&YtDlDb{})
+	if res.RowsAffected > 0 {
+		log.Infof("url:%s, file id:%s, found in database", key.Url, fileId)
+		return nil
+	}
 	ytdb := &YtDlDb{
 		YtDlKey: *key,
 		FileId:  fileId,
@@ -201,6 +206,10 @@ func saveFileToDb(key *YtDlKey, sent *gotgbot.Message) error {
 }
 
 func sendVideo(bot *gotgbot.Bot, ctx *ext.Context, res string, text string) (*gotgbot.Message, error) {
+	// 如果不是一个路径，那么就按照file id 的类型发送
+	if !strings.ContainsAny(res, "/\\") {
+		return bot.SendVideo(ctx.EffectiveChat.Id, res, nil)
+	}
 	replyId := int64(0)
 	if ctx.EffectiveMessage != nil {
 		replyId = ctx.EffectiveMessage.MessageId
@@ -216,7 +225,6 @@ func sendVideo(bot *gotgbot.Bot, ctx *ext.Context, res string, text string) (*go
 		log.Warnf("get video probe error %#v", err)
 		return nil, err
 	}
-
 	sent, err := bot.SendVideo(ctx.EffectiveChat.Id, fileSchema(res), &gotgbot.SendVideoOpts{
 		Thumbnail: fileSchema(frame),
 		Duration:  int64(probe.GetDuration()),
@@ -234,6 +242,9 @@ func sendVideo(bot *gotgbot.Bot, ctx *ext.Context, res string, text string) (*go
 	return sent, err
 }
 func sendAudio(bot *gotgbot.Bot, ctx *ext.Context, res string, text string) (*gotgbot.Message, error) {
+	if !strings.ContainsAny(res, "/\\") {
+		return bot.SendAudio(ctx.EffectiveChat.Id, res, nil)
+	}
 	replyId := int64(0)
 	if ctx.EffectiveMessage != nil {
 		replyId = ctx.EffectiveMessage.MessageId
