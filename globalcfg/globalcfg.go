@@ -4,12 +4,15 @@ import (
 	"fmt"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	"gopkg.in/natefinch/lumberjack.v2"
 	"gopkg.in/yaml.v3"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"main/helpers/azure"
 	"moul.io/zapgorm2"
 	"os"
+	"path/filepath"
+	"sync"
 )
 
 type Azure struct {
@@ -100,15 +103,40 @@ func GetConfig() *Config {
 	return config
 }
 
-func GetLogger(name string) *zap.SugaredLogger {
-	logCfg := zap.NewProductionConfig()
-	logCfg.Level.SetLevel(zapcore.Level(GetConfig().LogLevel))
-	logCfg.OutputPaths = []string{"stdout", "log.log"}
-	build, err := logCfg.Build()
-	if err != nil {
-		panic(err)
+var globalLogger = sync.OnceValue(func() *zap.Logger {
+	var err error
+	logfile, exists := os.LookupEnv("LOG_FILE")
+	if !exists {
+		logfile, err = filepath.Abs("logs/log.log")
+		if err != nil {
+			panic(err)
+		}
 	}
-	logger := build.Sugar()
+	w := zapcore.AddSync(&lumberjack.Logger{
+		Filename:   logfile,
+		MaxSize:    100, // megabytes
+		MaxBackups: 10,
+		MaxAge:     100, // days
+		Compress:   true,
+		LocalTime:  true,
+	})
+	_, noStdout := os.LookupEnv("NO_STDOUT")
+	if !noStdout {
+		w = zapcore.NewMultiWriteSyncer(w, zapcore.AddSync(os.Stdout))
+	}
+	core := zapcore.NewCore(
+		zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig()),
+		w,
+		zapcore.Level(GetConfig().LogLevel),
+	)
+	logger := zap.New(core)
+	return logger
+})
+
+func GetLogger(name string) *zap.SugaredLogger {
+	logger := globalLogger().
+		With(zap.String("name", name)).
+		WithOptions().Sugar()
 	loggers[name] = logger
 	return logger
 }
