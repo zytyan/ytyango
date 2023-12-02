@@ -2,8 +2,8 @@
 set -e
 
 function cmd_not_exists_exit() {
-    if ! [ -x "$(command -v $1)" ]; then
-        echo 'Error: '$1' is not installed.' >&2
+    if ! [ -x "$(command -v "$1")" ]; then
+        echo 'Error: '"$1"' is not installed.' >&2
     fi
 }
 
@@ -34,10 +34,10 @@ function compile_and_restart() {
     cd ..
     go get
     go build -ldflags "-X \"main.compileTime=$(date '+%Y-%m-%d %H:%M:%S')\"" -tags=jsoniter -o ./build/ytyan-go
-    echo "Compile done at"  `date '+%Y-%m-%d %H:%M:%S'`
+    echo "Compile done at"  "$(date '+%Y-%m-%d %H:%M:%S')"
     # 询问是否要重启服务
-    read -p "是否要重启服务？[y/n]" isRestart
-    if [ $isRestart == "y" ]; then
+    read -rp "是否要重启服务？[y/n]" isRestart
+    if [ "$isRestart" == "y" ]; then
        systemctl daemon-reload
        systemctl restart goytyan
     else
