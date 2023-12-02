@@ -8,6 +8,7 @@ import (
 	"github.com/go-co-op/gocron"
 	jsoniter "github.com/json-iterator/go"
 	"github.com/kr/pretty"
+	"github.com/puzpuzpuz/xsync/v3"
 	"github.com/rivo/uniseg"
 	"html"
 	"os"
@@ -17,8 +18,6 @@ import (
 	"sync"
 	"time"
 )
-
-var gStatMu = &sync.RWMutex{}
 
 type UserMsgStat struct {
 	MsgCount int
@@ -130,7 +129,8 @@ func (g *groupStatDaily) GetMostActiveTimeSeg() (timeId int, timeSeg string, cou
 	return
 }
 
-var groupStat = make(map[int64]*groupStatTwoDays)
+// var groupStat = make(map[int64]*groupStatTwoDays)
+var groupStat = xsync.NewMapOf[int64, *groupStatTwoDays]()
 
 // GetMostActiveUsers 获取最活跃的三个用户
 func (g *groupStatDaily) GetMostActiveUsers() (users []int64, counts []int) {
@@ -264,24 +264,16 @@ func GetCntByTime(bot *gotgbot.Bot, ctx *ext.Context) error {
 }
 
 func AddNewMsg(_ *gotgbot.Bot, ctx *ext.Context) error {
-	gStatMu.RLock()
-	stat, ok := groupStat[ctx.Message.Chat.Id]
-	gStatMu.RUnlock()
-	if !ok {
-		gStatMu.Lock()
-		stat = &groupStatTwoDays{mu: &sync.Mutex{}, Today: &groupStatDaily{}, LastUpdate: time.Now()}
-		groupStat[ctx.Message.Chat.Id] = stat
-		gStatMu.Unlock()
-	}
+	stat, _ := groupStat.LoadOrCompute(ctx.Message.Chat.Id, func() *groupStatTwoDays {
+		return &groupStatTwoDays{mu: &sync.Mutex{}, Today: &groupStatDaily{}, LastUpdate: time.Now()}
+	})
 	stat.tryNewDay()
 	stat.Today.addNewMsg(ctx.Message)
 	return nil
 }
 
 func sendGroupStat(bot *gotgbot.Bot, groupId int64, isToday bool) error {
-	gStatMu.RLock()
-	stat, ok := groupStat[groupId]
-	gStatMu.RUnlock()
+	stat, ok := groupStat.Load(groupId)
 	if !ok {
 		_, err := bot.SendMessage(groupId, "错误：这个群没有开启这个功能", nil)
 		return err
@@ -306,14 +298,15 @@ func GroupStatDiagnostic(bot *gotgbot.Bot, ctx *ext.Context) error {
 	defer t.Close()
 	defer os.Remove(filename)
 	_, _ = t.WriteString(fmt.Sprintf("run count: %d, next run: %s\n", job.RunCount(), job.NextRun().Format("2006-01-02 15:04:05")))
-	_, _ = t.WriteString(fmt.Sprintf("group stat count: %d\n", len(groupStat)))
-	for k, v := range groupStat {
+	_, _ = t.WriteString(fmt.Sprintf("group stat count: %d\n", groupStat.Size()))
+	groupStat.Range(func(k int64, v *groupStatTwoDays) bool {
 		_, _ = t.WriteString(fmt.Sprintf("group %d, last update: %s, next update: %s\n", k, v.LastUpdate.Format("2006-01-02 15:04:05"), v.NextUpdate.Format("2006-01-02 15:04:05")))
 		_, _ = t.WriteString(fmt.Sprintf("today message count: %d\n", v.Today.MessageCount))
 		_, _ = t.WriteString(fmt.Sprintf("last day message count: %d\n", v.LastDay.MessageCount))
 		_, _ = t.WriteString(pretty.Sprintf("today: %# v\n", v.Today))
 		_, _ = t.WriteString(pretty.Sprintf("last day: %# v\n", v.LastDay))
-	}
+		return true
+	})
 	_, err = bot.SendDocument(ctx.EffectiveChat.Id, fileSchema(filename), nil)
 	return err
 }
@@ -328,24 +321,16 @@ func SendGroupStat(bot *gotgbot.Bot, ctx *ext.Context) error {
 }
 
 func ForceNewDay(bot *gotgbot.Bot, ctx *ext.Context) error {
-	gStatMu.RLock()
-	stat, ok := groupStat[ctx.Message.Chat.Id]
-	gStatMu.RUnlock()
-	if !ok {
-		gStatMu.Lock()
-		stat = &groupStatTwoDays{mu: &sync.Mutex{}, Today: &groupStatDaily{}, LastUpdate: time.Now()}
-		groupStat[ctx.Message.Chat.Id] = stat
-		gStatMu.Unlock()
-	}
+	stat, _ := groupStat.LoadOrCompute(ctx.Message.Chat.Id, func() *groupStatTwoDays {
+		return &groupStatTwoDays{mu: &sync.Mutex{}, Today: &groupStatDaily{}, LastUpdate: time.Now()}
+	})
 	stat.forceNewDay()
 	_, err := bot.SendMessage(ctx.EffectiveChat.Id, "强制新的一天~", nil)
 	return err
 }
 
 func WithGroupLockToday(groupId int64, f func(daily *groupStatDaily)) {
-	gStatMu.RLock()
-	stat, ok := groupStat[groupId]
-	gStatMu.RUnlock()
+	stat, ok := groupStat.Load(groupId)
 	if !ok {
 		return
 	}
@@ -358,6 +343,7 @@ var sendScheduler *gocron.Scheduler
 var job *gocron.Job
 
 const statFile = "groupstat.gob"
+const statJsonFile = "groupstat.json"
 
 var loadSuccess = false
 
@@ -365,13 +351,19 @@ func saveStat() {
 	if !loadSuccess {
 		return
 	}
+	var tmpGroupStat = make(map[int64]*groupStatTwoDays)
+	groupStat.Range(func(k int64, v *groupStatTwoDays) bool {
+		tmpGroupStat[k] = v
+		return true
+	})
 	fb, err := os.Create(statFile)
 	if err != nil {
 		log.Errorf("save stat failed %s", err)
 		return
 	}
+	defer fb.Close()
 	e := gob.NewEncoder(fb)
-	err = e.Encode(groupStat)
+	err = e.Encode(tmpGroupStat)
 	if err != nil {
 		log.Errorf("save stat failed %s", err)
 		return
@@ -387,14 +379,19 @@ func loadStat() {
 		log.Errorf("load stat failed %s", err)
 		return
 	}
+	var tmpGroupStat = make(map[int64]*groupStatTwoDays)
 	d := gob.NewDecoder(fb)
-	err = d.Decode(&groupStat)
+	err = d.Decode(&tmpGroupStat)
 	if err != nil {
 		log.Errorf("load stat failed %s", err)
 		return
 	}
-	for _, v := range groupStat {
+	for _, v := range tmpGroupStat {
 		v.mu = &sync.Mutex{}
+	}
+	groupStat = xsync.NewMapOf[int64, *groupStatTwoDays]()
+	for k, v := range tmpGroupStat {
+		groupStat.Store(k, v)
 	}
 	loadSuccess = true
 	log.Infof("load stat success")

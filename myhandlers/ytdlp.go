@@ -283,6 +283,9 @@ func DownloadVideoCallback(bot *gotgbot.Bot, ctx *ext.Context) error {
 		_, err = answerCallback(bot, ctx, "请勿频繁下载", true)
 		return err
 	}
+	WithGroupLockToday(ctx.EffectiveChat.Id, func(daily *groupStatDaily) {
+		daily.DownloadVideoCount++
+	})
 	if db, ok := key.TakeDb(); ok {
 		log.Infof("url:%s, file id:%s, found in cache database", key.Url, db.FileId)
 		_, err = answerCallback(bot, ctx, "下载完成", false)
@@ -320,6 +323,9 @@ func DownloadVideo(bot *gotgbot.Bot, ctx *ext.Context) error {
 		_, err = ctx.Message.Reply(bot, "请勿频繁下载", nil)
 		return err
 	}
+	WithGroupLockToday(ctx.EffectiveChat.Id, func(daily *groupStatDaily) {
+		daily.DownloadVideoCount++
+	})
 	if db, ok := key.TakeDb(); ok {
 		log.Infof("url:%s, file id:%s, found in cache database", key.Url, db.FileId)
 		_, err = bot.SendVideo(ctx.EffectiveChat.Id, db.FileId, &gotgbot.SendVideoOpts{ReplyToMessageId: ctx.EffectiveMessage.MessageId})
@@ -357,6 +363,9 @@ func DownloadAudio(bot *gotgbot.Bot, ctx *ext.Context) error {
 		_, err = ctx.Message.Reply(bot, "请勿频繁下载", nil)
 		return err
 	}
+	WithGroupLockToday(ctx.EffectiveChat.Id, func(daily *groupStatDaily) {
+		daily.DownloadAudioCount++
+	})
 	if db, ok := key.TakeDb(); ok {
 		log.Infof("url:%s, file id:%s, found in cache database", key.Url, db.FileId)
 		_, err = bot.SendVideo(ctx.EffectiveChat.Id, db.FileId, &gotgbot.SendVideoOpts{ReplyToMessageId: ctx.EffectiveMessage.MessageId})
