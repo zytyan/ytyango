@@ -9,42 +9,16 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strings"
-	"time"
 )
-
-type Semaphore struct {
-	sem chan struct{}
-}
-
-func (s *Semaphore) AcquireWithTimeout(timeout time.Duration) bool {
-	select {
-	case s.sem <- struct{}{}:
-		return true
-	case <-time.After(timeout):
-		return false
-	}
-}
-
-func (s *Semaphore) Acquire() {
-	s.sem <- struct{}{}
-}
-
-func (s *Semaphore) Release() {
-	<-s.sem
-}
-
-func NewSemaphore(n int) *Semaphore {
-	return &Semaphore{sem: make(chan struct{}, n)}
-}
-
-var sema = NewSemaphore(1)
 
 func gif2mp4(gifFile, mp4File string) error {
 	// mp4 要求长宽必须是偶数，所以使用除2再乘2的方式来保证长宽是偶数
 	// command on shell: ffmpeg -i test.gif -movflags faststart -pix_fmt yuv420p -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" test.mp4
 	cmd := exec.Command("ffmpeg",
+		"-y",
 		"-i", gifFile,
 		"-movflags", "faststart",
 		"-pix_fmt", "yuv420p",
@@ -59,6 +33,7 @@ func gif2mp4(gifFile, mp4File string) error {
 }
 
 func downloadSinaGif(sinaUrl string) (gifFile string, err error) {
+	log.Infof("download gif from %s", sinaUrl)
 	get, err := http.Get(sinaUrl)
 	if err != nil {
 		return "", err
@@ -69,7 +44,7 @@ func downloadSinaGif(sinaUrl string) (gifFile string, err error) {
 	}
 	// 获取url中的文件名
 	pathBuf := strings.SplitN(urlObj.Path, "/", -1)
-	gifFile = fmt.Sprintf("/tmp/%s", pathBuf[len(pathBuf)-1])
+	gifFile = filepath.Join(os.TempDir(), pathBuf[len(pathBuf)-1])
 	defer get.Body.Close()
 	if get.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("status code not ok")
@@ -83,12 +58,20 @@ func downloadSinaGif(sinaUrl string) (gifFile string, err error) {
 	if err != nil {
 		return "", err
 	}
+	gifFile, err = filepath.Abs(gifFile)
+	if err != nil {
+		return "", err
+	}
+	log.Infof("download gif to %s", gifFile)
 	return gifFile, nil
 }
 
-var sinaGifRe = regexp.MustCompile(`https?://wx\d+\.sinaimg\.cn/[\w/\-_]+\.gif`)
+var sinaGifRe = regexp.MustCompile(`https?://wx\d+\.(sinaimg\.cn|moyu\.im)/[\w/\-_]+\.gif`)
 
 func HasSinaGif(msg *gotgbot.Message) bool {
+	if g, err := getGroupInfo(msg.Chat.Id); err != nil || !g.AutoCvtBili {
+		return false
+	}
 	return sinaGifRe.MatchString(getTextMsg(msg))
 }
 
@@ -101,6 +84,7 @@ func gif2Mp4(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
 	if gifUrl == "" {
 		return
 	}
+	gifUrl = strings.ReplaceAll(gifUrl, "moyu.im", "sinaimg.cn")
 	gifFile, err := downloadSinaGif(gifUrl)
 	if err != nil {
 		return err
@@ -110,7 +94,9 @@ func gif2Mp4(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
 	if err != nil {
 		return err
 	}
-	_, err = bot.SendVideo(ctx.EffectiveChat.Id, gotgbot.InputFile(mp4File), nil)
+	defer os.Remove(mp4File)
+	defer os.Remove(gifFile)
+	_, err = bot.SendVideo(ctx.EffectiveChat.Id, fileSchema(mp4File), nil)
 	if err != nil {
 		return err
 	}
@@ -119,17 +105,10 @@ func gif2Mp4(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
 
 func Gif2Mp4(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
 	go func() {
-		if !sema.AcquireWithTimeout(5 * time.Second) {
-			log.Warnf("gif2mp4 semaphore timeout")
-			_, err := ctx.EffectiveMessage.Reply(bot, "转换失败，请稍后再试", nil)
-			if err != nil {
-				log.Warnf("reply message failed, err: %s", err)
-				return
-			}
-			return
-		}
-		defer sema.Release()
 		err = gif2Mp4(bot, ctx)
+		if err != nil {
+			log.Warnf("gif2mp4 failed: %s", err)
+		}
 	}()
 	return
 }

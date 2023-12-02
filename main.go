@@ -98,10 +98,10 @@ func main() {
 	dispatcher.AddCommand("diag_forcenewday", myhandlers.ForceNewDay)
 	dispatcher.AddCommand("diag_getcntbytime", myhandlers.GetCntByTime)
 
+	dispatcher.AddHandler(handlers.NewMessage(myhandlers.HasSinaGif, myhandlers.Gif2Mp4))
 	dispatcher.AddHandler(handlers.NewCallback(myhandlers.IsBilibiliBtn, myhandlers.DownloadVideoCallback))
 	dispatcher.AddHandler(handlers.NewMessage(myhandlers.HasImage, myhandlers.SeseDetect))
 	dispatcher.AddHandler(handlers.NewMessage(myhandlers.NeedSolve, myhandlers.SolveMath))
-	dispatcher.AddHandler(handlers.NewMessage(myhandlers.HasSinaGif, myhandlers.Gif2Mp4))
 	dispatcher.AddHandler(handlers.NewMessage(myhandlers.IsCalcExchangeRate, myhandlers.ExchangeRateCalc))
 	err := updater.StartPolling(b, &ext.PollingOpts{
 		DropPendingUpdates:    globalcfg.GetConfig().DropPendingUpdates,
