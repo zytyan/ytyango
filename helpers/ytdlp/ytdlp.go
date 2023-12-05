@@ -62,7 +62,7 @@ func (c *Config) args() ([]string, error) {
 	}
 	args := []string{c.Url,
 		"-o",
-		filepath.Join(c.tmpPath, "%(title)s.%(ext)s"),
+		filepath.Join(c.tmpPath, "%(title).150B.%(ext)s"),
 		"--format", `bestvideo*+bestaudio/best`,
 		"--windows-filenames",
 	}
