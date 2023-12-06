@@ -32,7 +32,7 @@ func HasImage(msg *gotgbot.Message) bool {
 }
 
 func replyNsfw(bot *gotgbot.Bot, msg *gotgbot.Message, result *azure.ModeratorResult, groupInfo *GroupInfo) (bool, error) {
-	WithGroupLockToday(msg.Chat.Id, func(g *groupStatDaily) {
+	WithGroupLockToday(msg.Chat.Id, func(g *GroupStatDaily) {
 		if groupInfo.ModeratorConfig.IsAdult(result) {
 			g.AdultCount++
 		} else if groupInfo.ModeratorConfig.IsRacy(result) {

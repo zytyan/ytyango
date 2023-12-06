@@ -283,7 +283,7 @@ func DownloadVideoCallback(bot *gotgbot.Bot, ctx *ext.Context) error {
 		_, err = answerCallback(bot, ctx, "请勿频繁下载", true)
 		return err
 	}
-	WithGroupLockToday(ctx.EffectiveChat.Id, func(daily *groupStatDaily) {
+	WithGroupLockToday(ctx.EffectiveChat.Id, func(daily *GroupStatDaily) {
 		daily.DownloadVideoCount++
 	})
 	if db, ok := key.TakeDb(); ok {
@@ -323,7 +323,7 @@ func DownloadVideo(bot *gotgbot.Bot, ctx *ext.Context) error {
 		_, err = ctx.Message.Reply(bot, "请勿频繁下载", nil)
 		return err
 	}
-	WithGroupLockToday(ctx.EffectiveChat.Id, func(daily *groupStatDaily) {
+	WithGroupLockToday(ctx.EffectiveChat.Id, func(daily *GroupStatDaily) {
 		daily.DownloadVideoCount++
 	})
 	if db, ok := key.TakeDb(); ok {
@@ -363,7 +363,7 @@ func DownloadAudio(bot *gotgbot.Bot, ctx *ext.Context) error {
 		_, err = ctx.Message.Reply(bot, "请勿频繁下载", nil)
 		return err
 	}
-	WithGroupLockToday(ctx.EffectiveChat.Id, func(daily *groupStatDaily) {
+	WithGroupLockToday(ctx.EffectiveChat.Id, func(daily *GroupStatDaily) {
 		daily.DownloadAudioCount++
 	})
 	if db, ok := key.TakeDb(); ok {

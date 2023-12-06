@@ -39,7 +39,7 @@ func marsCounter(ctx *gin.Context) {
 		ctx.AbortWithStatus(400)
 		return
 	}
-	WithGroupLockToday(marsInfo.GroupID, func(g *groupStatDaily) {
+	WithGroupLockToday(marsInfo.GroupID, func(g *GroupStatDaily) {
 		g.MarsCount++
 		g.MaxMarsCount = max(g.MaxMarsCount, marsInfo.MarsCount)
 	})
@@ -65,7 +65,7 @@ func dioBan(ctx *gin.Context) {
 		ctx.AbortWithStatus(400)
 		return
 	}
-	WithGroupLockToday(dioBanUser.GroupId, func(g *groupStatDaily) {
+	WithGroupLockToday(dioBanUser.GroupId, func(g *GroupStatDaily) {
 		switch dioBanUser.Action {
 		case DioBanActionAdd:
 			g.DioAddUserCount++

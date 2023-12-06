@@ -23,31 +23,31 @@ type UserMsgStat struct {
 	MsgCount int
 	MsgLen   int
 }
-type groupStatDaily struct {
-	MessageCount int64
-	PhotoCount   int64
-	StickerCount int64
-	ForwardCount int64 // 转发了多少条
+type GroupStatDaily struct {
+	MessageCount int64 `json:"message_count"`
+	PhotoCount   int64 `json:"photo_count"`
+	StickerCount int64 `json:"sticker_count"`
+	ForwardCount int64 `json:"forward_count"` // 转发了多少条
 
-	UserMsgStat map[int64]*UserMsgStat
+	UserMsgStat map[int64]*UserMsgStat `json:"user_msg_stat"`
 	// 分时间段计算群内发消息的数量，用于统计频率，每十分钟一个计数
-	MsgCountByTime   [24 * 6]int64
-	MsgIdAtTimeStart [24 * 6]int64
+	MsgCountByTime   [24 * 6]int64 `json:"msg_count_by_time"`
+	MsgIdAtTimeStart [24 * 6]int64 `json:"msg_id_at_time_start"`
 
-	MarsCount    int64 // 火星图的数量，从python处做联动，用httpx直接发过来
-	MaxMarsCount int64 // 火星图的最大火星次数
+	MarsCount    int64 `json:"mars_count"`     // 火星图的数量，从python处做联动，用httpx直接发过来
+	MaxMarsCount int64 `json:"max_mars_count"` // 火星图的最大火星次数
 
-	RacyCount  int64 // 色图数量
-	AdultCount int64 // 色图(R18)数量
+	RacyCount  int64 `json:"racy_count"`  // 色图数量
+	AdultCount int64 `json:"adult_count"` // 色图(R18)数量
 
-	DownloadVideoCount int64 // 下载视频数量
-	DownloadAudioCount int64 // 下载音频数量
+	DownloadVideoCount int64 `json:"download_video_count"` // 下载视频数量
+	DownloadAudioCount int64 `json:"download_audio_count"` // 下载音频数量
 
-	DioAddUserCount int64
-	DioBanUserCount int64
+	DioAddUserCount int64 `json:"dio_add_user_count"`
+	DioBanUserCount int64 `json:"dio_ban_user_count"`
 }
 
-func (g *groupStatDaily) addNewMsg(msg *gotgbot.Message) {
+func (g *GroupStatDaily) addNewMsg(msg *gotgbot.Message) {
 	g.MessageCount++
 	if g.UserMsgStat == nil {
 		g.UserMsgStat = make(map[int64]*UserMsgStat)
@@ -79,20 +79,20 @@ func (g *groupStatDaily) addNewMsg(msg *gotgbot.Message) {
 	}
 }
 
-// 由于是8点才发送，所以要保存昨天的计数
-type groupStatTwoDays struct {
+// GroupStatTwoDays 由于是8点才发送，所以要保存昨天的计数
+type GroupStatTwoDays struct {
 	mu         *sync.Mutex
-	LastDay    *groupStatDaily // 有可能并不是昨天，而是更早的一天
-	Today      *groupStatDaily
-	LastUpdate time.Time
-	NextUpdate time.Time
+	LastDay    *GroupStatDaily `json:"last_day,omitempty"` // 有可能并不是昨天，而是更早的一天
+	Today      *GroupStatDaily `json:"today,omitempty"`
+	LastUpdate time.Time       `json:"last_update"`
+	NextUpdate time.Time       `json:"next_update"`
 }
 
-func (g *groupStatTwoDays) forceNewDay() {
+func (g *GroupStatTwoDays) forceNewDay() {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	g.LastDay = g.Today
-	g.Today = &groupStatDaily{
+	g.Today = &GroupStatDaily{
 		UserMsgStat: make(map[int64]*UserMsgStat),
 	}
 	g.LastUpdate = time.Now()
@@ -106,7 +106,7 @@ func (g *groupStatTwoDays) forceNewDay() {
 	}
 	g.NextUpdate = next4Am
 }
-func (g *groupStatTwoDays) tryNewDay() {
+func (g *GroupStatTwoDays) tryNewDay() {
 	if time.Now().Before(g.NextUpdate) {
 		return
 	}
@@ -114,7 +114,7 @@ func (g *groupStatTwoDays) tryNewDay() {
 }
 
 // GetMostActiveTimeSeg 获取群内发言频率最高的时间段
-func (g *groupStatDaily) GetMostActiveTimeSeg() (timeId int, timeSeg string, count int64) {
+func (g *GroupStatDaily) GetMostActiveTimeSeg() (timeId int, timeSeg string, count int64) {
 	timeSegInt := 0
 	for i, c := range g.MsgCountByTime {
 		if c > count {
@@ -129,11 +129,11 @@ func (g *groupStatDaily) GetMostActiveTimeSeg() (timeId int, timeSeg string, cou
 	return
 }
 
-// var groupStat = make(map[int64]*groupStatTwoDays)
-var groupStat = xsync.NewMapOf[int64, *groupStatTwoDays]()
+// var groupStat = make(map[int64]*GroupStatTwoDays)
+var groupStat = xsync.NewMapOf[int64, *GroupStatTwoDays]()
 
 // GetMostActiveUsers 获取最活跃的三个用户
-func (g *groupStatDaily) GetMostActiveUsers() (users []int64, counts []int) {
+func (g *GroupStatDaily) GetMostActiveUsers() (users []int64, counts []int) {
 	type userCount struct {
 		user int64
 		stat *UserMsgStat
@@ -152,7 +152,7 @@ func (g *groupStatDaily) GetMostActiveUsers() (users []int64, counts []int) {
 	return
 }
 
-func (g *groupStatDaily) String(groupId int64) string {
+func (g *GroupStatDaily) String(groupId int64) string {
 	if g == nil {
 		return "<!nil>没有数据"
 	}
@@ -202,7 +202,7 @@ func (g *groupStatDaily) String(groupId int64) string {
 		link, actTime, actTimeCnt)
 	return tmp
 }
-func (g *groupStatDaily) GetRank() string {
+func (g *GroupStatDaily) GetRank() string {
 	type userCount struct {
 		user  int64
 		count int64
@@ -233,7 +233,7 @@ func (g *groupStatDaily) GetRank() string {
 
 func GetRank(bot *gotgbot.Bot, ctx *ext.Context) error {
 	var text string
-	WithGroupLockToday(ctx.EffectiveChat.Id, func(daily *groupStatDaily) {
+	WithGroupLockToday(ctx.EffectiveChat.Id, func(daily *GroupStatDaily) {
 		text = daily.GetRank()
 	})
 	if text == "" {
@@ -247,7 +247,7 @@ func GetCntByTime(bot *gotgbot.Bot, ctx *ext.Context) error {
 	var text string
 	var textB []byte
 	var err error
-	WithGroupLockToday(ctx.EffectiveChat.Id, func(daily *groupStatDaily) {
+	WithGroupLockToday(ctx.EffectiveChat.Id, func(daily *GroupStatDaily) {
 		textB, err = jsoniter.Marshal(daily.MsgCountByTime)
 		if err != nil {
 			return
@@ -264,8 +264,8 @@ func GetCntByTime(bot *gotgbot.Bot, ctx *ext.Context) error {
 }
 
 func AddNewMsg(_ *gotgbot.Bot, ctx *ext.Context) error {
-	stat, _ := groupStat.LoadOrCompute(ctx.Message.Chat.Id, func() *groupStatTwoDays {
-		return &groupStatTwoDays{mu: &sync.Mutex{}, Today: &groupStatDaily{}, LastUpdate: time.Now()}
+	stat, _ := groupStat.LoadOrCompute(ctx.Message.Chat.Id, func() *GroupStatTwoDays {
+		return &GroupStatTwoDays{mu: &sync.Mutex{}, Today: &GroupStatDaily{}, LastUpdate: time.Now()}
 	})
 	stat.tryNewDay()
 	stat.Today.addNewMsg(ctx.Message)
@@ -299,7 +299,7 @@ func GroupStatDiagnostic(bot *gotgbot.Bot, ctx *ext.Context) error {
 	defer os.Remove(filename)
 	_, _ = t.WriteString(fmt.Sprintf("run count: %d, next run: %s\n", job.RunCount(), job.NextRun().Format("2006-01-02 15:04:05")))
 	_, _ = t.WriteString(fmt.Sprintf("group stat count: %d\n", groupStat.Size()))
-	groupStat.Range(func(k int64, v *groupStatTwoDays) bool {
+	groupStat.Range(func(k int64, v *GroupStatTwoDays) bool {
 		_, _ = t.WriteString(fmt.Sprintf("group %d, last update: %s, next update: %s\n", k, v.LastUpdate.Format("2006-01-02 15:04:05"), v.NextUpdate.Format("2006-01-02 15:04:05")))
 		_, _ = t.WriteString(fmt.Sprintf("today message count: %d\n", v.Today.MessageCount))
 		_, _ = t.WriteString(fmt.Sprintf("last day message count: %d\n", v.LastDay.MessageCount))
@@ -321,15 +321,15 @@ func SendGroupStat(bot *gotgbot.Bot, ctx *ext.Context) error {
 }
 
 func ForceNewDay(bot *gotgbot.Bot, ctx *ext.Context) error {
-	stat, _ := groupStat.LoadOrCompute(ctx.Message.Chat.Id, func() *groupStatTwoDays {
-		return &groupStatTwoDays{mu: &sync.Mutex{}, Today: &groupStatDaily{}, LastUpdate: time.Now()}
+	stat, _ := groupStat.LoadOrCompute(ctx.Message.Chat.Id, func() *GroupStatTwoDays {
+		return &GroupStatTwoDays{mu: &sync.Mutex{}, Today: &GroupStatDaily{}, LastUpdate: time.Now()}
 	})
 	stat.forceNewDay()
 	_, err := bot.SendMessage(ctx.EffectiveChat.Id, "强制新的一天~", nil)
 	return err
 }
 
-func WithGroupLockToday(groupId int64, f func(daily *groupStatDaily)) {
+func WithGroupLockToday(groupId int64, f func(daily *GroupStatDaily)) {
 	stat, ok := groupStat.Load(groupId)
 	if !ok {
 		return
@@ -337,6 +337,10 @@ func WithGroupLockToday(groupId int64, f func(daily *groupStatDaily)) {
 	stat.mu.Lock()
 	defer stat.mu.Unlock()
 	f(stat.Today)
+}
+
+func GetGroupStat(groupId int64) (*GroupStatTwoDays, bool) {
+	return groupStat.Load(groupId)
 }
 
 var sendScheduler *gocron.Scheduler
@@ -351,8 +355,8 @@ func saveStat() {
 	if !loadSuccess {
 		return
 	}
-	var tmpGroupStat = make(map[int64]*groupStatTwoDays)
-	groupStat.Range(func(k int64, v *groupStatTwoDays) bool {
+	var tmpGroupStat = make(map[int64]*GroupStatTwoDays)
+	groupStat.Range(func(k int64, v *GroupStatTwoDays) bool {
 		tmpGroupStat[k] = v
 		return true
 	})
@@ -379,7 +383,7 @@ func loadStat() {
 		log.Errorf("load stat failed %s", err)
 		return
 	}
-	var tmpGroupStat = make(map[int64]*groupStatTwoDays)
+	var tmpGroupStat = make(map[int64]*GroupStatTwoDays)
 	d := gob.NewDecoder(fb)
 	err = d.Decode(&tmpGroupStat)
 	if err != nil {
@@ -389,7 +393,7 @@ func loadStat() {
 	for _, v := range tmpGroupStat {
 		v.mu = &sync.Mutex{}
 	}
-	groupStat = xsync.NewMapOf[int64, *groupStatTwoDays]()
+	groupStat = xsync.NewMapOf[int64, *GroupStatTwoDays]()
 	for k, v := range tmpGroupStat {
 		groupStat.Store(k, v)
 	}
