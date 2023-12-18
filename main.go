@@ -98,6 +98,7 @@ func main() {
 	dispatcher.AddCommand("diag_forcenewday", myhandlers.ForceNewDay)
 	dispatcher.AddCommand("diag_getcntbytime", myhandlers.GetCntByTime)
 	dispatcher.AddCommand("searchmsg", myhandlers.SearchMessage)
+	dispatcher.AddHandler(handlers.NewMessage(myhandlers.IsRemindMsg, myhandlers.Remind))
 	dispatcher.AddHandler(handlers.NewMessage(myhandlers.HasSinaGif, myhandlers.Gif2Mp4))
 	dispatcher.AddHandler(handlers.NewCallback(myhandlers.IsBilibiliBtn, myhandlers.DownloadVideoCallback))
 	dispatcher.AddHandler(handlers.NewMessage(myhandlers.HasImage, myhandlers.SeseDetect))
