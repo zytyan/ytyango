@@ -25,7 +25,7 @@ func pow(base, exponent uint64) uint64 {
 	return result
 }
 
-var keyword = regexp.MustCompile(`(https?://)?(b23\.tv/\w+)|((((www|m)\.)?bilibili\.com/(video/)?(av\d+|BV[\da-zA-Z]+))/?\?[\w=&%+._()*$@!^\-]+)`)
+var keyword = regexp.MustCompile(`(https?://)?((b23\.tv/\w+)|((((www|m)\.)?bilibili\.com/(video/)?(av\d+|BV[\da-zA-Z]+))/?\?[\w=&%+._()*$@!^\-]+))`)
 var bv2AvConvKey = map[int32]int{
 	'1': 13, '2': 12, '3': 46, '4': 31, '5': 43, '6': 18,
 	'7': 40, '8': 28, '9': 5, 'A': 54, 'B': 20,
@@ -41,7 +41,7 @@ var bv2AvConvKey = map[int32]int{
 var bvPosExp = []uint64{6, 2, 4, 8, 5, 9, 3, 7, 1, 0}
 var NotBv = errors.New("not a bv str")
 var NoLocation = errors.New("b23 has no location")
-var bv = regexp.MustCompile(`/[Bb][Vv][0-9a-zA-Z]{5,12}`)
+var regexBv = regexp.MustCompile(`/[Bb][Vv][0-9a-zA-Z]{5,12}`)
 var client = &http.Client{
 	CheckRedirect: func(req *http.Request, via []*http.Request) error {
 		return http.ErrUseLastResponse
@@ -73,17 +73,17 @@ func bv2av(bv string) string {
 
 //goland:noinspection GoUnusedExportedFunction
 func Bv2av(bv string) (string, error) {
-	if !strings.HasPrefix(strings.ToLower(bv), "/bv") {
+	if !strings.HasPrefix(strings.ToLower(bv), "/regexBv") {
 		return "", NotBv
 	}
 	return bv2av(bv), nil
 }
 
 var validParams = []string{"p", "start_progress", "t"}
-var BvNotFount = errors.New("bv not found")
+var BvNotFount = errors.New("regexBv not found")
 
 func BvLink2AvLink(link string) (string, error) {
-	index := bv.FindStringIndex(link)
+	index := regexBv.FindStringIndex(link)
 	if index == nil {
 		return "", BvNotFount
 	}
@@ -194,7 +194,7 @@ func (t *TextWithLink) ConvertToAv() (string, error) {
 	}
 	link, err := BvLink2AvLink(*t.Converted)
 	if err != nil {
-		// when bv not found, just return the original link
+		// when regexBv not found, just return the original link
 		return *t.Converted, nil
 	}
 	return link, nil
