@@ -106,11 +106,9 @@ func BiliMsgConverterInline(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
 	if err != nil {
 		return err
 	}
-	av, _ := prepare.ToAv()
 	_, err = ctx.InlineQuery.Answer(bot,
 		[]gotgbot.InlineQueryResult{
 			buildQueryResult("转换后的链接", bv, nil),
-			buildQueryResult("转换后的链接(AV号)", av, nil),
 		}, nil)
 	return err
 }
