@@ -79,7 +79,8 @@ func Bv2av(bv string) (string, error) {
 	return bv2av(bv), nil
 }
 
-var validParams = []string{"p", "start_progress", "t"}
+var validBvParams = []string{"p", "start_progress", "t"}
+var validMallParams = []string{"itemsId"}
 var BvNotFount = errors.New("regexBv not found")
 
 func BvLink2AvLink(link string) (string, error) {
@@ -95,6 +96,17 @@ func BvLink2AvLink(link string) (string, error) {
 	return newLink, nil
 
 }
+
+func paramsFilter(params url.Values, validParams ...string) url.Values {
+	newQuery := make(url.Values)
+	for _, param := range validParams {
+		if params.Has(param) {
+			newQuery.Add(param, params.Get(param))
+		}
+	}
+	return newQuery
+}
+
 func BilibiliCleanParams(biliUrl string) (string, error) {
 	parsedUrl, err := url.Parse(biliUrl)
 	if err != nil {
@@ -103,10 +115,13 @@ func BilibiliCleanParams(biliUrl string) (string, error) {
 	parsedUrl.Scheme = "https"
 	oldQuery := parsedUrl.Query()
 	newQuery := make(url.Values)
-	for _, param := range validParams {
-		if oldQuery.Has(param) {
-			newQuery.Add(param, oldQuery.Get(param))
-		}
+	switch parsedUrl.Host {
+	case "mall.bilibili.com":
+		newQuery = paramsFilter(oldQuery, validMallParams...)
+	case "www.bilibili.com", "bilibili.com":
+		newQuery = paramsFilter(oldQuery, validBvParams...)
+	default:
+		return "", errors.New("unknown host")
 	}
 	parsedUrl.RawQuery = newQuery.Encode()
 	return parsedUrl.String(), nil
@@ -155,7 +170,7 @@ PROCESS:
 	}
 	q := u.Query()
 	for key := range q {
-		if !slices.Contains(validParams, key) {
+		if !slices.Contains(validBvParams, key) {
 			return true
 		}
 	}

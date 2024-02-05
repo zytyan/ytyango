@@ -19,7 +19,17 @@ func TestPure(t *testing.T) {
 	as.True(prepare.NeedConvert())
 	as.Len(prepare, 1)
 }
-
+func TestMall(t *testing.T) {
+	as := require.New(t)
+	text := `https://b23.tv/58xhm9y`
+	prepare, err := ContainsBiliLinkAndTryPrepare(text)
+	as.NoError(err)
+	as.True(prepare.NeedConvert())
+	as.Len(prepare, 1)
+	link, err := prepare.ToBv()
+	as.NoError(err)
+	as.Equal("https://mall.bilibili.com/detail.html?itemsId=10247954", link)
+}
 func TestOneWithComment(t *testing.T) {
 	as := require.New(t)
 	text := `this is a comment https://b23.tv/rg1TQ3N`
