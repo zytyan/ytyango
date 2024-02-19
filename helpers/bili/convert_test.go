@@ -11,6 +11,19 @@ func TestExtractLink(t *testing.T) {
 	indexList := keyword.FindAllStringIndex(text, -1)
 	as.Len(indexList, 1)
 }
+
+func TestExtractHttpLink(t *testing.T) {
+	as := require.New(t)
+
+	text := `http://b23.tv/rg1TQ3N`
+	parsed, err := ContainsBiliLinkAndTryPrepare(text)
+	as.NoError(err)
+	as.True(parsed.NeedConvert())
+	bv, err := parsed.ToBv()
+	as.NoError(err)
+	as.Equal(`https://www.bilibili.com/video/BV1yp4y1M7Mi?p=1`, bv)
+}
+
 func TestPure(t *testing.T) {
 	as := require.New(t)
 	text := `https://b23.tv/rg1TQ3N`

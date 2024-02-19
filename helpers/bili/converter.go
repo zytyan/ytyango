@@ -128,11 +128,14 @@ func BilibiliCleanParams(biliUrl string) (string, error) {
 }
 
 func B23ToBilibili(url string) (string, error) {
+	if strings.EqualFold(url[:7], "http://") {
+		url = "https://" + url[7:]
+	}
 	resp, err := client.Get(url)
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
+	resp.Body.Close()
 	location := resp.Header.Get("Location")
 	if location == "" {
 		return "", NoLocation
