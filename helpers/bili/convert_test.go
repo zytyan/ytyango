@@ -89,3 +89,13 @@ func TestKeyword_FindAllStringIndex(t *testing.T) {
 	as.Equal(0, indexList[0][0])
 	as.Equal(len(text), indexList[0][1])
 }
+func TestLive(t *testing.T) {
+	as := require.New(t)
+	text := `https://b23.tv/pzrrcMj`
+	clean, err := ContainsBiliLinkAndTryPrepare(text)
+	as.NoError(err)
+	bv, err := clean.ToBv()
+	as.NoError(err)
+	as.Equal(`https://live.bilibili.com/22266761`, bv)
+
+}

@@ -121,7 +121,7 @@ func BilibiliCleanParams(biliUrl string) (string, error) {
 	case "www.bilibili.com", "bilibili.com":
 		newQuery = paramsFilter(oldQuery, validBvParams...)
 	default:
-		return "", errors.New("unknown host")
+		newQuery = paramsFilter(oldQuery)
 	}
 	parsedUrl.RawQuery = newQuery.Encode()
 	return parsedUrl.String(), nil
