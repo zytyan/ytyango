@@ -235,6 +235,10 @@ func sendVideo(bot *gotgbot.Bot, ctx *ext.Context, res string, text string) (*go
 
 		ReplyToMessageId:  replyId,
 		SupportsStreaming: true,
+
+		RequestOpts: &gotgbot.RequestOpts{
+			Timeout: time.Hour * 6,
+		},
 	})
 	if err != nil {
 		log.Warnf("send video error %s", err)
@@ -260,6 +264,10 @@ func sendAudio(bot *gotgbot.Bot, ctx *ext.Context, res string, text string) (*go
 		ParseMode: "HTML",
 
 		ReplyToMessageId: replyId,
+
+		RequestOpts: &gotgbot.RequestOpts{
+			Timeout: time.Hour * 6,
+		},
 	})
 	if err != nil {
 		log.Warnf("send audio error %s", err)
