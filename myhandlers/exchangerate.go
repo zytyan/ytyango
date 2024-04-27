@@ -14,12 +14,18 @@ func IsCalcExchangeRate(msg *gotgbot.Message) bool {
 	}
 	return exchange.IsExchangeRateCalc(getTextMsg(msg))
 }
+
+var exchangeAlias = map[string]string{
+	"RMB": "CNY",
+	"NTD": "TWD",
+}
+
 func ExchangeRateCalc(bot *gotgbot.Bot, ctx *ext.Context) error {
 	req, err := exchange.ParseExchangeRate(getText(ctx))
 	if err != nil {
 		return err
 	}
-	rate, err := exchange.GetExchangeRate(req)
+	rate, err := exchange.GetExchangeRateWithAlias(req, exchangeAlias)
 	if err != nil {
 		if errors.Is(err, exchange.NotAValidExchangeReq) {
 			return nil

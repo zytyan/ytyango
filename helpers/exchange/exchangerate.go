@@ -167,6 +167,18 @@ func GetExchangeRate(req Req) (Resp, error) {
 	return e.Exchange(req)
 }
 
+func GetExchangeRateWithAlias(req Req, alias map[string]string) (Resp, error) {
+	aliasedFrom, ok := alias[req.From]
+	if ok {
+		req.From = aliasedFrom
+	}
+	aliasedTo, ok := alias[req.To]
+	if ok {
+		req.To = aliasedTo
+	}
+	return GetExchangeRate(req)
+}
+
 func ParseExchangeRate(text string) (Req, error) {
 	match := exRe.FindStringSubmatch(text)
 	if match == nil {
