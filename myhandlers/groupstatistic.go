@@ -47,7 +47,11 @@ type GroupStatDaily struct {
 	DioBanUserCount int64 `json:"dio_ban_user_count"`
 }
 
+var addNewMsgMutex = &sync.Mutex{}
+
 func (g *GroupStatDaily) addNewMsg(msg *gotgbot.Message) {
+	addNewMsgMutex.Lock()
+	defer addNewMsgMutex.Unlock()
 	g.MessageCount++
 	if g.UserMsgStat == nil {
 		g.UserMsgStat = make(map[int64]*UserMsgStat)

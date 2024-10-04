@@ -13,6 +13,7 @@ import (
 	"main/helpers/ytdlp"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -144,12 +145,7 @@ func parseYtDlKey(url, allText string) (*YtDlKey, error) {
 	log.Debugf("get key: %#v", key)
 	return key, nil
 }
-
-func BuildYtDlKey(ctx *ext.Context) (*YtDlKey, error) {
-	text := getText(ctx)
-	if replyText := getTextMsg(ctx.EffectiveMessage.ReplyToMessage); replyText != "" {
-		text += "\n\n" + getTextMsg(ctx.EffectiveMessage.ReplyToMessage)
-	}
+func buildYtDlKeyFromText(text string) (*YtDlKey, error) {
 	if text == "" {
 		return nil, ErrNoUrl
 	}
@@ -162,6 +158,13 @@ func BuildYtDlKey(ctx *ext.Context) (*YtDlKey, error) {
 		}
 	}
 	return nil, ErrNoUrl
+}
+func BuildYtDlKey(ctx *ext.Context) (*YtDlKey, error) {
+	text := getText(ctx)
+	if replyText := getTextMsg(ctx.EffectiveMessage.ReplyToMessage); replyText != "" {
+		text += "\n\n" + getTextMsg(ctx.EffectiveMessage.ReplyToMessage)
+	}
+	return buildYtDlKeyFromText(text)
 }
 func checkOrAddRecentDownloaded(key *YtDlKey, chatId int64) bool {
 	debounceKey := YtDlDebounceKey{
@@ -281,6 +284,7 @@ func answerCallback(bot *gotgbot.Bot, ctx *ext.Context, text string, alert bool)
 	})
 	return ans, err
 }
+
 func DownloadVideoCallback(bot *gotgbot.Bot, ctx *ext.Context) error {
 	key, err := BuildYtDlKey(ctx)
 	if err != nil {
@@ -316,6 +320,59 @@ func DownloadVideoCallback(bot *gotgbot.Bot, ctx *ext.Context) error {
 	sent, err := sendVideo(bot, ctx, path, "")
 	if err != nil {
 		_, err = bot.SendMessage(ctx.EffectiveChat.Id, "发送视频失败", nil)
+		return err
+	}
+	return saveFileToDb(key, sent)
+}
+
+func DownloadInlinedBv(bot *gotgbot.Bot, ctx *ext.Context) error {
+	uid, err := strconv.ParseInt(ctx.CallbackQuery.Data[len(biliInlineCallbackPrefix):], 16, 64)
+	if err != nil {
+		return err
+	}
+	var result BiliInlineResult
+	tx := globalcfg.GetDb().Model(&BiliInlineResult{}).Where("uid = ?", uid).First(&result)
+	if tx.Error != nil {
+		_, _ = answerCallback(bot, ctx, "没有找到视频链接，可能是数据库问题", true)
+		return tx.Error
+	}
+	key, err := buildYtDlKeyFromText(result.Text)
+	if err != nil {
+		_, err = answerCallback(bot, ctx, "没有找到视频链接", true)
+		return err
+	}
+	chatId := result.ChatId
+	msgId := result.Message
+	if checkOrAddRecentDownloaded(key, chatId) {
+		_, err = answerCallback(bot, ctx, "请勿频繁下载", true)
+		return err
+	}
+	WithGroupLockToday(chatId, func(daily *GroupStatDaily) {
+		daily.DownloadVideoCount++
+	})
+	if db, ok := key.TakeDb(); ok {
+		log.Infof("url:%s, file id:%s, found in cache database", key.Url, db.FileId)
+		_, err = answerCallback(bot, ctx, "下载完成", false)
+		if err != nil {
+			log.Warnf("answer callback query error %s", err)
+		}
+		_, err = bot.SendVideo(chatId, db.FileId, &gotgbot.SendVideoOpts{ReplyToMessageId: msgId})
+		return err
+	}
+	_, err = answerCallback(bot, ctx, "正在下载，请稍等", false)
+	if err != nil {
+		log.Warnf("answer callback query error %s", err)
+	}
+	path, clean, err := key.Download()
+	defer clean()
+	if err != nil {
+		_, err = answerCallback(bot, ctx, "下载失败", true)
+		return err
+	}
+	ctx.EffectiveChat = &gotgbot.Chat{Id: chatId} // hack一下，因为这个函数是在inline query里面调用的，所以没有chat, 但是需要chat id
+	sent, err := sendVideo(bot, ctx, path, "")
+	if err != nil {
+		_, err = answerCallback(bot, ctx, "发送视频失败", true)
 		return err
 	}
 	return saveFileToDb(key, sent)

@@ -66,11 +66,18 @@ func meiliSearch(query SearchQuery) (SearchResult, error) {
 	if err != nil {
 		return result, err
 	}
-	post, err := http.Post(searchUrl, "application/json", bytes.NewReader(data))
+	preparedPost, err := http.NewRequest(http.MethodPost, searchUrl, bytes.NewReader(data))
+	if err != nil {
+		return result, err
+	}
+	preparedPost.Header.Set("Authorization", "Bearer "+globalcfg.GetConfig().MeiliConfig.MasterKey)
+	preparedPost.Header.Set("Content-Type", "application/json")
+	post, err := http.DefaultClient.Do(preparedPost)
 	if err != nil {
 		return result, err
 	}
 	data, _ = io.ReadAll(post.Body)
+	log.Infof("search result %s", data)
 	err = jsoniter.Unmarshal(data, &result)
 	if err != nil {
 		return result, err

@@ -1,16 +1,16 @@
 grammar Calc;
 
 prog
-    : (stat (ENTER|EOF))+
+    : stat (ENTER+ stat)* (ENTER)* EOF
     ;
 
 stat
     : expr
-    | ID '=' expr
     ;
 
 expr
-    : <assoc=right> expr POW expr       # Pow
+    : expr DICE expr       # Dice
+    | <assoc=right> expr POW expr       # Pow
     | expr (MUL|DIV|MOD) expr # MulDivMod
     | expr (ADD|SUB) expr # AddSub
     | number              # Num
@@ -24,8 +24,8 @@ ADD : '+' ;
 SUB : '-' ;
 POW : '^'|'**' ;
 MOD : '%' | 'mod' ;
-
-ID  : [a-zA-Z]+ ;
+DICE: 'd' | 'D' ;
+ID  : ('pi'|'e') ;
 
 INT : [0-9]+;
 FLOAT

@@ -250,6 +250,24 @@ func (c *ContentWithLinks) ToAv() (string, error) {
 	}
 	return strings.Join(buf, ""), nil
 }
+
+var reBvRegex = regexp.MustCompile(`[Bb][Vv][0-9a-zA-Z]{5,12}`)
+
+func (c *ContentWithLinks) FirstBvId() (string, error) {
+	for _, link := range *c {
+		if link.LinkType != NotLink {
+			v, err := link.Convert()
+			if err != nil {
+				return "", err
+			}
+			if reBvRegex.FindString(*v) != "" {
+				return *v, nil
+			}
+		}
+	}
+	return "", errors.New("no Bilibili link")
+}
+
 func ContainsBiliLinkAndTryPrepare(text string) (links ContentWithLinks, err error) {
 	indexList := keyword.FindAllStringIndex(text, -1)
 	if indexList == nil {
