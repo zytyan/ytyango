@@ -5,9 +5,13 @@ import (
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 	"main/helpers/mathparser"
-	"regexp"
+	"math/big"
 	"strings"
 )
+
+func ratToText(r *big.Rat) string {
+	return strings.TrimRight(strings.TrimRight(r.FloatString(4), "0"), ".")
+}
 
 func SolveMath(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
 	text := ctx.Message.Text
@@ -17,7 +21,7 @@ func SolveMath(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
 		_, text = splitCommand(text)
 		force = true
 	}
-	res, err := mathparser.ParseString(text)
+	res, err := mathparser.Evaluate(text)
 	if err != nil {
 		if force {
 			_, _ = ctx.EffectiveMessage.Reply(bot,
@@ -27,7 +31,7 @@ func SolveMath(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
 		return nil
 	}
 	_, _ = ctx.EffectiveMessage.Reply(bot,
-		fmt.Sprintf("%s = %s", text, res.ToText()), nil)
+		fmt.Sprintf("%s = %s", text, ratToText(res)), nil)
 	return
 }
 
@@ -53,16 +57,13 @@ var mathReplacer = func() *strings.Replacer {
 	return replacer
 }()
 
-var mathRe = regexp.MustCompile(`^[a-zA-Z0-9+\-*/^.()]+$`)
-var pureDigestRe = regexp.MustCompile(`(^[0-9\.]+$)|(0x[0-9a-fA-F]+)|pi|e`)
-
 func NeedSolve(msg *gotgbot.Message) bool {
 	if !GetGroupInfo(msg.Chat.Id).AutoCalculate {
 		return false
 	}
 	text := msg.Text
-	if strings.HasPrefix(text, "/") || pureDigestRe.MatchString(text) {
+	if strings.HasPrefix(text, "/") {
 		return false
 	}
-	return mathRe.MatchString(text)
+	return mathparser.FastCheck(text)
 }
