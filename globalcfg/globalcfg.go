@@ -68,6 +68,7 @@ type Config struct {
 	LocalKvDbPath      string        `yaml:"local-kv-db-path"`
 	TmpPath            string        `yaml:"tmp-path"`
 	DatabasePath       string        `yaml:"database-path"`
+	GeminiKey          string        `yaml:"gemini-key"`
 }
 
 var config *Config = nil
