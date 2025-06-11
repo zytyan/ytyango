@@ -1,0 +1,37 @@
+bot-token: "801365684:AAFNzKfvUi3r93jwNqBomKMQLuv_D5XjOH0"
+
+god: 199456161
+my-chats:
+  - -1001471592463
+  - -1001126241898
+  - -1001170816274
+
+mongo-url: mongodb://localhost:27017
+
+content-moderator:
+  endpoint: "https://sese-detect.cognitiveservices.azure.com"
+  api-key: "76f80c707b2c4e2fb08359d58b54fbb7"
+ocr:
+  endpoint: "https://bot-cv.cognitiveservices.azure.com"
+  api-key: '309854db85b14b8081fb32e1ee608965'
+  api-ver: "2023-02-01-preview"
+  language: ""
+  features: "Read"
+
+qr-scan-url: http://localhost:4023
+save-message: true
+tg-api-url: http://localhost:8081
+drop-pending-updates: false
+
+meili-config:
+  base-url: http://localhost:7700
+  index-name: tgmsgs
+  primary-key: mongo_id
+  master-key:
+
+sese:
+  adult-threshold: 0.8
+  racy-threshold: 0.6
+
+log-level: -1
+local-kv-db-path: ./caches.badb

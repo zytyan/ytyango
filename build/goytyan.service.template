@@ -1,0 +1,23 @@
+[Unit]
+Description=Ytyan main bot
+After=network.target
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Slice=memory-limit.slice
+Restart=on-failure
+RestartSec=5s
+Type=simple
+Environment="NO_STDOUT=1"
+Environment="TZ=Asia/Shanghai"
+# 外部挂载的磁盘空间会大一些，但不一定都有
+# Environment="TMPDIR=/mnt/sda/tmp"
+KillSignal=SIGINT
+WorkingDirectory=CUR_PATH/build
+ExecStart=CUR_PATH/ytyan-go
+User=root
+Group=root
+
+[Install]
+WantedBy=multi-user.target
