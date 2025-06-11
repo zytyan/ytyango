@@ -17,7 +17,7 @@ import (
 var getGenAiClient = sync.OnceValues(func() (*genai.Client, error) {
 	ctx := context.Background()
 	client, err := genai.NewClient(ctx, &genai.ClientConfig{
-		APIKey:  "AIzaSyCi5YxmjFhU5dPsytJiN6Sz8af2WKO81Aw",
+		APIKey:  globalcfg.GetConfig().GeminiKey,
 		Backend: genai.BackendGeminiAPI,
 	})
 	if err != nil {
