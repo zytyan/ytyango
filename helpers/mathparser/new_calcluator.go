@@ -33,6 +33,9 @@ const (
 	RPAREN
 	FLOORDIV
 	MOD
+	FACT
+	PERM
+	COMB
 )
 
 // Token holds value or symbol and numeric literal
@@ -51,6 +54,10 @@ var replacer = strings.NewReplacer(
 	"＋", "+", "－", "-",
 	"×", "*", "＊", "*",
 	"÷", "/", "／", "/",
+	"！", "!",
+	"Ａ", "A", "ａ", "a",
+	"Ｃ", "C", "ｃ", "c",
+	"Ｐ", "P", "ｐ", "p",
 )
 
 var e, _ = new(big.Rat).SetString(`2.718281828459`)
@@ -85,7 +92,18 @@ func tokenize(input string) ([]Token, error) {
 				i++
 			}
 			name := string(runes[start:i])
-			tokens = append(tokens, Token{typ: IDENT, str: name})
+			if len(name) == 1 {
+				switch strings.ToLower(name) {
+				case "a", "p":
+					tokens = append(tokens, Token{typ: PERM, str: name})
+				case "c":
+					tokens = append(tokens, Token{typ: COMB, str: name})
+				default:
+					tokens = append(tokens, Token{typ: IDENT, str: name})
+				}
+			} else {
+				tokens = append(tokens, Token{typ: IDENT, str: name})
+			}
 		default:
 			if i+1 < len(runes) {
 				two := string(runes[i : i+2])
@@ -113,6 +131,8 @@ func tokenize(input string) ([]Token, error) {
 				tokens = append(tokens, Token{typ: MOD, str: "%"})
 			case '^':
 				tokens = append(tokens, Token{typ: POW, str: "^"})
+			case '!':
+				tokens = append(tokens, Token{typ: FACT, str: "!"})
 			case '(':
 				tokens = append(tokens, Token{typ: LPAREN, str: "("})
 			case ')':
@@ -137,6 +157,8 @@ func precedence(tok Token) int {
 		return 2
 	case POW:
 		return 3
+	case FACT, PERM, COMB:
+		return 4
 	default:
 		return 0
 	}
@@ -156,7 +178,7 @@ func shuntingYard(tokens []Token) ([]Token, error) {
 		switch tok.typ {
 		case NUMBER, IDENT:
 			output = append(output, tok)
-		case PLUS, MINUS, MUL, DIV, POW, FLOORDIV, MOD:
+		case PLUS, MINUS, MUL, DIV, POW, FLOORDIV, MOD, FACT, PERM, COMB:
 			for len(ops) > 0 {
 				top := ops[len(ops)-1]
 				if (top.typ != LPAREN) && (precedence(top) > precedence(tok) || (precedence(top) == precedence(tok) && !isRightAssociative(tok))) {
@@ -232,7 +254,7 @@ func evalRPN(rpn []Token) (*big.Rat, error) {
 				return nil, fmt.Errorf("unknown identifier: %s", tok.str)
 			}
 			push(r)
-		case PLUS, MINUS, MUL, DIV, POW, FLOORDIV, MOD:
+		case PLUS, MINUS, MUL, DIV, POW, FLOORDIV, MOD, PERM, COMB:
 			// binary ops: pop right then left
 			right, err := pop()
 			if err != nil {
@@ -297,10 +319,55 @@ func evalRPN(rpn []Token) (*big.Rat, error) {
 				}
 				m := new(big.Int).Mod(a, b)
 				res = new(big.Rat).SetInt(m)
+			case PERM:
+				if !left.IsInt() || !right.IsInt() {
+					return nil, fmt.Errorf("permutation requires integers")
+				}
+				n := left.Num().Int64()
+				r := right.Num().Int64()
+				if n < 0 || r < 0 || r > n {
+					return nil, fmt.Errorf("invalid permutation")
+				}
+				if approxPermDigits(n, r) > 8000 {
+					return nil, fmt.Errorf("result too big")
+				}
+				resInt := permInt(n, r)
+				res = new(big.Rat).SetInt(resInt)
+			case COMB:
+				if !left.IsInt() || !right.IsInt() {
+					return nil, fmt.Errorf("combination requires integers")
+				}
+				n := left.Num().Int64()
+				r := right.Num().Int64()
+				if n < 0 || r < 0 || r > n {
+					return nil, fmt.Errorf("invalid combination")
+				}
+				if approxCombDigits(n, r) > 8000 {
+					return nil, fmt.Errorf("result too big")
+				}
+				resInt := combInt(n, r)
+				res = new(big.Rat).SetInt(resInt)
 			default:
 				return nil, fmt.Errorf("unexpected token in shunting yard: %v", tok)
 			}
 			push(res)
+		case FACT:
+			val, err := pop()
+			if err != nil {
+				return nil, err
+			}
+			if !val.IsInt() {
+				return nil, fmt.Errorf("factorial requires integer")
+			}
+			n := val.Num().Int64()
+			if n < 0 {
+				return nil, fmt.Errorf("factorial of negative number")
+			}
+			if approxFactorialDigits(n) > 8000 {
+				return nil, fmt.Errorf("result too big")
+			}
+			resInt := factorialInt(n)
+			push(new(big.Rat).SetInt(resInt))
 		case LPAREN, RPAREN, EOF:
 		// ignore
 		default:
@@ -328,6 +395,52 @@ func powRat(base *big.Rat, exp int) *big.Rat {
 	return res
 }
 
+func factorialInt(n int64) *big.Int {
+	res := big.NewInt(1)
+	for i := int64(2); i <= n; i++ {
+		res.Mul(res, big.NewInt(i))
+	}
+	return res
+}
+
+func approxFactorialDigits(n int64) float64 {
+	lg, _ := math.Lgamma(float64(n) + 1)
+	return lg / math.Ln10
+}
+
+func permInt(n, r int64) *big.Int {
+	res := big.NewInt(1)
+	for i := int64(0); i < r; i++ {
+		res.Mul(res, big.NewInt(n-i))
+	}
+	return res
+}
+
+func approxPermDigits(n, r int64) float64 {
+	lg1, _ := math.Lgamma(float64(n) + 1)
+	lg2, _ := math.Lgamma(float64(n-r) + 1)
+	return (lg1 - lg2) / math.Ln10
+}
+
+func combInt(n, r int64) *big.Int {
+	if r > n-r {
+		r = n - r
+	}
+	res := big.NewInt(1)
+	for i := int64(1); i <= r; i++ {
+		res.Mul(res, big.NewInt(n-r+i))
+		res.Div(res, big.NewInt(i))
+	}
+	return res
+}
+
+func approxCombDigits(n, r int64) float64 {
+	lg1, _ := math.Lgamma(float64(n) + 1)
+	lg2, _ := math.Lgamma(float64(r) + 1)
+	lg3, _ := math.Lgamma(float64(n-r) + 1)
+	return (lg1 - lg2 - lg3) / math.Ln10
+}
+
 // Evaluate takes an expression string, tokenizes, parses, and evaluates to big.Rat
 
 func Evaluate(expr string) (*big.Rat, error) {
@@ -342,7 +455,7 @@ func Evaluate(expr string) (*big.Rat, error) {
 	return evalRPN(rpn)
 }
 
-var reFastCheck = regexp.MustCompile(`^[ \depi（(）)＋+－\-×*＊÷/／.]+$`)
+var reFastCheck = regexp.MustCompile(`^[ \depiacpACP（(）)＋+－\-×*＊÷/／.!]+$`)
 
 func FastCheck(expr string) bool {
 	for _, c := range expr {
