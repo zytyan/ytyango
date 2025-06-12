@@ -9,7 +9,7 @@ import (
 )
 
 /*
-bot-token: "***REMOVED***"
+bot-token: "TEST_BOT_TOKEN"
 
 god: 199456161
 my-chats:
@@ -21,10 +21,10 @@ mongo-url: ***REMOVED***
 
 content-Moderator:
   endpoint: "https://sese-detect.cognitiveservices.azure.com"
-  api-key: "***REMOVED***"
+  api-key: "TEST_MODERATOR_KEY"
 Ocr:
   endpoint: "https://bot-cv.cognitiveservices.azure.com"
-  api-key: '***REMOVED***'
+  api-key: 'TEST_OCR_KEY'
   api-ver: "2023-02-01-preview"
   language: ""
   features: ""
@@ -52,12 +52,12 @@ func TestGetConfig(t *testing.T) {
 	as := require.New(t)
 	config := GetConfig()
 	as.True(config != nil)
-	as.Equal(config.BotToken, "***REMOVED***")
+	as.Equal(config.BotToken, "TEST_BOT_TOKEN")
 	as.Equal(config.God, int64(199456161))
 	as.Equal(config.ContentModerator.Endpoint, "https://sese-detect.cognitiveservices.azure.com")
-	as.Equal(config.ContentModerator.ApiKey, "***REMOVED***")
+	as.Equal(config.ContentModerator.ApiKey, "TEST_MODERATOR_KEY")
 	as.Equal(config.Ocr.Endpoint, "https://bot-cv.cognitiveservices.azure.com")
-	as.Equal(config.Ocr.ApiKey, "***REMOVED***")
+	as.Equal(config.Ocr.ApiKey, "TEST_OCR_KEY")
 	as.Equal(config.Ocr.ApiVer, "2023-02-01-preview")
 	as.Equal(config.Ocr.Language, "")
 	as.Equal(config.Ocr.Features, "")
