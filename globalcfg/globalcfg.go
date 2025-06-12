@@ -141,7 +141,11 @@ func GetLogger(name string) *zap.SugaredLogger {
 		return logger.Logger
 	}
 	lvl := zap.NewAtomicLevel()
-	lvl.SetLevel(zapcore.Level(GetConfig().LogLevel))
+	if testing {
+		lvl.SetLevel(zap.DebugLevel)
+	} else {
+		lvl.SetLevel(zapcore.Level(GetConfig().LogLevel))
+	}
 	core := zapcore.NewCore(
 		zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig()),
 		gWriteSyncer,
