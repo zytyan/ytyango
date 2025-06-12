@@ -1,6 +1,6 @@
 module main
 
-go 1.23
+go 1.23.0
 
 toolchain go1.23.2
 
@@ -20,7 +20,7 @@ require (
 	github.com/rivo/uniseg v0.4.4
 	github.com/stretchr/testify v1.10.0
 	go.uber.org/zap v1.26.0
-	golang.org/x/text v0.21.0
+	golang.org/x/text v0.23.0
 	golang.org/x/time v0.6.0
 	google.golang.org/genai v1.6.0
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
@@ -68,10 +68,10 @@ require (
 	go.uber.org/atomic v1.9.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/arch v0.5.0 // indirect
-	golang.org/x/crypto v0.27.0 // indirect
+	golang.org/x/crypto v0.36.0 // indirect
 	golang.org/x/image v0.13.0 // indirect
-	golang.org/x/net v0.29.0 // indirect
-	golang.org/x/sys v0.25.0 // indirect
+	golang.org/x/net v0.38.0 // indirect
+	golang.org/x/sys v0.31.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240903143218-8af14fe29dc1 // indirect
 	google.golang.org/grpc v1.66.2 // indirect
 	google.golang.org/protobuf v1.34.2 // indirect

@@ -1,13 +1,14 @@
 package bili
 
 import (
+	"fmt"
 	"github.com/stretchr/testify/require"
 	"testing"
 )
 
 var testB23Link = `https://b23.tv/azH0KMi`
 var testBili2233Link = `https://bili2233.cn/azH0KMi`
-var testMallB23Link = `https://b23.tv/58xhm9y`
+var testMallB23Link = `https://b23.tv/S62FYLs`
 
 func TestAvToBv(t *testing.T) {
 	as := require.New(t)
@@ -49,11 +50,12 @@ func TestMall(t *testing.T) {
 	as := require.New(t)
 	prepare, err := ConvertBilibiliLinks(testMallB23Link)
 	as.NoError(err)
+	fmt.Println(prepare)
 	as.True(prepare.CanConvert())
 
 	as.True(prepare.HasBv)
 	as.False(prepare.HasAv)
-	as.Equal("https://mall.bilibili.com/detail.html?itemsId=10247954", prepare.BvText)
+	as.Equal("https://mall.bilibili.com/detail.html?itemsId=10664158", prepare.BvText)
 }
 
 func TestOneWithComment(t *testing.T) {
