@@ -97,4 +97,29 @@ func TestEvaluate(t *testing.T) {
 	as.NoError(err)
 	as.Equal(big.NewRat(942477, 100000).Cmp(res), -1)
 	as.Equal(big.NewRat(942480, 100000).Cmp(res), 1)
+
+	expr = "5!"
+	res, err = Evaluate(expr)
+	as.NoError(err)
+	as.Equal(big.NewRat(120, 1), res)
+
+	expr = "10P3"
+	res, err = Evaluate(expr)
+	as.NoError(err)
+	as.Equal(big.NewRat(720, 1), res)
+
+	expr = "10C3"
+	res, err = Evaluate(expr)
+	as.NoError(err)
+	as.Equal(big.NewRat(120, 1), res)
+
+	expr = "5！"
+	res, err = Evaluate(expr)
+	as.NoError(err)
+	as.Equal(big.NewRat(120, 1), res)
+
+	expr = "10Ａ3"
+	res, err = Evaluate(expr)
+	as.NoError(err)
+	as.Equal(big.NewRat(720, 1), res)
 }
