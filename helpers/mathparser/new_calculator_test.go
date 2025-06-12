@@ -123,3 +123,49 @@ func TestEvaluate(t *testing.T) {
 	as.NoError(err)
 	as.Equal(big.NewRat(720, 1), res)
 }
+
+func TestTokenizeErrors(t *testing.T) {
+	as := require.New(t)
+
+	_, err := tokenize("1.2.3")
+	as.Error(err)
+	ce, ok := err.(*CalcError)
+	as.True(ok)
+	as.Equal(ErrorInvalidNumber, ce.Typ)
+	as.Equal(0, ce.pos)
+
+	_, err = tokenize("1$2")
+	as.Error(err)
+	ce, ok = err.(*CalcError)
+	as.True(ok)
+	as.Equal(ErrorUnknownCharacter, ce.Typ)
+	as.Equal(1, ce.pos)
+}
+
+func TestEvaluateErrors(t *testing.T) {
+	as := require.New(t)
+
+	_, err := Evaluate("1+(2")
+	as.Error(err)
+	ce, ok := err.(*CalcError)
+	as.True(ok)
+	as.Equal(ErrorMismatchedParentheses, ce.Typ)
+
+	_, err = Evaluate("foo")
+	as.Error(err)
+	ce, ok = err.(*CalcError)
+	as.True(ok)
+	as.Equal(ErrorUnknownIdentifier, ce.Typ)
+
+	_, err = Evaluate("1/0")
+	as.Error(err)
+	ce, ok = err.(*CalcError)
+	as.True(ok)
+	as.Equal(ErrorDivisionByZero, ce.Typ)
+
+	_, err = Evaluate("1.1 % 2")
+	as.Error(err)
+	ce, ok = err.(*CalcError)
+	as.True(ok)
+	as.Equal(ErrorModuloRequiresInt, ce.Typ)
+}

@@ -3,7 +3,6 @@ package mathparser
 // LL(1) Calculator with big.Rat support, Unicode tokens, and structured tokens
 
 import (
-	"fmt"
 	"math"
 	"math/big"
 	"regexp"
@@ -83,7 +82,7 @@ func tokenize(input string) ([]Token, error) {
 			raw := string(runes[start:i])
 			r := new(big.Rat)
 			if _, ok := r.SetString(raw); !ok {
-				return nil, fmt.Errorf("invalid number: %s", raw)
+				return nil, errorAt(start, ErrorInvalidNumber, "invalid number: %s", raw)
 			}
 			tokens = append(tokens, Token{typ: NUMBER, num: r})
 		case unicode.IsLetter(c):
@@ -138,7 +137,7 @@ func tokenize(input string) ([]Token, error) {
 			case ')':
 				tokens = append(tokens, Token{typ: RPAREN, str: ")"})
 			default:
-				return nil, fmt.Errorf("unknown character: %q at %d", c, i)
+				return nil, errorAt(i, ErrorUnknownCharacter, "unknown character: %q at %d", c, i)
 			}
 			i++
 		}
@@ -203,19 +202,19 @@ func shuntingYard(tokens []Token) ([]Token, error) {
 				output = append(output, top)
 			}
 			if !found {
-				return nil, fmt.Errorf("mismatched parentheses")
+				return nil, errorAt(-1, ErrorMismatchedParentheses, "mismatched parentheses")
 			}
 		case EOF:
 			break
 		default:
-			return nil, fmt.Errorf("unexpected token in shunting yard: %v", tok)
+			return nil, errorAt(-1, ErrorUnexpectedToken, "unexpected token in shunting yard: %v", tok)
 		}
 	}
 	for len(ops) > 0 {
 		top := ops[len(ops)-1]
 		ops = ops[:len(ops)-1]
 		if top.typ == LPAREN || top.typ == RPAREN {
-			return nil, fmt.Errorf("mismatched parentheses")
+			return nil, errorAt(-1, ErrorMismatchedParentheses, "mismatched parentheses")
 		}
 		output = append(output, top)
 	}
@@ -232,7 +231,7 @@ func evalRPN(rpn []Token) (*big.Rat, error) {
 	}
 	pop := func() (*big.Rat, error) {
 		if len(stack) < 1 {
-			return nil, fmt.Errorf("stack underflow")
+			return nil, errorAt(-1, ErrorStackUnderflow, "stack underflow")
 		}
 		r := stack[len(stack)-1]
 		stack = stack[:len(stack)-1]
@@ -251,7 +250,7 @@ func evalRPN(rpn []Token) (*big.Rat, error) {
 			case "e":
 				r = e
 			default:
-				return nil, fmt.Errorf("unknown identifier: %s", tok.str)
+				return nil, errorAt(-1, ErrorUnknownIdentifier, "unknown identifier: %s", tok.str)
 			}
 			push(r)
 		case PLUS, MINUS, MUL, DIV, POW, FLOORDIV, MOD, PERM, COMB:
@@ -274,7 +273,7 @@ func evalRPN(rpn []Token) (*big.Rat, error) {
 				res = new(big.Rat).Mul(left, right)
 			case DIV:
 				if right.Cmp(new(big.Rat)) == 0 {
-					return nil, fmt.Errorf("division by zero")
+					return nil, errorAt(-1, ErrorDivisionByZero, "division by zero")
 				}
 				res = new(big.Rat).Quo(left, right)
 			case POW:
@@ -282,21 +281,21 @@ func evalRPN(rpn []Token) (*big.Rat, error) {
 				exp, _ := right.Float64()
 				base, _ := left.Float64()
 				if math.IsInf(exp, 0) {
-					return nil, fmt.Errorf("infinite exponent")
+					return nil, errorAt(-1, ErrorInfiniteResult, "infinite exponent")
 				}
 				if math.IsInf(base, 0) {
-					return nil, fmt.Errorf("infinite base number")
+					return nil, errorAt(-1, ErrorInfiniteResult, "infinite base number")
 				}
 				if !right.IsInt() {
 					floatRet := math.Pow(base, exp)
 					if math.IsInf(floatRet, 0) || math.IsNaN(floatRet) {
-						return nil, fmt.Errorf("infinite float")
+						return nil, errorAt(-1, ErrorInfiniteResult, "infinite float")
 					}
 					res = new(big.Rat).SetFloat64(floatRet)
 					break
 				}
 				if math.Log10(base)*exp > 3000 {
-					return nil, fmt.Errorf("result too big")
+					return nil, errorAt(-1, ErrorResultTooBig, "result too big")
 				}
 				res = powRat(left, int(exp))
 			case FLOORDIV:
@@ -304,51 +303,51 @@ func evalRPN(rpn []Token) (*big.Rat, error) {
 				n := new(big.Int).Mul(left.Num(), right.Denom())
 				d := new(big.Int).Mul(left.Denom(), right.Num())
 				if d.Sign() == 0 {
-					return nil, fmt.Errorf("floor division by zero")
+					return nil, errorAt(-1, ErrorDivisionByZero, "floor division by zero")
 				}
 				quo := new(big.Int).Div(n, d)
 				res = new(big.Rat).SetInt(quo)
 			case MOD:
 				if !left.IsInt() || !right.IsInt() {
-					return nil, fmt.Errorf("modulo requires integers")
+					return nil, errorAt(-1, ErrorModuloRequiresInt, "modulo requires integers")
 				}
 				a := left.Num()
 				b := right.Num()
 				if b.Sign() == 0 {
-					return nil, fmt.Errorf("mod by zero")
+					return nil, errorAt(-1, ErrorModByZero, "mod by zero")
 				}
 				m := new(big.Int).Mod(a, b)
 				res = new(big.Rat).SetInt(m)
 			case PERM:
 				if !left.IsInt() || !right.IsInt() {
-					return nil, fmt.Errorf("permutation requires integers")
+					return nil, errorAt(-1, ErrorPermutationRequiresInt, "permutation requires integers")
 				}
 				n := left.Num().Int64()
 				r := right.Num().Int64()
 				if n < 0 || r < 0 || r > n {
-					return nil, fmt.Errorf("invalid permutation")
+					return nil, errorAt(-1, ErrorInvalidPermutation, "invalid permutation")
 				}
 				if approxPermDigits(n, r) > 8000 {
-					return nil, fmt.Errorf("result too big")
+					return nil, errorAt(-1, ErrorResultTooBig, "result too big")
 				}
 				resInt := permInt(n, r)
 				res = new(big.Rat).SetInt(resInt)
 			case COMB:
 				if !left.IsInt() || !right.IsInt() {
-					return nil, fmt.Errorf("combination requires integers")
+					return nil, errorAt(-1, ErrorCombinationRequiresInt, "combination requires integers")
 				}
 				n := left.Num().Int64()
 				r := right.Num().Int64()
 				if n < 0 || r < 0 || r > n {
-					return nil, fmt.Errorf("invalid combination")
+					return nil, errorAt(-1, ErrorInvalidCombination, "invalid combination")
 				}
 				if approxCombDigits(n, r) > 8000 {
-					return nil, fmt.Errorf("result too big")
+					return nil, errorAt(-1, ErrorResultTooBig, "result too big")
 				}
 				resInt := combInt(n, r)
 				res = new(big.Rat).SetInt(resInt)
 			default:
-				return nil, fmt.Errorf("unexpected token in shunting yard: %v", tok)
+				return nil, errorAt(-1, ErrorUnexpectedToken, "unexpected token in shunting yard: %v", tok)
 			}
 			push(res)
 		case FACT:
@@ -357,25 +356,25 @@ func evalRPN(rpn []Token) (*big.Rat, error) {
 				return nil, err
 			}
 			if !val.IsInt() {
-				return nil, fmt.Errorf("factorial requires integer")
+				return nil, errorAt(-1, ErrorFactorialRequiresInt, "factorial requires integer")
 			}
 			n := val.Num().Int64()
 			if n < 0 {
-				return nil, fmt.Errorf("factorial of negative number")
+				return nil, errorAt(-1, ErrorFactorialNegative, "factorial of negative number")
 			}
 			if approxFactorialDigits(n) > 8000 {
-				return nil, fmt.Errorf("result too big")
+				return nil, errorAt(-1, ErrorResultTooBig, "result too big")
 			}
 			resInt := factorialInt(n)
 			push(new(big.Rat).SetInt(resInt))
 		case LPAREN, RPAREN, EOF:
 		// ignore
 		default:
-			return nil, fmt.Errorf("unexpected token in eval: %v", tok)
+			return nil, errorAt(-1, ErrorUnexpectedToken, "unexpected token in eval: %v", tok)
 		}
 	}
 	if len(stack) != 1 {
-		return nil, fmt.Errorf("invalid expression, stack has %d elements", len(stack))
+		return nil, errorAt(-1, ErrorInvalidExpression, "invalid expression, stack has %d elements", len(stack))
 	}
 	return stack[0], nil
 }
