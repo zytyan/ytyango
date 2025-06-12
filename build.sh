@@ -2,7 +2,7 @@
 set -e
 
 function compile_and_restart() {
-    cd ..
+    mkdir build -p
     go get
     go build -ldflags "-X \"main.compileTime=$(date '+%Y-%m-%d %H:%M:%S')\"" -tags=jsoniter -o ./build/ytyan-go
     echo "Compile done at"  "$(date '+%Y-%m-%d %H:%M:%S')"

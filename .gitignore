@@ -1,6 +1,4 @@
 /.idea
 /.vscode
-main.exe
-build/*
-!build/build.sh
-!build/goytyan.service.template
+/main.exe
+/build/*
