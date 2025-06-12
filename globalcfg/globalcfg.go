@@ -11,11 +11,8 @@ import (
 	"main/helpers/azure"
 	"moul.io/zapgorm2"
 	"os"
-	"path/filepath"
 	"sync"
 )
-
-var testing = false
 
 type Azure struct {
 	Endpoint string `yaml:"endpoint"`
@@ -73,20 +70,24 @@ type Config struct {
 	GeminiKey          string        `yaml:"gemini-key"`
 }
 
-var config *Config = nil
 var Ocr *azure.Ocr = nil
 var Moderator *azure.Moderator = nil
 var loggers = make(map[string]LoggerWithLevel)
 var globalMu sync.Mutex
 
-func LoadConfig(path string) error {
-	data, err := os.ReadFile(path)
+var GetConfig = sync.OnceValue[*Config](func() *Config {
+	var config Config
+	configFile, exists := os.LookupEnv("GOYTYAN_CONFIG")
+	if !exists {
+		return &config
+	}
+	data, err := os.ReadFile(configFile)
 	if err != nil {
-		return err
+		panic(err)
 	}
 	err = yaml.Unmarshal(data, &config)
 	if err != nil {
-		return err
+		panic(err)
 	}
 	Ocr = &azure.Ocr{
 		Client:   *azure.NewClient(config.Ocr.Endpoint, config.Ocr.ApiKey, azure.OcrPath),
@@ -97,35 +98,26 @@ func LoadConfig(path string) error {
 	Moderator = &azure.Moderator{
 		Client: *azure.NewClient(config.ContentModerator.Endpoint, config.ContentModerator.ApiKey, azure.ContentModeratorPath),
 	}
-	return nil
-}
-func GetConfig() *Config {
-	// safe: 初始化会在init内部，不会有并发问题
-	return config
-}
+	return &config
+})
 
 var gWriteSyncer = sync.OnceValue(func() zapcore.WriteSyncer {
-	var err error
-	logfile, exists := os.LookupEnv("LOG_FILE")
+	logfile, exists := os.LookupEnv("GOYTYAN_LOG_FILE")
 	if !exists {
-		logfile, err = filepath.Abs("logs/log.log")
-		if err != nil {
-			panic(err)
-		}
+		return zapcore.AddSync(os.Stderr)
 	}
 	w := zapcore.AddSync(&lumberjack.Logger{
 		Filename:   logfile,
-		MaxSize:    100, // megabytes
+		MaxSize:    1, // megabytes
 		MaxBackups: 10,
 		MaxAge:     100, // days
 		Compress:   true,
 		LocalTime:  true,
 	})
-	_, noStdout := os.LookupEnv("NO_STDOUT")
+	_, noStdout := os.LookupEnv("GOYTYAN_NO_STDOUT")
 	if !noStdout {
 		w = zapcore.NewMultiWriteSyncer(w, zapcore.AddSync(os.Stdout))
 	}
-
 	return w
 })()
 
@@ -141,11 +133,7 @@ func GetLogger(name string) *zap.SugaredLogger {
 		return logger.Logger
 	}
 	lvl := zap.NewAtomicLevel()
-	if testing {
-		lvl.SetLevel(zap.DebugLevel)
-	} else {
-		lvl.SetLevel(zapcore.Level(GetConfig().LogLevel))
-	}
+	lvl.SetLevel(zapcore.Level(GetConfig().LogLevel))
 	core := zapcore.NewCore(
 		zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig()),
 		gWriteSyncer,
@@ -166,37 +154,16 @@ func GetAllLoggers() map[string]LoggerWithLevel {
 	return loggers
 }
 
-func init() {
-	if !testing {
-		return
-	}
-	path, exists := os.LookupEnv("CONFIG_PATH")
-	if !exists {
-		path = "config.yaml"
-	}
-	err := LoadConfig(path)
-	if err != nil {
-		panic(err)
-	}
-	initDB()
-}
-
-var db *gorm.DB
-
-func initDB() {
+var GetDb = sync.OnceValue(func() *gorm.DB {
 	var err error
 	newLogger := zapgorm2.New(GetLogger("gorm").Desugar())
 	newLogger.IgnoreRecordNotFoundError = true
-	db, err = gorm.Open(sqlite.Open(config.DatabasePath), &gorm.Config{
-		Logger: newLogger,
-
+	db, err := gorm.Open(sqlite.Open(GetConfig().DatabasePath), &gorm.Config{
+		Logger:                                   newLogger,
 		DisableForeignKeyConstraintWhenMigrating: false,
 	})
 	if err != nil {
 		panic(err)
 	}
-}
-
-func GetDb() *gorm.DB {
 	return db
-}
+})
