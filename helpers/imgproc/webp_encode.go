@@ -10,6 +10,8 @@ import (
 	"os"
 )
 
+const webpEnabled = true
+
 func encodeToWebp(img image.Image, file string) error {
 	if img == nil {
 		return errors.New("nil image")

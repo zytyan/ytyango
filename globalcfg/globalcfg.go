@@ -15,6 +15,8 @@ import (
 	"sync"
 )
 
+var testing = false
+
 type Azure struct {
 	Endpoint string `yaml:"endpoint"`
 	ApiKey   string `yaml:"api-key"`
@@ -161,6 +163,9 @@ func GetAllLoggers() map[string]LoggerWithLevel {
 }
 
 func init() {
+	if !testing {
+		return
+	}
 	path, exists := os.LookupEnv("CONFIG_PATH")
 	if !exists {
 		path = "config.yaml"
