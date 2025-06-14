@@ -22,7 +22,7 @@ var getSakabanImage = sync.OnceValue(func() *image.NRGBA {
 	return img.(*image.NRGBA)
 })
 
-var reSacabambaspis = regexp.MustCompile(`^((萨卡|saca|saka|さか|サカ)|(班|bam|ban|ばん|バン)|(甲|basu?|ばす|バス)|(鱼|pisu?|ぴす|ピス))+$`)
+var reSacabambaspis = regexp.MustCompile(`^((萨卡|薩卡|saca|saka|さか|サカ)|(班|bam|ban|ばん|バン)|(甲|basu?|ばす|バス)|(鱼|魚|pisu?|ぴす|ピス))+$`)
 
 func MatchSacabambaspis(text string) bool {
 	return reSacabambaspis.MatchString(text)
@@ -44,8 +44,8 @@ type sacaMap struct {
 
 var sacaToEnum = []sacaMap{
 	// saca
-	{"萨卡", saca}, {"saca", saca}, {"saka", saca},
-	{"さか", saca}, {"サカ", saca},
+	{"萨卡", saca}, {"萨卡", saca}, {"saca", saca},
+	{"saka", saca}, {"さか", saca}, {"サカ", saca},
 	// bam
 	{"班", bam}, {"bam", bam}, {"ban", bam},
 	{"ばん", bam}, {"バン", bam},
@@ -53,8 +53,8 @@ var sacaToEnum = []sacaMap{
 	{"甲", bas}, {"basu", bas}, {"bas", bas},
 	{"ばす", bas}, {"バス", bas},
 	// pis
-	{"鱼", pis}, {"pisu", pis}, {"pis", pis},
-	{"ぴす", pis}, {"ピス", pis},
+	{"鱼", pis}, {"魚", pis}, {"pisu", pis},
+	{"pis", pis}, {"ぴす", pis}, {"ピス", pis},
 }
 
 func strToSacabamList(text string) []sacabamType {
