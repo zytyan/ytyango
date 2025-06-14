@@ -73,6 +73,9 @@ func strToSacabamList(text string) []sacabamType {
 			// 无法识别，终止
 			return nil
 		}
+		if len(result) > 20 {
+			return nil
+		}
 	}
 	return result
 }
