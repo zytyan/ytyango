@@ -128,6 +128,7 @@ func main() {
 	dispatcher.AddHandler(handlers.NewMessage(myhandlers.IsSetDndAttr, myhandlers.SetDndAttr))
 	dispatcher.AddHandler(handlers.NewMessage(myhandlers.IsRequiredRacy, myhandlers.SendRandRacy))
 	dispatcher.AddHandler(handlers.NewMessage(myhandlers.IsRequiredAdult, myhandlers.SendRandAdult))
+	dispatcher.AddHandler(handlers.NewMessage(myhandlers.IsSacabam, myhandlers.GenSacabam))
 	dispatcher.AddHandler(handlers.NewCallback(myhandlers.IsStopBattle, myhandlers.StopBattle))
 	dispatcher.AddHandler(handlers.NewCallback(myhandlers.IsNextRound, myhandlers.NextRound))
 	dispatcher.AddHandler(handlers.NewMessage(myhandlers.IsBattleCommand, myhandlers.ExecuteBattleCommand))
