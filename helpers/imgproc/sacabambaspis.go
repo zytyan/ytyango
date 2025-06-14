@@ -57,6 +57,8 @@ var sacaToEnum = []sacaMap{
 	{"pis", pis}, {"ぴす", pis}, {"ピス", pis},
 }
 
+const maxSacaListLen = 50
+
 func strToSacabamList(text string) []sacabamType {
 	var result []sacabamType
 	for len(text) > 0 {
@@ -73,7 +75,7 @@ func strToSacabamList(text string) []sacabamType {
 			// 无法识别，终止
 			return nil
 		}
-		if len(result) > 20 {
+		if len(result) > maxSacaListLen {
 			return nil
 		}
 	}
