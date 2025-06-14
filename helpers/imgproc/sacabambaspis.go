@@ -3,6 +3,7 @@ package imgproc
 import (
 	"bytes"
 	_ "embed"
+	"errors"
 	"fmt"
 	"github.com/disintegration/imaging"
 	"image"
@@ -57,9 +58,19 @@ var sacaToEnum = []sacaMap{
 	{"pis", pis}, {"ぴす", pis}, {"ピス", pis},
 }
 
-const maxSacaListLen = 50
+const maxSacaListLen = 100
 
-func strToSacabamList(text string) []sacabamType {
+var ErrNoSacaList = errors.New("no saca list")
+
+type ErrTooLongSacaList struct {
+	Limit int
+	Len   int
+}
+
+func (e *ErrTooLongSacaList) Error() string {
+	return fmt.Sprintf("saca list too long, %d > %d", e.Len, e.Limit)
+}
+func strToSacabamList(text string) ([]sacabamType, error) {
 	var result []sacabamType
 	for len(text) > 0 {
 		matched := false
@@ -73,13 +84,13 @@ func strToSacabamList(text string) []sacabamType {
 		}
 		if !matched {
 			// 无法识别，终止
-			return nil
+			return nil, ErrNoSacaList
 		}
 		if len(result) > maxSacaListLen {
-			return nil
+			return nil, &ErrTooLongSacaList{Limit: maxSacaListLen, Len: len(result)}
 		}
 	}
-	return result
+	return result, nil
 }
 
 var sacabamBgColor = color.RGBA{R: 254, G: 143, B: 0, A: 255}
@@ -107,10 +118,10 @@ func getSacaSubImgByType(typ sacabamType) *image.NRGBA {
 	return getSakabanImage().SubImage(getSacaRectByType(typ)).(*image.NRGBA)
 }
 
-func GenSacaImage(text string) *image.NRGBA {
-	sacaList := strToSacabamList(text)
-	if len(sacaList) == 0 {
-		return nil
+func GenSacaImage(text string) (*image.NRGBA, error) {
+	sacaList, err := strToSacabamList(text)
+	if len(sacaList) == 0 || err != nil {
+		return nil, err
 	}
 	posList := make([]int, 0, len(sacaList))
 	posList = append(posList, 0)
@@ -146,5 +157,5 @@ func GenSacaImage(text string) *image.NRGBA {
 		subImg := getSacaSubImgByType(sacaList[i])
 		img = imaging.Overlay(img, subImg, image.Point{X: baseX + pos, Y: 0}, 1.0)
 	}
-	return img
+	return img, nil
 }
