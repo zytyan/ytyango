@@ -22,7 +22,7 @@ function build() {
 
     [[ "$no_pull" -eq 0 ]] && {
         echo "🔃 Pulling git repo..."
-        if [[ "$dry_run" -eq 1 ]]; then
+        if [[ "$dry_run" -eq 0 ]]; then
             git clean -fd
         else
             git clean -fdn
