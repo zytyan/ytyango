@@ -71,7 +71,7 @@ func (c *Req) args() []string {
 		filepath.Join(c.tmpPath, "%(title).150B.%(ext)s"),
 		"--quiet",
 		"--print", "after_move:%(filepath)j",
-		//"--format", `bestvideo[ext=mp4]+bestaudio[ext=m4a]/best`,
+		"--format", `bestvideo+bestaudio/best`,
 		"--windows-filenames",
 	}
 	if c.WriteInfoJson {
