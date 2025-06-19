@@ -9,6 +9,7 @@ import (
 	"image"
 	"image/color"
 	"regexp"
+	"strings"
 	"sync"
 )
 
@@ -23,7 +24,7 @@ var getSakabanImage = sync.OnceValue(func() *image.NRGBA {
 	return img.(*image.NRGBA)
 })
 
-var reSacabambaspis = regexp.MustCompile(`^((萨卡|薩卡|saca|saka|さか|サカ)|(班|bam|ban|ばん|バン)|(甲|basu?|ばす|バス)|(鱼|魚|pisu?|ぴす|ピス))+$`)
+var reSacabambaspis = regexp.MustCompile(`(?i)^((萨卡|薩卡|saca|saka|さか|サカ)|(班|bam|ban|ばん|バン)|(甲|basu?|ばす|バス)|(鱼|魚|pisu?|ぴす|ピス))+$`)
 
 func MatchSacabambaspis(text string) bool {
 	return reSacabambaspis.MatchString(text)
@@ -45,7 +46,7 @@ type sacaMap struct {
 
 var sacaToEnum = []sacaMap{
 	// saca
-	{"萨卡", saca}, {"萨卡", saca}, {"saca", saca},
+	{"萨卡", saca}, {"薩卡", saca}, {"saca", saca},
 	{"saka", saca}, {"さか", saca}, {"サカ", saca},
 	// bam
 	{"班", bam}, {"bam", bam}, {"ban", bam},
@@ -72,6 +73,7 @@ func (e *ErrTooLongSacaList) Error() string {
 }
 func strToSacabamList(text string) ([]sacabamType, error) {
 	var result []sacabamType
+	text = strings.ToLower(text)
 	for len(text) > 0 {
 		matched := false
 		for _, mapping := range sacaToEnum {
@@ -86,9 +88,9 @@ func strToSacabamList(text string) ([]sacabamType, error) {
 			// 无法识别，终止
 			return nil, ErrNoSacaList
 		}
-		if len(result) > maxSacaListLen {
-			return nil, &ErrTooLongSacaList{Limit: maxSacaListLen, Len: len(result)}
-		}
+	}
+	if len(result) > maxSacaListLen {
+		return nil, &ErrTooLongSacaList{Limit: maxSacaListLen, Len: len(result)}
 	}
 	return result, nil
 }
