@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -19,11 +20,17 @@ type RunError struct {
 	Err      error
 	Stdout   string
 	Stderr   string
+	Args     []string
 	ExitCode int
 }
 
 func (e *RunError) Error() string {
-	return fmt.Sprintf("%s\nstderr=%s\nstdout=%s", e.Err, e.Stderr, e.Stdout)
+	argList := make([]string, 0, len(e.Args))
+	for _, arg := range e.Args {
+		argList = append(argList, strconv.Quote(arg))
+	}
+	args := strings.Join(argList, " ")
+	return fmt.Sprintf("%s\nstderr=%s\nstdout=%s\nargs=%s", e.Err, e.Stderr, e.Stdout, args)
 }
 
 type Req struct {
@@ -123,6 +130,7 @@ func (c *Req) runWithCtx(ctx context.Context) (resp *Resp, err error) {
 			Stdout:   outBuf.String(),
 			Stderr:   errBuf.String(),
 			ExitCode: exitErr.ExitCode(),
+			Args:     args,
 		}
 	}
 	err = jsoniter.Unmarshal(outBuf.Bytes(), &resp.FilePath)
