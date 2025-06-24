@@ -71,8 +71,11 @@ func (c *Req) args() []string {
 		filepath.Join(c.tmpPath, "%(title).150B.%(ext)s"),
 		"--quiet",
 		"--print", "after_move:%(filepath)j",
-		"--format", `bestvideo+bestaudio/best`,
 		"--windows-filenames",
+	}
+	if strings.Contains(c.Url, "youtu") {
+		// 目前就油管用到了这个能力，在B站启用反而会导致下载失败的问题
+		args = append(args, "--format", `bestvideo+bestaudio/best`)
 	}
 	if c.WriteInfoJson {
 		args = append(args, "--write-info-json")
