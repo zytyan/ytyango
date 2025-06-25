@@ -116,7 +116,6 @@ func main() {
 	dispatcher.AddCommand("count_nsfw_pics", myhandlers.CountNsfwPics)
 	dispatcher.AddCommand("settimezone", myhandlers.SetUserTimeZone)
 
-	dispatcher.AddHandler(handlers.NewMessage(myhandlers.HasTime, myhandlers.GeminiExtractTime))
 	dispatcher.AddHandler(handlers.NewMessage(myhandlers.HasPhoto, myhandlers.ManualAddPic))
 	dispatcher.AddHandler(handlers.NewMessage(myhandlers.HasSinaGif, myhandlers.Gif2Mp4))
 	dispatcher.AddHandler(handlers.NewCallback(myhandlers.IsBilibiliBtn, myhandlers.DownloadVideoCallback))
