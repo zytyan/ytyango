@@ -18,7 +18,7 @@ func webp2png(file string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	out, err := os.CreateTemp(os.TempDir(), "webp2png")
+	out, err := os.CreateTemp(os.TempDir(), "webp2png*.png")
 	if err != nil {
 		return "", err
 	}
