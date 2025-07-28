@@ -111,6 +111,7 @@ func main() {
 	dispatcher.AddCommand("nsfw_mark_not_racy", myhandlers.MarkPicNotRacy)
 	dispatcher.AddCommand("nsfw_mark_is_adult", myhandlers.MarkPicIsAdult)
 	dispatcher.AddCommand("nsfw_mark_not_adult", myhandlers.MarkPicNotAdult)
+	dispatcher.AddCommand("webp2png", myhandlers.WebpToPng)
 
 	dispatcher.AddCommand("manual_add_pic", myhandlers.SetManualAddPic)
 	dispatcher.AddCommand("count_nsfw_pics", myhandlers.CountNsfwPics)
