@@ -112,6 +112,7 @@ func main() {
 	dispatcher.AddCommand("nsfw_mark_is_adult", myhandlers.MarkPicIsAdult)
 	dispatcher.AddCommand("nsfw_mark_not_adult", myhandlers.MarkPicNotAdult)
 	dispatcher.AddCommand("webp2png", myhandlers.WebpToPng)
+	dispatcher.AddCommand("toggle_auto_exchange", myhandlers.ToggleAutoExchange)
 
 	dispatcher.AddCommand("manual_add_pic", myhandlers.SetManualAddPic)
 	dispatcher.AddCommand("count_nsfw_pics", myhandlers.CountNsfwPics)

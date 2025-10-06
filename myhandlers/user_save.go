@@ -94,7 +94,7 @@ func (u *User) DownloadProfilePhoto(bot *gotgbot.Bot) (string, error) {
 	}
 	file, err := bot.GetFile(u.ProfilePhoto, nil)
 	if err != nil {
-		return file.FilePath, err
+		return "", err
 	}
 	return file.FilePath, err
 }
