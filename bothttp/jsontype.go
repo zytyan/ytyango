@@ -8,7 +8,7 @@ func (j *JsonInt64) UnmarshalJSON(bs []byte) error {
 	if bs[0] == '"' && bs[len(bs)-1] == '"' {
 		bs = bs[1 : len(bs)-1]
 	}
-	x, err := strconv.ParseUint(string(bs), 10, 64)
+	x, err := strconv.ParseInt(string(bs), 10, 64)
 	if err != nil {
 		return err
 	}
