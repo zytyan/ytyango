@@ -116,12 +116,12 @@ func (g *GroupInfo) UpdateNow() error {
 	return globalcfg.GetDb().Save(g).Error
 }
 
-func (g *GroupInfo) Update() error {
+func (g *GroupInfo) Update() {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	if g.timer != nil {
 		g.timer.Reset(3 * time.Second)
-		return nil
+		return
 	}
 	g.timer = time.AfterFunc(3*time.Second, func() {
 		err := g.UpdateNow()
@@ -129,7 +129,7 @@ func (g *GroupInfo) Update() error {
 			log.Warnf("update group info %d error %s", g.GroupID, err)
 		}
 	})
-	return nil
+	return
 }
 
 // SetFieldByName 仅允许修改带 btnTxt 标签的字段
