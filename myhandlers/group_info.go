@@ -28,11 +28,11 @@ type GroupInfo struct {
 	AutoCalculate   bool `btnTxt:"自动计算算式" pos:"2,1"`
 	AutoExchange    bool `btnTxt:"自动换算汇率" pos:"2,2"`
 	ParseFlags      bool
-	AutoCheckAdult  bool            `btnTxt:"自动OCR" pos:"3,1"`
+	AutoCheckAdult  bool
 	CoCEnabled      bool            `btnTxt:"启用CoC辅助" pos:"3,2"`
 	ModeratorConfig ModeratorConfig `gorm:"embedded;embeddedPrefix:moderator_"`
 
-	SaveMessages bool
+	SaveMessages bool `btnTxt:"保存群组消息" pos:"3,1"`
 }
 
 var groupInfoCache = mustNewLru[int64, *GroupInfo](1000)
