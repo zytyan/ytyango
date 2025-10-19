@@ -4,6 +4,7 @@ import (
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers"
+	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers/filters/callbackquery"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers/filters/inlinequery"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers/filters/message"
 	"main/bothttp"
@@ -112,6 +113,7 @@ func main() {
 	dispatcher.AddCommand("nsfw_mark_is_adult", myhandlers.MarkPicIsAdult)
 	dispatcher.AddCommand("nsfw_mark_not_adult", myhandlers.MarkPicNotAdult)
 	dispatcher.AddCommand("webp2png", myhandlers.WebpToPng)
+	dispatcher.AddCommand("show_group_cfg", myhandlers.ShowGroupCfg)
 	dispatcher.AddCommand("toggle_auto_exchange", myhandlers.ToggleAutoExchange)
 
 	dispatcher.AddCommand("manual_add_pic", myhandlers.SetManualAddPic)
@@ -134,6 +136,7 @@ func main() {
 	dispatcher.AddHandler(handlers.NewCallback(myhandlers.IsNextRound, myhandlers.NextRound))
 	dispatcher.AddHandler(handlers.NewMessage(myhandlers.IsBattleCommand, myhandlers.ExecuteBattleCommand))
 	dispatcher.AddHandler(handlers.NewCallback(myhandlers.IsBilibiliInlineBtn, myhandlers.DownloadInlinedBv))
+	dispatcher.AddHandler(handlers.NewCallback(callbackquery.Prefix(myhandlers.GroupConfigModifyPrefix), myhandlers.ModifyGroupConfigByButton))
 
 	err := updater.StartPolling(b, &ext.PollingOpts{
 		DropPendingUpdates:    globalcfg.GetConfig().DropPendingUpdates,

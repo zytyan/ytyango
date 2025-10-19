@@ -2,9 +2,11 @@ package myhandlers
 
 import (
 	"errors"
+	"fmt"
 	"gorm.io/gorm"
 	"main/globalcfg"
 	"main/helpers/azure"
+	"reflect"
 	"sync"
 )
 
@@ -18,13 +20,13 @@ type GroupInfo struct {
 	GroupID    int64 `gorm:"unique"`
 	GroupWebId int64 `gorm:"index"`
 
-	AutoCvtBili     bool
+	AutoCvtBili     bool `btnTxt:"自动转换Bilibili视频链接" pos:"1,1"`
 	AutoOcr         bool
-	AutoCalculate   bool
-	AutoExchange    bool
-	ParseFlags      bool // 是否要解析群友立下的flag
-	AutoCheckAdult  bool
-	CoCEnabled      bool
+	AutoCalculate   bool `btnTxt:"自动计算算式" pos:"2,1"`
+	AutoExchange    bool `btnTxt:"自动换算汇率" pos:"2,2"`
+	ParseFlags      bool
+	AutoCheckAdult  bool            `btnTxt:"自动OCR" pos:"3,1"`
+	CoCEnabled      bool            `btnTxt:"启用CoC辅助" pos:"3,2"`
 	ModeratorConfig ModeratorConfig `gorm:"embedded;embeddedPrefix:moderator_"`
 
 	SaveMessages bool
@@ -128,6 +130,65 @@ func (g *GroupInfo) UpdateWebId(newId int64) error {
 
 func (g *GroupInfo) HasWebId() bool {
 	return g.GroupWebId != 0
+}
+
+// SetFieldByName 仅允许修改带 btnTxt 标签的字段
+func (g *GroupInfo) SetFieldByName(fieldName string, value any) error {
+	v := reflect.ValueOf(g).Elem()
+	t := v.Type()
+
+	f, ok := t.FieldByName(fieldName)
+	if !ok {
+		return fmt.Errorf("no such field: %s", fieldName)
+	}
+
+	tag := f.Tag.Get("btnTxt")
+	if tag == "" {
+		return fmt.Errorf("field %s has no btnTxt tag (not allowed to modify)", fieldName)
+	}
+	fieldVal := v.FieldByName(fieldName)
+	if !fieldVal.CanSet() {
+		return fmt.Errorf("cannot set field: %s", fieldName)
+	}
+
+	val := reflect.ValueOf(value)
+	if val.Kind() != reflect.Bool {
+		return fmt.Errorf("invalid value type: expected bool, got %v", val.Kind())
+	}
+
+	fieldVal.SetBool(val.Bool())
+	return nil
+}
+
+type BtnField struct {
+	Name     string // 字段名
+	Text     string // btnTxt 内容
+	Value    bool   // 字段值
+	Position [2]int // 所在位置
+}
+
+// GetBtnTxtFields 返回所有带有 btnTxt 且类型为 bool 的字段（按定义顺序）
+func (g *GroupInfo) GetBtnTxtFields() []BtnField {
+	v := reflect.ValueOf(g).Elem()
+	t := v.Type()
+
+	var fields []BtnField
+	for i := 0; i < v.NumField(); i++ {
+		field := t.Field(i)
+		tag := field.Tag.Get("btnTxt")
+		posTag := field.Tag.Get("pos")
+		if tag != "" && posTag != "" && field.Type.Kind() == reflect.Bool {
+			var row, col int
+			_, _ = fmt.Sscanf(posTag, "%d,%d", &row, &col)
+			fields = append(fields, BtnField{
+				Name:     field.Name,
+				Text:     tag,
+				Value:    v.Field(i).Bool(),
+				Position: [2]int{row, col},
+			})
+		}
+	}
+	return fields
 }
 
 func (m *ModeratorConfig) IsAdult(res *azure.ModeratorResult) bool {
