@@ -36,7 +36,7 @@ func generateGroupModifyReplyMarkup(groupInfo *GroupInfo) gotgbot.InlineKeyboard
 	})
 	rows := make([]int, mf.Position[0])
 	for _, field := range fields {
-		if field.Position[1] > rows[field.Position[0]] {
+		if field.Position[1] > rows[field.Position[0]-1] {
 			rows[field.Position[0]-1] = field.Position[1]
 		}
 	}
