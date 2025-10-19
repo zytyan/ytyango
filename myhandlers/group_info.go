@@ -119,8 +119,6 @@ func (g *GroupInfo) UpdateNow() error {
 
 func (g *GroupInfo) Update() {
 	log.Infof("update group info %d after 3 seconds", g.ID)
-	g.mu.Lock()
-	defer g.mu.Unlock()
 	if g.timer != nil {
 		g.timer.Reset(3 * time.Second)
 		return
