@@ -15,19 +15,6 @@ func IsCalcExchangeRate(msg *gotgbot.Message) bool {
 	return exchange.IsExchangeRateCalc(getTextMsg(msg))
 }
 
-func ToggleAutoExchange(bot *gotgbot.Bot, ctx *ext.Context) error {
-	group := GetGroupInfo(ctx.EffectiveChat.Id)
-	if group == nil {
-		return nil
-	}
-	groupInfoWMutex.Lock()
-	defer groupInfoWMutex.Unlock()
-	group.AutoExchange = !group.AutoExchange
-	text := fmt.Sprintf("群组自动汇率换算切换为%t", group.AutoExchange)
-	_, err := ctx.EffectiveMessage.Reply(bot, text, nil)
-	return err
-}
-
 var exchangeAlias = map[string]string{
 	"RMB": "CNY",
 	"NTD": "TWD",

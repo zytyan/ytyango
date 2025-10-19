@@ -194,7 +194,7 @@ func DndDice(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
 }
 
 func CoCHelp(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
-	helpText := `<b>在使用CoC辅助之前，请先使用 /toggle_coc 命令启用CoC功能</b>
+	helpText := `<b>在使用CoC辅助之前，请先使用 /config_chat 命令启用CoC功能</b>
 
 <b>骰子功能</b>
 <b>用法：</b>
@@ -323,17 +323,5 @@ func ExecuteBattleCommand(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
 	_, err = ctx.EffectiveMessage.Reply(bot, battle.String(), &gotgbot.SendMessageOpts{ParseMode: "HTML",
 		ReplyMarkup: buildBattleKeyboard(uid),
 	})
-	return err
-}
-
-func ToggleCoC(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
-	group := GetGroupInfo(ctx.EffectiveChat.Id)
-	group.CoCEnabled = !group.CoCEnabled
-	globalcfg.GetDb().Save(&group)
-	if group.CoCEnabled {
-		_, err = ctx.EffectiveMessage.Reply(bot, "CoC功能已启用", nil)
-	} else {
-		_, err = ctx.EffectiveMessage.Reply(bot, "CoC功能已禁用", nil)
-	}
 	return err
 }

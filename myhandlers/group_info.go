@@ -8,6 +8,7 @@ import (
 	"main/helpers/azure"
 	"reflect"
 	"sync"
+	"time"
 )
 
 type ModeratorConfig struct {
@@ -16,6 +17,8 @@ type ModeratorConfig struct {
 }
 
 type GroupInfo struct {
+	mu         *sync.Mutex
+	timer      *time.Timer
 	ID         int64 `gorm:"primaryKey"`
 	GroupID    int64 `gorm:"unique"`
 	GroupWebId int64 `gorm:"index"`
@@ -40,6 +43,7 @@ func GetGroupInfo(groupId int64) *GroupInfo {
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			newInfo := &GroupInfo{
+				mu:         &sync.Mutex{},
 				GroupID:    groupId,
 				GroupWebId: 0,
 
@@ -62,8 +66,11 @@ func GetGroupInfo(groupId int64) *GroupInfo {
 }
 
 func getGroupInfo(groupId int64) (*GroupInfo, error) {
+	groupInfoWMutex.Lock()
+	defer groupInfoWMutex.Unlock()
 	var info GroupInfo
 	if res, found := groupInfoCache.Get(groupId); found {
+		res.mu = &sync.Mutex{}
 		log.Debugf("get group info %d from groupInfoCache", groupId)
 		return res, nil
 	}
@@ -71,6 +78,7 @@ func getGroupInfo(groupId int64) (*GroupInfo, error) {
 	if res.Error != nil {
 		return nil, res.Error
 	}
+	info.mu = &sync.Mutex{}
 	groupInfoCache.Add(groupId, &info)
 	return &info, nil
 }
@@ -104,32 +112,24 @@ func CreateGroupInfo(info *GroupInfo) {
 	}
 }
 
+func (g *GroupInfo) UpdateNow() error {
+	return globalcfg.GetDb().Save(g).Error
+}
+
 func (g *GroupInfo) Update() error {
-	db := globalcfg.GetDb()
-	db.Model(g).Updates(map[string]any{
-		"auto_convert_bilibili": g.AutoCvtBili,
-		"auto_ocr":              g.AutoOcr,
-		"auto_check_adult":      g.AutoCheckAdult,
-		"auto_calculate":        g.AutoCalculate,
-		"auto_exchange":         g.AutoExchange,
-		"parse_flags":           g.ParseFlags,
-		"save_messages":         g.SaveMessages,
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if g.timer != nil {
+		g.timer.Reset(3 * time.Second)
+		return nil
+	}
+	g.timer = time.AfterFunc(3*time.Second, func() {
+		err := g.UpdateNow()
+		if err != nil {
+			log.Warnf("update group info %d error %s", g.GroupID, err)
+		}
 	})
-	groupInfoCache.Add(g.GroupID, g)
 	return nil
-}
-
-func (g *GroupInfo) UpdateWebId(newId int64) error {
-	db := globalcfg.GetDb()
-	db.Model(g).Updates(map[string]any{
-		"group_web_id": newId,
-	})
-	groupInfoCache.Add(g.GroupID, g)
-	return nil
-}
-
-func (g *GroupInfo) HasWebId() bool {
-	return g.GroupWebId != 0
 }
 
 // SetFieldByName 仅允许修改带 btnTxt 标签的字段

@@ -7,7 +7,6 @@ import (
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 	"slices"
 	"strings"
-	"sync"
 )
 
 const GroupConfigModifyPrefix = "gcfg:"
@@ -58,11 +57,7 @@ func generateGroupModifyReplyMarkup(groupInfo *GroupInfo) gotgbot.InlineKeyboard
 	return markup
 }
 
-var modifyMu sync.Mutex
-
 func ModifyGroupConfigByButton(bot *gotgbot.Bot, ctx *ext.Context) error {
-	modifyMu.Lock()
-	defer modifyMu.Unlock()
 	msg := ctx.EffectiveMessage
 	if msg == nil {
 		return fmt.Errorf("ModifyGroupConfigByButton: message should not be nil")
@@ -71,6 +66,8 @@ func ModifyGroupConfigByButton(bot *gotgbot.Bot, ctx *ext.Context) error {
 	if err != nil {
 		return err
 	}
+	groupInfo.mu.Lock()
+	defer groupInfo.mu.Unlock()
 	cmdList := strings.Split(ctx.CallbackQuery.Data, ":")
 	if len(cmdList) < 3 {
 		return fmt.Errorf("ModifyGroupConfigByButton: invalid command")
@@ -91,10 +88,15 @@ func ModifyGroupConfigByButton(bot *gotgbot.Bot, ctx *ext.Context) error {
 	_, _, err = ctx.EffectiveMessage.EditReplyMarkup(bot, &gotgbot.EditMessageReplyMarkupOpts{
 		ReplyMarkup: generateGroupModifyReplyMarkup(groupInfo),
 	})
+	_, err = ctx.CallbackQuery.Answer(bot, &gotgbot.AnswerCallbackQueryOpts{
+		Text:      fmt.Sprintf("%s %s -> %s", cmdList[2], boolToEmoji(argBool), boolToEmoji(!argBool)),
+		CacheTime: 0,
+	})
+
 	return err
 }
 
-func ShowGroupCfg(bot *gotgbot.Bot, ctx *ext.Context) error {
+func ShowChatCfg(bot *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
 	if msg == nil {
 		return fmt.Errorf("ModifyGroupConfigByButton: message should not be nil")
