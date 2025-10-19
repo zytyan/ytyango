@@ -190,7 +190,28 @@ func (g *GroupInfo) GetBtnTxtFields() []BtnField {
 	}
 	return fields
 }
+func (g *GroupInfo) GetBtnTxtFieldByName(name string) BtnField {
+	v := reflect.ValueOf(g).Elem()
+	t := v.Type()
 
+	for i := 0; i < v.NumField(); i++ {
+		field := t.Field(i)
+		tag := field.Tag.Get("btnTxt")
+		posTag := field.Tag.Get("pos")
+		if tag != "" && field.Name == name && field.Type.Kind() == reflect.Bool {
+			var row, col int
+			_, _ = fmt.Sscanf(posTag, "%d,%d", &row, &col)
+
+			return BtnField{
+				Name:     field.Name,
+				Text:     tag,
+				Value:    v.Field(i).Bool(),
+				Position: [2]int{row, col},
+			}
+		}
+	}
+	return BtnField{Name: "???"}
+}
 func (m *ModeratorConfig) IsAdult(res *azure.ModeratorResult) bool {
 	return res.AdultClassificationScore > m.AdultThreshold
 }

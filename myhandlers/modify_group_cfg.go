@@ -88,8 +88,9 @@ func ModifyGroupConfigByButton(bot *gotgbot.Bot, ctx *ext.Context) error {
 	_, _, err = ctx.EffectiveMessage.EditReplyMarkup(bot, &gotgbot.EditMessageReplyMarkupOpts{
 		ReplyMarkup: generateGroupModifyReplyMarkup(groupInfo),
 	})
+	showText := groupInfo.GetBtnTxtFieldByName(cmdList[1]).Text
 	_, err = ctx.CallbackQuery.Answer(bot, &gotgbot.AnswerCallbackQueryOpts{
-		Text:      fmt.Sprintf("%s %s -> %s", cmdList[2], boolToEmoji(argBool), boolToEmoji(!argBool)),
+		Text:      fmt.Sprintf("%s %s -> %s", showText, boolToEmoji(argBool), boolToEmoji(!argBool)),
 		CacheTime: 0,
 	})
 

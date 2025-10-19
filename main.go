@@ -102,7 +102,6 @@ func main() {
 	dispatcher.AddCommand("diag_getcntbytime", myhandlers.GetCntByTime)
 	dispatcher.AddCommand("diag_msginfo", myhandlers.GetMsgInfo)
 	dispatcher.AddCommand("searchmsg", myhandlers.SearchMessage)
-	dispatcher.AddCommand("enable_calc", myhandlers.EnableCalc)
 	dispatcher.AddCommand("cochelp", myhandlers.CoCHelp)
 	dispatcher.AddCommand("list_attr", myhandlers.ListDndAttr)
 	dispatcher.AddCommand("del_attr", myhandlers.DelDndAttr)
