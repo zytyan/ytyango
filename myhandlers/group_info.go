@@ -113,10 +113,12 @@ func CreateGroupInfo(info *GroupInfo) {
 }
 
 func (g *GroupInfo) UpdateNow() error {
+	log.Infof("update group info %d", g.ID)
 	return globalcfg.GetDb().Save(g).Error
 }
 
 func (g *GroupInfo) Update() {
+	log.Infof("update group info %d after 3 seconds", g.ID)
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	if g.timer != nil {
