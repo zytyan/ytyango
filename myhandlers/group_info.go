@@ -98,9 +98,9 @@ func GetGroupInfoUseWebId(webId int64) *GroupInfo {
 }
 
 func CreateGroupInfo(info *GroupInfo) {
+	_, err := getGroupInfo(info.GroupID)
 	groupInfoWMutex.Lock()
 	defer groupInfoWMutex.Unlock()
-	_, err := getGroupInfo(info.GroupID)
 	if err != nil && errors.Is(err, gorm.ErrRecordNotFound) {
 		globalcfg.GetDb().Create(info)
 		groupInfoCache.Add(info.GroupID, info)
