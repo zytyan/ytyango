@@ -1,17 +1,22 @@
 package azure
 
 import (
-	"encoding/json"
+	"bytes"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"strings"
+
+	jsoniter "github.com/json-iterator/go"
 )
 
+//goland:noinspection GoUnusedConst
 const (
-	ContentModeratorPath = "/contentmoderator/moderate/v1.0/ProcessImage/Evaluate"
-	OcrPath              = "/computervision/imageanalysis:analyze"
+	ContentModeratorPath   = "/contentmoderator/moderate/v1.0/ProcessImage/Evaluate"
+	ContentModeratorV2Path = "/contentsafety/image:analyze?api-version=2024-09-01"
+	OcrPath                = "/computervision/imageanalysis:analyze"
 )
 
 type ResponseError struct {
@@ -31,14 +36,31 @@ func NewClient(endpoint string, apiKey string, path string) *Client {
 	return &Client{apiKey: apiKey, endpoint: endpoint, path: path}
 }
 
-func (c *Client) reqWithAuth() *http.Request {
+func (c *Client) reqWithAuth(method, contentType string) *http.Request {
 	urlPath := fmt.Sprintf("%s%s", c.endpoint, c.path)
-	request, err := http.NewRequest(http.MethodGet, urlPath, nil)
+	request, err := http.NewRequest(method, urlPath, nil)
 	if err != nil {
-		return nil
+		panic(err) // 理论上不会有问题
 	}
+	request.Header.Set("Content-Type", contentType)
 	request.Header.Add("Ocp-Apim-Subscription-Key", c.apiKey)
 	return request
+}
+
+func unmarshalResponse(resp *http.Response, v any) error {
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("HTTP Response error(%d): %s", resp.StatusCode, body)
+	}
+	err = jsoniter.Unmarshal(body, v)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 type ModeratorResult struct {
@@ -66,28 +88,15 @@ func (m *Moderator) EvalFile(path string) (*ModeratorResult, error) {
 	if err != nil {
 		return nil, err
 	}
-	req := m.reqWithAuth()
-	req.Method = http.MethodPost
-	req.Header.Add("Content-Type", "image/jpeg")
+	req := m.reqWithAuth(http.MethodPost, "image/jpeg")
 	req.Body = file
 	resp, err := m.client.Do(req)
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
-	data, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("status code: %d, error body: %s", resp.StatusCode, data)
-	}
-	res := ModeratorResult{}
-	err = json.Unmarshal(data, &res)
-	if err != nil {
-		return nil, err
-	}
-	return &res, nil
+	res := &ModeratorResult{}
+	err = unmarshalResponse(resp, res)
+	return res, err
 }
 
 type Ocr struct {
@@ -131,10 +140,7 @@ func (o *Ocr) OcrFile(path string) (*OcrResult, error) {
 	if err != nil {
 		return nil, err
 	}
-	req := o.reqWithAuth()
-	req.Header.Set("Content-Type", "image/jpeg")
-	req.Method = http.MethodPost
-	//req.TransferEncoding = []string{"identity"}
+	req := o.reqWithAuth(http.MethodPost, "image/jpeg")
 	req.Body = file
 	q := req.URL.Query()
 	q.Add("api-version", o.ApiVer)
@@ -143,7 +149,6 @@ func (o *Ocr) OcrFile(path string) (*OcrResult, error) {
 	}
 	if o.Language != "" {
 		q.Add("language", o.Language)
-
 	}
 	req.URL.RawQuery = q.Encode()
 	stat, err := file.Stat()
@@ -152,23 +157,9 @@ func (o *Ocr) OcrFile(path string) (*OcrResult, error) {
 	}
 	req.ContentLength = stat.Size()
 	resp, err := o.client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	data, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("status code: %d, error body: %s", resp.StatusCode, data)
-	}
-	res := OcrResult{}
-	err = json.Unmarshal(data, &res)
-	if err != nil {
-		return nil, err
-	}
-	return &res, nil
+	res := &OcrResult{}
+	err = unmarshalResponse(resp, res)
+	return res, err
 }
 
 type Error struct {
@@ -205,4 +196,73 @@ func (r *OcrResult) Text() string {
 	}
 	return buf.String()
 
+}
+
+//goland:noinspection GoUnusedConst
+const (
+	ModerateV2CatHate     = "Hate"
+	ModerateV2CatSelfHarm = "SelfHarm"
+	ModerateV2CatViolence = "Violence"
+	ModerateV2CatSexual   = "Sexual"
+)
+
+type ModeratorV2Result struct {
+	CategoriesAnalysis []struct {
+		Category string `json:"category"`
+		Severity int    `json:"severity"`
+	} `json:"categoriesAnalysis"`
+}
+
+type moderatorV2Param struct {
+	Image struct {
+		Content string `json:"content"`
+	} `json:"image"`
+	Categories []string `json:"categories"`
+	OutputType string   `json:"outputType"`
+}
+
+type ModeratorV2 struct {
+	Client
+	Categories []string `json:"categories"`
+	OutputType string   `json:"outputType"`
+}
+
+func (m *ModeratorV2) EvalFile(path string) (*ModeratorV2Result, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+	req := m.reqWithAuth(http.MethodPost, "application/json")
+	data, err := io.ReadAll(file)
+	if err != nil {
+		return nil, err
+	}
+	b64Data := base64.StdEncoding.EncodeToString(data)
+	param := moderatorV2Param{
+		Categories: m.Categories,
+		OutputType: m.OutputType,
+	}
+	param.Image.Content = b64Data
+	body, err := jsoniter.Marshal(&param)
+	if err != nil {
+		return nil, err
+	}
+	req.Body = io.NopCloser(bytes.NewReader(body))
+	resp, err := m.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	result := &ModeratorV2Result{}
+	err = unmarshalResponse(resp, result)
+	return result, err
+}
+
+func (r *ModeratorV2Result) GetSeverityByCategory(category string) int {
+	for _, analysis := range r.CategoriesAnalysis {
+		if analysis.Category == category {
+			return analysis.Severity
+		}
+	}
+	return -1
 }

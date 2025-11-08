@@ -2,13 +2,14 @@ package myhandlers
 
 import (
 	"errors"
-	"github.com/PaulSonOfLars/gotgbot/v2"
-	"golang.org/x/time/rate"
 	"image"
 	"main/globalcfg"
 	"main/helpers/azure"
 	"os"
 	"time"
+
+	"github.com/PaulSonOfLars/gotgbot/v2"
+	"golang.org/x/time/rate"
 )
 
 var photoCache = mustNewLru[string, *gotgbot.File](500)
@@ -65,10 +66,10 @@ func ocrMsg(bot *gotgbot.Bot, file *gotgbot.PhotoSize) (string, error) {
 	return content, nil
 }
 
-var moderatorMsgCache = mustNewLru[string, *azure.ModeratorResult](500)
+var moderatorMsgCache = mustNewLru[string, *azure.ModeratorV2Result](500)
 var moderatorRateLimiter = rate.NewLimiter(rate.Every(3*time.Second), 1)
 
-func moderatorMsg(bot *gotgbot.Bot, file *gotgbot.PhotoSize) (*azure.ModeratorResult, error) {
+func moderatorMsg(bot *gotgbot.Bot, file *gotgbot.PhotoSize) (*azure.ModeratorV2Result, error) {
 	r := moderatorRateLimiter.Reserve()
 	dur := r.Delay()
 	if dur > 3*time.Minute {
@@ -77,8 +78,8 @@ func moderatorMsg(bot *gotgbot.Bot, file *gotgbot.PhotoSize) (*azure.ModeratorRe
 	}
 	time.Sleep(dur)
 	if res, found := moderatorMsgCache.Get(file.FileUniqueId); found {
-		log.Debugf("get image %s moderator result (%f, %f) from ocrCache",
-			file.FileUniqueId, res.RacyClassificationScore, res.AdultClassificationScore)
+		log.Debugf("get image %s moderator result sexual severity %d",
+			file.FileUniqueId, res.GetSeverityByCategory(azure.ModerateV2CatSexual))
 		return res, nil
 	}
 	localFile, err := getPhotoCache(bot, file)
@@ -103,8 +104,8 @@ func moderatorMsg(bot *gotgbot.Bot, file *gotgbot.PhotoSize) (*azure.ModeratorRe
 	if err != nil {
 		return nil, err
 	}
-	log.Debugf("get image %s moderator result (%f, %f) from azure",
-		file.FileUniqueId, res.RacyClassificationScore, res.AdultClassificationScore)
+	log.Debugf("get image %s moderator result sexual severity %d",
+		file.FileUniqueId, res.GetSeverityByCategory(azure.ModerateV2CatSexual))
 	moderatorMsgCache.Add(file.FileUniqueId, res)
 	return res, nil
 }

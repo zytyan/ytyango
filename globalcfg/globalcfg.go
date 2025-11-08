@@ -2,16 +2,17 @@ package globalcfg
 
 import (
 	"fmt"
+	"main/helpers/azure"
+	"os"
+	"sync"
+
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"gopkg.in/natefinch/lumberjack.v2"
 	"gopkg.in/yaml.v3"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
-	"main/helpers/azure"
 	"moul.io/zapgorm2"
-	"os"
-	"sync"
 )
 
 type Azure struct {
@@ -32,10 +33,6 @@ type MeiliConfig struct {
 	saveUrlCache   string
 	searchUrlCache string
 }
-type SeseThreshold struct {
-	AdultThreshold float64 `yaml:"adult-threshold"`
-	RacyThreshold  float64 `yaml:"racy-threshold"`
-}
 
 func (m *MeiliConfig) GetSaveUrl() string {
 	if m.saveUrlCache != "" {
@@ -53,25 +50,24 @@ func (m *MeiliConfig) GetSearchUrl() string {
 }
 
 type Config struct {
-	BotToken           string        `yaml:"bot-token"`
-	God                int64         `yaml:"god"`
-	MeiliConfig        MeiliConfig   `yaml:"meili-config"`
-	ContentModerator   Azure         `yaml:"content-moderator"`
-	Ocr                OcrConfig     `yaml:"ocr"`
-	QrScanUrl          string        `yaml:"qr-scan-url"`
-	SaveMessage        bool          `yaml:"save-message"`
-	TgApiUrl           string        `yaml:"tg-api-url"`
-	DropPendingUpdates bool          `yaml:"drop-pending-updates"`
-	SeseThreshold      SeseThreshold `yaml:"sese"`
-	LogLevel           int8          `yaml:"log-level"`
-	LocalKvDbPath      string        `yaml:"local-kv-db-path"`
-	TmpPath            string        `yaml:"tmp-path"`
-	DatabasePath       string        `yaml:"database-path"`
-	GeminiKey          string        `yaml:"gemini-key"`
+	BotToken           string      `yaml:"bot-token"`
+	God                int64       `yaml:"god"`
+	MeiliConfig        MeiliConfig `yaml:"meili-config"`
+	ContentModerator   Azure       `yaml:"content-moderator"`
+	Ocr                OcrConfig   `yaml:"ocr"`
+	QrScanUrl          string      `yaml:"qr-scan-url"`
+	SaveMessage        bool        `yaml:"save-message"`
+	TgApiUrl           string      `yaml:"tg-api-url"`
+	DropPendingUpdates bool        `yaml:"drop-pending-updates"`
+	LogLevel           int8        `yaml:"log-level"`
+	LocalKvDbPath      string      `yaml:"local-kv-db-path"`
+	TmpPath            string      `yaml:"tmp-path"`
+	DatabasePath       string      `yaml:"database-path"`
+	GeminiKey          string      `yaml:"gemini-key"`
 }
 
 var Ocr *azure.Ocr = nil
-var Moderator *azure.Moderator = nil
+var Moderator *azure.ModeratorV2 = nil
 var loggers = make(map[string]LoggerWithLevel)
 var globalMu sync.Mutex
 
@@ -95,8 +91,10 @@ var GetConfig = sync.OnceValue[*Config](func() *Config {
 		Language: config.Ocr.Language,
 		Features: config.Ocr.Features,
 	}
-	Moderator = &azure.Moderator{
-		Client: *azure.NewClient(config.ContentModerator.Endpoint, config.ContentModerator.ApiKey, azure.ContentModeratorPath),
+	Moderator = &azure.ModeratorV2{
+		Client:     *azure.NewClient(config.ContentModerator.Endpoint, config.ContentModerator.ApiKey, azure.ContentModeratorV2Path),
+		Categories: []string{azure.ModerateV2CatSexual}, // 也只查涩图
+		OutputType: "FourSeverityLevels",                // Azure仅支持这个参数，所以硬编码
 	}
 	return &config
 })

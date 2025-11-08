@@ -3,18 +3,13 @@ package myhandlers
 import (
 	"errors"
 	"fmt"
-	"gorm.io/gorm"
 	"main/globalcfg"
-	"main/helpers/azure"
 	"reflect"
 	"sync"
 	"time"
-)
 
-type ModeratorConfig struct {
-	AdultThreshold float64 `gorm:"default:0.7"`
-	RacyThreshold  float64 `gorm:"default:0.7"`
-}
+	"gorm.io/gorm"
+)
 
 type GroupInfo struct {
 	mu         *sync.Mutex
@@ -22,17 +17,15 @@ type GroupInfo struct {
 	ID         int64 `gorm:"primaryKey"`
 	GroupID    int64 `gorm:"unique"`
 	GroupWebId int64 `gorm:"index"`
+	// 这里是Azure的配置，由于要钱，所以不对外开放
+	AutoOcr        bool
+	AutoCheckAdult bool
 
-	AutoCvtBili     bool `btnTxt:"自动转换Bilibili视频链接" pos:"1,1"`
-	AutoOcr         bool
-	AutoCalculate   bool `btnTxt:"自动计算算式" pos:"2,1"`
-	AutoExchange    bool `btnTxt:"自动换算汇率" pos:"2,2"`
-	ParseFlags      bool
-	AutoCheckAdult  bool
-	CoCEnabled      bool            `btnTxt:"启用CoC辅助" pos:"3,2"`
-	ModeratorConfig ModeratorConfig `gorm:"embedded;embeddedPrefix:moderator_"`
-
-	SaveMessages bool `btnTxt:"保存群组消息" pos:"3,1"`
+	AutoCvtBili   bool `btnTxt:"自动转换Bilibili视频链接" pos:"1,1"`
+	AutoCalculate bool `btnTxt:"自动计算算式" pos:"2,1"`
+	AutoExchange  bool `btnTxt:"自动换算汇率" pos:"2,2"`
+	CoCEnabled    bool `btnTxt:"启用CoC辅助" pos:"3,2"`
+	SaveMessages  bool `btnTxt:"保存群组消息" pos:"3,1"`
 }
 
 var groupInfoCache = mustNewLru[int64, *GroupInfo](1000)
@@ -51,7 +44,6 @@ func GetGroupInfo(groupId int64) *GroupInfo {
 				AutoOcr:        false,
 				AutoCalculate:  false,
 				AutoExchange:   false,
-				ParseFlags:     false,
 				AutoCheckAdult: false,
 
 				SaveMessages: true,
@@ -211,11 +203,4 @@ func (g *GroupInfo) GetBtnTxtFieldByName(name string) BtnField {
 		}
 	}
 	return BtnField{Name: "???"}
-}
-func (m *ModeratorConfig) IsAdult(res *azure.ModeratorResult) bool {
-	return res.AdultClassificationScore > m.AdultThreshold
-}
-
-func (m *ModeratorConfig) IsRacy(res *azure.ModeratorResult) bool {
-	return res.RacyClassificationScore > m.RacyThreshold
 }

@@ -2,22 +2,16 @@ package myhandlers
 
 import (
 	"fmt"
-	"github.com/PaulSonOfLars/gotgbot/v2"
-	"github.com/PaulSonOfLars/gotgbot/v2/ext"
-	"gorm.io/gorm/clause"
 	"main/globalcfg"
 	"main/helpers/azure"
 	"strings"
 	"sync"
 	"time"
-)
 
-func bool2yn(b bool) string {
-	if b {
-		return "Y"
-	}
-	return "N"
-}
+	"github.com/PaulSonOfLars/gotgbot/v2"
+	"github.com/PaulSonOfLars/gotgbot/v2/ext"
+	"gorm.io/gorm/clause"
+)
 
 type groupedMsgK struct {
 	ChatId  int64
@@ -81,9 +75,10 @@ func saveNsfw(picId string, isRacy, isAdult bool) {
 	}
 }
 
-func replyNsfw(bot *gotgbot.Bot, msg *gotgbot.Message, result *azure.ModeratorResult, groupInfo *GroupInfo) (bool, error) {
-	isAdult := groupInfo.ModeratorConfig.IsAdult(result)
-	isRacy := groupInfo.ModeratorConfig.IsRacy(result)
+func replyNsfw(bot *gotgbot.Bot, msg *gotgbot.Message, result *azure.ModeratorV2Result) (bool, error) {
+	severity := result.GetSeverityByCategory(azure.ModerateV2CatSexual)
+	isAdult := severity >= 6
+	isRacy := severity >= 4
 	if !isAdult && !isRacy {
 		return false, nil
 	}
@@ -95,6 +90,7 @@ func replyNsfw(bot *gotgbot.Bot, msg *gotgbot.Message, result *azure.ModeratorRe
 			g.RacyCount++
 		}
 	})
+
 	if !msg.HasMediaSpoiler {
 		if isAdult {
 			_, err := msg.Reply(bot, "口夷~", nil)
@@ -118,13 +114,13 @@ func replyNsfw(bot *gotgbot.Bot, msg *gotgbot.Message, result *azure.ModeratorRe
 	}
 }
 
-func moderateDetectOne(bot *gotgbot.Bot, msg *gotgbot.Message, groupInfo *GroupInfo) (replied bool) {
+func moderateDetectOne(bot *gotgbot.Bot, msg *gotgbot.Message) (replied bool) {
 	moderatorResult, err := moderatorMsg(bot, &msg.Photo[len(msg.Photo)-1])
 	if err != nil {
 		log.Warnf("moderate msg failed, err: %s", err)
 		return
 	}
-	replied, err = replyNsfw(bot, msg, moderatorResult, groupInfo)
+	replied, err = replyNsfw(bot, msg, moderatorResult)
 	if err != nil {
 		log.Warnf("reply message failed, err: %s", err)
 	}
@@ -133,7 +129,7 @@ func moderateDetectOne(bot *gotgbot.Bot, msg *gotgbot.Message, groupInfo *GroupI
 
 var groupedDetectMap = &sync.Map{}
 
-func moderateDetectGrouped(bot *gotgbot.Bot, msg *gotgbot.Message, groupInfo *GroupInfo) {
+func moderateDetectGrouped(bot *gotgbot.Bot, msg *gotgbot.Message) {
 	key := groupedMsgK{ChatId: msg.Chat.Id, GroupId: msg.MediaGroupId}
 	chn := make(chan *gotgbot.Message, 10)
 	existsChn, ok := groupedDetectMap.LoadOrStore(key, chn)
@@ -153,7 +149,7 @@ func moderateDetectGrouped(bot *gotgbot.Bot, msg *gotgbot.Message, groupInfo *Gr
 			if !ok {
 				return
 			}
-			if moderateDetectOne(bot, msg, groupInfo) {
+			if moderateDetectOne(bot, msg) {
 				return
 			}
 		}
@@ -161,15 +157,15 @@ func moderateDetectGrouped(bot *gotgbot.Bot, msg *gotgbot.Message, groupInfo *Gr
 
 }
 
-func seseDetect(bot *gotgbot.Bot, ctx *ext.Context, groupInfo *GroupInfo) {
+func seseDetect(bot *gotgbot.Bot, ctx *ext.Context) {
 	if !HasImage(ctx.Message) {
 		return
 	}
 	if ctx.Message.MediaGroupId != "" {
-		moderateDetectGrouped(bot, ctx.Message, groupInfo)
+		moderateDetectGrouped(bot, ctx.Message)
 		return
 	}
-	moderateDetectOne(bot, ctx.Message, groupInfo)
+	moderateDetectOne(bot, ctx.Message)
 }
 
 func CmdScore(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
@@ -193,11 +189,9 @@ func CmdScore(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
 		}
 		return err
 	}
-	go saveNsfw(photo.FileId, result.IsImageRacyClassified, result.IsImageAdultClassified)
-	text := fmt.Sprintf("audlt: %f [%s]\nracy: %f [%s]",
-		result.AdultClassificationScore, bool2yn(result.IsImageAdultClassified),
-		result.RacyClassificationScore, bool2yn(result.IsImageRacyClassified),
-	)
+	severity := result.GetSeverityByCategory(azure.ModerateV2CatSexual)
+	go saveNsfw(photo.FileId, severity >= 4, severity >= 6)
+	text := fmt.Sprintf("score: %d", severity)
 	_, err = ctx.Message.Reply(bot, text, nil)
 	if err != nil {
 		log.Warnf("reply message failed, err: %s", err)
@@ -218,10 +212,10 @@ func SafeGo(f func()) {
 
 func SeseDetect(bot *gotgbot.Bot, ctx *ext.Context) error {
 	groupInfo := GetGroupInfo(ctx.Message.Chat.Id)
-	if !groupInfo.AutoCheckAdult {
+	if groupInfo != nil && !groupInfo.AutoCheckAdult {
 		return nil
 	}
-	SafeGo(func() { seseDetect(bot, ctx, groupInfo) })
+	SafeGo(func() { seseDetect(bot, ctx) })
 	return nil
 }
 
@@ -255,7 +249,7 @@ func SetManualAddPic(bot *gotgbot.Bot, ctx *ext.Context) error {
 	return err
 }
 
-func ManualAddPic(bot *gotgbot.Bot, ctx *ext.Context) error {
+func ManualAddPic(_ *gotgbot.Bot, ctx *ext.Context) error {
 	if ctx.EffectiveUser.Id != globalcfg.GetConfig().God {
 		return nil
 	}
