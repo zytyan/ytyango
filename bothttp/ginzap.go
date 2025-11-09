@@ -1,6 +1,7 @@
 package bothttp
 
 import (
+	"errors"
 	"net"
 	"net/http"
 	"net/http/httputil"
@@ -117,8 +118,10 @@ func CustomRecoveryWithZap(logger ZapLogger, stack bool, recovery gin.RecoveryFu
 				// Check for a broken connection, as it is not really a
 				// condition that warrants a panic stack trace.
 				var brokenPipe bool
-				if ne, ok := err.(*net.OpError); ok {
-					if se, ok := ne.Err.(*os.SyscallError); ok {
+				var ne *net.OpError
+				if e, ok := err.(error); ok && errors.As(e, &ne) {
+					var se *os.SyscallError
+					if errors.As(ne.Err, &se) {
 						if strings.Contains(strings.ToLower(se.Error()), "broken pipe") || strings.Contains(strings.ToLower(se.Error()), "connection reset by peer") {
 							brokenPipe = true
 						}
@@ -132,7 +135,7 @@ func CustomRecoveryWithZap(logger ZapLogger, stack bool, recovery gin.RecoveryFu
 						zap.String("request", string(httpRequest)),
 					)
 					// If the connection is dead, we can't write a status to it.
-					c.Error(err.(error)) // nolint: errcheck
+					_ = c.Error(err.(error))
 					c.Abort()
 					return
 				}

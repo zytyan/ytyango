@@ -123,7 +123,7 @@ func MakeAnswerCallback(bot *gotgbot.Bot, ctx *ext.Context) func(string, bool) {
 		l.Lock()
 		defer l.Unlock()
 		if answerRan {
-			log.Warnf("answer %d[%s] callback ran twice", ctx.CallbackQuery.Id, ctx.CallbackQuery.Data)
+			log.Warnf("answer %s[%s] callback ran twice", ctx.CallbackQuery.Id, ctx.CallbackQuery.Data)
 			return
 		}
 		answerRan = true

@@ -169,7 +169,7 @@ func (g *GroupStatDaily) String(groupId int64) string {
 	act3UsersName := ""
 	actMaxCnt := 0
 	if len(actUser) > 0 {
-		actMaxCnt = int(count[0])
+		actMaxCnt = count[0]
 	}
 	for i := 0; i < 3 && i < len(actUser); i++ {
 		act3Users = append(act3Users, GetUser(actUser[i]).Name())
