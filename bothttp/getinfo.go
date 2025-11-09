@@ -1,10 +1,11 @@
 package bothttp
 
 import (
-	"github.com/gin-gonic/gin"
 	"main/myhandlers"
 	"os"
 	"strconv"
+
+	"github.com/gin-gonic/gin"
 )
 
 type User struct {

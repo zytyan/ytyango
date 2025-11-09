@@ -3,12 +3,13 @@ package exchange
 import (
 	"errors"
 	"fmt"
-	jsoniter "github.com/json-iterator/go"
 	"net/http"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
+
+	jsoniter "github.com/json-iterator/go"
 )
 
 type Rate map[string]float64

@@ -1,11 +1,12 @@
 package imgproc
 
 import (
-	"github.com/disintegration/imaging"
-	"github.com/stretchr/testify/require"
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/disintegration/imaging"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGenSacaImage(t *testing.T) {

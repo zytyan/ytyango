@@ -1,8 +1,9 @@
 package bothttp
 
 import (
-	"github.com/gin-gonic/gin"
 	"os"
+
+	"github.com/gin-gonic/gin"
 )
 
 var devMode = os.Getenv("DEV_MODE") == "true"

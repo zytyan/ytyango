@@ -1,18 +1,16 @@
 package myhandlers
 
 import (
+	"encoding/base64"
+	"fmt"
 	"hash/fnv"
+	"html"
 	"main/globalcfg"
+	"main/helpers/bili"
 	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
-)
-import (
-	"encoding/base64"
-	"fmt"
-	"html"
-	"main/helpers/bili"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"

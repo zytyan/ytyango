@@ -5,12 +5,13 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
-	"github.com/disintegration/imaging"
 	"image"
 	"image/color"
 	"regexp"
 	"strings"
 	"sync"
+
+	"github.com/disintegration/imaging"
 )
 
 //go:embed assets/sakabanbasupisu.png

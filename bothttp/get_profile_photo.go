@@ -2,14 +2,15 @@ package bothttp
 
 import (
 	"fmt"
-	"github.com/gin-gonic/gin"
-	"github.com/kolesa-team/go-webp/encoder"
-	"github.com/kolesa-team/go-webp/webp"
 	"image"
 	_ "image/jpeg"
 	"main/myhandlers"
 	"os"
 	"strconv"
+
+	"github.com/gin-gonic/gin"
+	"github.com/kolesa-team/go-webp/encoder"
+	"github.com/kolesa-team/go-webp/webp"
 )
 
 func webpConvert(in, out string) error {

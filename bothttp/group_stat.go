@@ -1,9 +1,10 @@
 package bothttp
 
 import (
-	"github.com/gin-gonic/gin"
 	"main/myhandlers"
 	"strconv"
+
+	"github.com/gin-gonic/gin"
 )
 
 func groupStat(ctx *gin.Context) {

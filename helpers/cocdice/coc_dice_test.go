@@ -2,9 +2,10 @@ package cocdice
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestDiceCommand_NormalDice1(t *testing.T) {

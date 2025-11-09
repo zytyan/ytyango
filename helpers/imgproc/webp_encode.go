@@ -4,10 +4,11 @@ package imgproc
 
 import (
 	"errors"
-	"github.com/kolesa-team/go-webp/encoder"
-	"github.com/kolesa-team/go-webp/webp"
 	"image"
 	"os"
+
+	"github.com/kolesa-team/go-webp/encoder"
+	"github.com/kolesa-team/go-webp/webp"
 )
 
 const webpEnabled = true

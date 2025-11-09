@@ -3,13 +3,14 @@ package bothttp
 import (
 	"bytes"
 	"errors"
-	"github.com/gin-gonic/gin"
-	jsoniter "github.com/json-iterator/go"
 	"io"
 	"main/globalcfg"
 	"main/myhandlers"
 	"net/http"
 	"strconv"
+
+	"github.com/gin-gonic/gin"
+	jsoniter "github.com/json-iterator/go"
 )
 
 type SearchQuery struct {

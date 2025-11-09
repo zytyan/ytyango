@@ -3,11 +3,12 @@ package imgproc
 import (
 	"bytes"
 	_ "embed"
-	"github.com/disintegration/imaging"
 	"image"
 	_ "image/jpeg"
 	_ "image/png"
 	"sync"
+
+	"github.com/disintegration/imaging"
 )
 
 //go:embed assets/prpr_base.png

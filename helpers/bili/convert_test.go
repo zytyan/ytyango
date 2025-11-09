@@ -2,8 +2,9 @@ package bili
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/require"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 var testB23Link = `https://b23.tv/azH0KMi`

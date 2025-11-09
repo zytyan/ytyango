@@ -3,8 +3,9 @@ package bothttp
 import (
 	"crypto/hmac"
 	"crypto/sha256"
-	"github.com/stretchr/testify/require"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestTelegramAuth(t *testing.T) {
