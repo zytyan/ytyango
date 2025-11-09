@@ -2,14 +2,15 @@ package myhandlers
 
 import (
 	"fmt"
-	"github.com/PaulSonOfLars/gotgbot/v2"
-	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 	"html"
 	"math/rand"
 	"net/url"
 	"strconv"
 	"time"
 	"unicode"
+
+	"github.com/PaulSonOfLars/gotgbot/v2"
+	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 )
 
 func splitCommand(command string) (string, string) {
@@ -115,8 +116,8 @@ func Wiki(bot *gotgbot.Bot, ctx *ext.Context) error {
 		_, err := ctx.Message.Reply(bot, `<a href="https://zh.wikipedia.org/wiki/">维基百科</a>`, &gotgbot.SendMessageOpts{ParseMode: "HTML"})
 		if err != nil {
 			log.Warnf("wiki reply failed: %s", err)
-			return err
 		}
+		return err
 	}
 	wikiUrl := "https://zh.wikipedia.org/w/index.php?search=" + url.QueryEscape(query)
 	htmlEscaped := html.EscapeString(query)

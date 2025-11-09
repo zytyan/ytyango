@@ -3,13 +3,6 @@ package myhandlers
 import (
 	"encoding/gob"
 	"fmt"
-	"github.com/PaulSonOfLars/gotgbot/v2"
-	"github.com/PaulSonOfLars/gotgbot/v2/ext"
-	"github.com/go-co-op/gocron"
-	jsoniter "github.com/json-iterator/go"
-	"github.com/kr/pretty"
-	"github.com/puzpuzpuz/xsync/v3"
-	"github.com/rivo/uniseg"
 	"html"
 	"os"
 	"os/signal"
@@ -17,6 +10,14 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/PaulSonOfLars/gotgbot/v2"
+	"github.com/PaulSonOfLars/gotgbot/v2/ext"
+	"github.com/go-co-op/gocron"
+	jsoniter "github.com/json-iterator/go"
+	"github.com/kr/pretty"
+	"github.com/puzpuzpuz/xsync/v3"
+	"github.com/rivo/uniseg"
 )
 
 type UserMsgStat struct {
@@ -71,7 +72,7 @@ func (g *GroupStatDaily) addNewMsg(msg *gotgbot.Message) {
 	if g.MsgIdAtTimeStart[timeSeg] == 0 {
 		g.MsgIdAtTimeStart[timeSeg] = msg.MessageId
 	}
-	if msg.ForwardFrom != nil {
+	if msg.ForwardOrigin != nil {
 		g.ForwardCount++
 	}
 

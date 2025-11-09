@@ -2,25 +2,25 @@ package myhandlers
 
 import (
 	"fmt"
-	"github.com/PaulSonOfLars/gotgbot/v2"
-	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 	"main/globalcfg"
 	"net/url"
 	"path/filepath"
 	"sync"
 	"time"
+
+	"github.com/PaulSonOfLars/gotgbot/v2"
+	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 )
 
-func fileSchema(filename string) string {
+func fileSchema(filename string) gotgbot.InputFileOrString {
 	if !filepath.IsAbs(filename) {
 		var err error
 		filename, err = filepath.Abs(filename)
 		if err != nil {
-			log.Error(err)
-			return ""
+			log.Panic(err)
 		}
 	}
-	return "file://" + url.PathEscape(filename)
+	return gotgbot.InputFileByURL("file://" + url.PathEscape(filename))
 }
 
 var mainBot *gotgbot.Bot
@@ -46,13 +46,6 @@ func GetMsgInfo(bot *gotgbot.Bot, ctx *ext.Context) error {
 	_, err := ctx.EffectiveMessage.Reply(bot, data, nil)
 	return err
 }
-func EnableCalc(bot *gotgbot.Bot, ctx *ext.Context) error {
-	groupInfo := GetGroupInfo(ctx.EffectiveChat.Id)
-	groupInfo.AutoCalculate = true
-	globalcfg.GetDb().Save(&groupInfo)
-	_, err := ctx.EffectiveMessage.Reply(bot, "已开启计算器", nil)
-	return err
-}
 
 func cutString(s string, length int) string {
 	rl := []rune(s)
@@ -61,7 +54,14 @@ func cutString(s string, length int) string {
 	}
 	return string(rl[:length-3]) + "..."
 }
-
+func MakeReplyToMsgID(msgId int64) *gotgbot.ReplyParameters {
+	if msgId == 0 {
+		return nil
+	}
+	return &gotgbot.ReplyParameters{
+		MessageId: msgId,
+	}
+}
 func MakeDebounceReply(bot *gotgbot.Bot, ctx *ext.Context, interval time.Duration) (func(s string) (*gotgbot.Message, error), func() error) {
 	var l sync.Mutex
 	var timer *time.Timer

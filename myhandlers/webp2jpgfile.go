@@ -1,11 +1,12 @@
 package myhandlers
 
 import (
+	"os"
+
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 	"github.com/disintegration/imaging"
 	"github.com/kolesa-team/go-webp/webp"
-	"os"
 )
 
 func webp2png(file string) (string, error) {
@@ -51,7 +52,7 @@ func WebpToPng(bot *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.Message
 	defer os.Remove(pngFile)
 	_, err = bot.SendDocument(msg.Chat.Id, fileSchema(pngFile), &gotgbot.SendDocumentOpts{
-		ReplyToMessageId: msg.MessageId,
+		ReplyParameters: MakeReplyToMsgID(msg.Chat.Id),
 	})
 	return err
 }

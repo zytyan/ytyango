@@ -3,14 +3,15 @@ package myhandlers
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/PaulSonOfLars/gotgbot/v2"
-	"github.com/PaulSonOfLars/gotgbot/v2/ext"
-	"github.com/bwmarrin/snowflake"
-	"go.uber.org/zap/zapcore"
 	"io"
 	"main/globalcfg"
 	"net/http"
 	"strings"
+
+	"github.com/PaulSonOfLars/gotgbot/v2"
+	"github.com/PaulSonOfLars/gotgbot/v2/ext"
+	"github.com/bwmarrin/snowflake"
+	"go.uber.org/zap/zapcore"
 )
 
 var saveMsgMeili = &http.Client{}

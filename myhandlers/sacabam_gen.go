@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"main/helpers/imgproc"
+
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 	"github.com/disintegration/imaging"
-	"main/helpers/imgproc"
 )
 
 func IsSacabam(msg *gotgbot.Message) bool {
@@ -32,8 +33,12 @@ func GenSacabam(bot *gotgbot.Bot, ctx *ext.Context) error {
 		return err
 	}
 	_, err = bot.SendPhoto(ctx.EffectiveChat.Id,
-		buf,
-		&gotgbot.SendPhotoOpts{ReplyToMessageId: ctx.EffectiveMessage.MessageId},
+		gotgbot.InputFileByReader("sacabam.jpg", buf),
+		&gotgbot.SendPhotoOpts{
+			ReplyParameters: &gotgbot.ReplyParameters{
+				MessageId: ctx.EffectiveMessage.MessageId,
+			},
+		},
 	)
 	return err
 }

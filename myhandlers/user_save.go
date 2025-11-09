@@ -4,13 +4,14 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"main/globalcfg"
+	"strings"
+	"time"
+
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 	lru "github.com/hashicorp/golang-lru/v2"
 	"gorm.io/gorm"
-	"main/globalcfg"
-	"strings"
-	"time"
 )
 
 type User struct {

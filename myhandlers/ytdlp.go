@@ -3,11 +3,6 @@ package myhandlers
 import (
 	"errors"
 	"fmt"
-	"github.com/PaulSonOfLars/gotgbot/v2"
-	"github.com/PaulSonOfLars/gotgbot/v2/ext"
-	"github.com/puzpuzpuz/xsync/v3"
-	"golang.org/x/time/rate"
-	"gorm.io/gorm"
 	"html"
 	"main/globalcfg"
 	"main/helpers/ytdlp"
@@ -16,6 +11,12 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/PaulSonOfLars/gotgbot/v2"
+	"github.com/PaulSonOfLars/gotgbot/v2/ext"
+	"github.com/puzpuzpuz/xsync/v3"
+	"golang.org/x/time/rate"
+	"gorm.io/gorm"
 )
 
 var (
@@ -264,10 +265,10 @@ func sendVideo(bot *gotgbot.Bot, ctx *ext.Context, res *YtDlResult) (*gotgbot.Me
 	text := res.formatCaption(ctx.EffectiveUser)
 	// 如果不是一个路径，那么就按照file id 的类型发送
 	if res.IsFileId() {
-		return bot.SendVideo(ctx.EffectiveChat.Id, res.File, &gotgbot.SendVideoOpts{
-			Caption:          text,
-			ReplyToMessageId: replyId,
-			ParseMode:        "HTML",
+		return bot.SendVideo(ctx.EffectiveChat.Id, gotgbot.InputFileByID(res.File), &gotgbot.SendVideoOpts{
+			Caption:         text,
+			ReplyParameters: MakeReplyToMsgID(replyId),
+			ParseMode:       "HTML",
 		})
 	}
 	frame, err := ytdlp.ExtractFirstFrame(res.File)
@@ -281,14 +282,14 @@ func sendVideo(bot *gotgbot.Bot, ctx *ext.Context, res *YtDlResult) (*gotgbot.Me
 		return nil, err
 	}
 	sent, err := bot.SendVideo(ctx.EffectiveChat.Id, fileSchema(res.File), &gotgbot.SendVideoOpts{
-		Thumbnail: fileSchema(frame),
+		Thumbnail: fileSchema(frame).(gotgbot.InputFile),
 		Duration:  int64(probe.GetDuration()),
 		Width:     int64(probe.GetWidth()),
 		Height:    int64(probe.GetHeight()),
 		Caption:   text,
 		ParseMode: "HTML",
 
-		ReplyToMessageId:  replyId,
+		ReplyParameters:   MakeReplyToMsgID(replyId),
 		SupportsStreaming: true,
 
 		RequestOpts: &gotgbot.RequestOpts{
@@ -309,7 +310,10 @@ func sendAudio(bot *gotgbot.Bot, ctx *ext.Context, res *YtDlResult) (*gotgbot.Me
 	}
 	text := res.formatCaption(ctx.EffectiveUser)
 	if res.IsFileId() {
-		return bot.SendAudio(ctx.EffectiveChat.Id, res.File, &gotgbot.SendAudioOpts{ReplyToMessageId: replyId, Caption: text, ParseMode: "HTML"})
+		return bot.SendAudio(
+			ctx.EffectiveChat.Id, gotgbot.InputFileByID(res.File),
+			&gotgbot.SendAudioOpts{ReplyParameters: MakeReplyToMsgID(replyId), Caption: text, ParseMode: "HTML"},
+		)
 	}
 
 	probe, err := ffmpegProbes(res.File)
@@ -322,7 +326,7 @@ func sendAudio(bot *gotgbot.Bot, ctx *ext.Context, res *YtDlResult) (*gotgbot.Me
 		Caption:   text,
 		ParseMode: "HTML",
 
-		ReplyToMessageId: replyId,
+		ReplyParameters: MakeReplyToMsgID(replyId),
 
 		RequestOpts: &gotgbot.RequestOpts{
 			Timeout: time.Hour * 6,

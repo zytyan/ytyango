@@ -2,9 +2,10 @@ package myhandlers
 
 import (
 	"bytes"
-	jsoniter "github.com/json-iterator/go"
 	"os/exec"
 	"strconv"
+
+	jsoniter "github.com/json-iterator/go"
 )
 
 type FfmpegProbes struct {

@@ -3,12 +3,13 @@ package bothttp
 import (
 	"crypto/hmac"
 	"crypto/sha256"
-	ginzap "github.com/gin-contrib/zap"
-	"github.com/gin-gonic/gin"
-	"go.uber.org/zap"
 	"main/globalcfg"
 	"net/http"
 	"time"
+
+	ginzap "github.com/gin-contrib/zap"
+	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
 )
 
 var botVerifyKey = func() []byte {
@@ -32,7 +33,6 @@ func Run() {
 	err := r.SetTrustedProxies(nil)
 	if err != nil {
 		panic(err)
-		return
 	}
 	logger := globalcfg.GetLogger("bot-http").Desugar()
 	log = logger.Sugar()

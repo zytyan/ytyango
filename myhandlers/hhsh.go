@@ -2,15 +2,15 @@ package myhandlers
 
 import (
 	"fmt"
-	"github.com/PaulSonOfLars/gotgbot/v2"
-	"github.com/PaulSonOfLars/gotgbot/v2/ext"
-	jsoniter "github.com/json-iterator/go"
-
 	"io"
 	"net/http"
 	"net/url"
 	"regexp"
 	"strings"
+
+	"github.com/PaulSonOfLars/gotgbot/v2"
+	"github.com/PaulSonOfLars/gotgbot/v2/ext"
+	jsoniter "github.com/json-iterator/go"
 )
 
 type HhshResponse struct {

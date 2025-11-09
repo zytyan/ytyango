@@ -1,18 +1,19 @@
 package main
 
 import (
-	"github.com/PaulSonOfLars/gotgbot/v2"
-	"github.com/PaulSonOfLars/gotgbot/v2/ext"
-	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers"
-	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers/filters/callbackquery"
-	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers/filters/inlinequery"
-	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers/filters/message"
 	"main/bothttp"
 	"main/globalcfg"
 	"main/myhandlers"
 	"net/http"
 	"sync"
 	"time"
+
+	"github.com/PaulSonOfLars/gotgbot/v2"
+	"github.com/PaulSonOfLars/gotgbot/v2/ext"
+	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers"
+	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers/filters/callbackquery"
+	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers/filters/inlinequery"
+	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers/filters/message"
 )
 
 var log = globalcfg.GetLogger("main")
@@ -74,9 +75,12 @@ func main() {
 		},
 		MaxRoutines: ext.DefaultMaxRoutines,
 	}), autoInc: 0, mutex: sync.Mutex{}}
-	updater := ext.NewUpdater(&ext.UpdaterOpts{
-		Dispatcher: dispatcher.Dispatcher,
-	})
+	updater := ext.NewUpdater(dispatcher.Dispatcher, &ext.UpdaterOpts{
+		UnhandledErrFunc: func(err error) {
+			log.Errorf("an error occurred while handling update: %s", err)
+		},
+	},
+	)
 	hMsg := handlers.NewMessage(message.All, myhandlers.SaveMessage)
 	hMsg.AllowChannel = true
 	hMsg.AllowEdited = true

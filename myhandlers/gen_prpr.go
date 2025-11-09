@@ -1,12 +1,13 @@
 package myhandlers
 
 import (
-	"github.com/PaulSonOfLars/gotgbot/v2"
-	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 	"main/globalcfg"
 	"main/helpers/imgproc"
 	"os"
 	"path/filepath"
+
+	"github.com/PaulSonOfLars/gotgbot/v2"
+	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 )
 
 type prprCache struct {
@@ -50,7 +51,7 @@ func GenPrpr(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
 	photo := photos.Photos[0][0]
 	prpr, err := getPrprCache(photo.FileUniqueId)
 	if err == nil {
-		_, err = bot.SendSticker(ctx.EffectiveChat.Id, prpr, nil)
+		_, err = bot.SendSticker(ctx.EffectiveChat.Id, gotgbot.InputFileByID(prpr), nil)
 		return err
 	}
 	file, err := bot.GetFile(photo.FileId, nil)

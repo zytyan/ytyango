@@ -2,13 +2,14 @@ package myhandlers
 
 import (
 	"fmt"
-	ginzap "github.com/gin-contrib/zap"
-	"github.com/gin-gonic/gin"
-	"go.uber.org/zap/zapcore"
 	"main/globalcfg"
 	"strconv"
 	"strings"
 	"time"
+
+	ginzap "github.com/gin-contrib/zap"
+	"github.com/gin-gonic/gin"
+	"go.uber.org/zap/zapcore"
 )
 
 type MarsInfo struct {

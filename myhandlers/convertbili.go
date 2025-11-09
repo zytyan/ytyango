@@ -11,10 +11,11 @@ import (
 import (
 	"encoding/base64"
 	"fmt"
-	"github.com/PaulSonOfLars/gotgbot/v2"
-	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 	"html"
 	"main/helpers/bili"
+
+	"github.com/PaulSonOfLars/gotgbot/v2"
+	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 )
 
 var log = globalcfg.GetLogger("handlers")

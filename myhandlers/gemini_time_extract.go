@@ -3,15 +3,16 @@ package myhandlers
 import (
 	"context"
 	"fmt"
-	"github.com/PaulSonOfLars/gotgbot/v2"
-	"github.com/PaulSonOfLars/gotgbot/v2/ext"
-	jsoniter "github.com/json-iterator/go"
-	"google.golang.org/genai"
 	"main/globalcfg"
 	"regexp"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/PaulSonOfLars/gotgbot/v2"
+	"github.com/PaulSonOfLars/gotgbot/v2/ext"
+	jsoniter "github.com/json-iterator/go"
+	"google.golang.org/genai"
 )
 
 var getGenAiClient = sync.OnceValues(func() (*genai.Client, error) {
@@ -139,6 +140,9 @@ func SetUserTimeZone(bot *gotgbot.Bot, ctx *ext.Context) error {
 	}
 	_, zone := t.Zone()
 	user := GetUser(ctx.EffectiveUser.Id)
+	if user == nil {
+		return fmt.Errorf("user id %d not found", ctx.EffectiveUser.Id)
+	}
 	user.TimeZone.Valid = true
 	user.TimeZone.Int32 = int32(zone)
 	err = globalcfg.GetDb().Model(user).

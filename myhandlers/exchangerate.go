@@ -3,9 +3,10 @@ package myhandlers
 import (
 	"errors"
 	"fmt"
+	"main/helpers/exchange"
+
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
-	"main/helpers/exchange"
 )
 
 func IsCalcExchangeRate(msg *gotgbot.Message) bool {

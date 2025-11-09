@@ -2,15 +2,16 @@ package myhandlers
 
 import (
 	"fmt"
-	"github.com/PaulSonOfLars/gotgbot/v2"
-	"github.com/PaulSonOfLars/gotgbot/v2/ext"
-	"github.com/google/uuid"
-	"golang.org/x/text/width"
 	"main/globalcfg"
 	"main/helpers/cocdice"
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/PaulSonOfLars/gotgbot/v2"
+	"github.com/PaulSonOfLars/gotgbot/v2/ext"
+	"github.com/google/uuid"
+	"golang.org/x/text/width"
 )
 
 var dndDiceRe = regexp.MustCompile(`^((\d+)\s*)?([dDbBpP])\s*(\d+)?(\s*([+-])(\d+))?\s*(/?\s*([\w\p{Han}\p{Hiragana}\p{Katakana}]+))?$`)

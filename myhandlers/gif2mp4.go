@@ -2,8 +2,6 @@ package myhandlers
 
 import (
 	"fmt"
-	"github.com/PaulSonOfLars/gotgbot/v2"
-	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 	"io"
 	"net/http"
 	"net/url"
@@ -12,6 +10,9 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/PaulSonOfLars/gotgbot/v2"
+	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 )
 
 func gif2mp4(gifFile, mp4File string) error {

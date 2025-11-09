@@ -1,11 +1,12 @@
 package myhandlers
 
 import (
+	"main/globalcfg"
+	"regexp"
+
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 	"gorm.io/gorm/clause"
-	"main/globalcfg"
-	"regexp"
 )
 
 func getRandomNsfwAdult() string {
@@ -25,9 +26,9 @@ func SendRandAdult(bot *gotgbot.Bot, ctx *ext.Context) error {
 		_, err := ctx.EffectiveMessage.Reply(bot, "没有色图~", nil)
 		return err
 	}
-	_, err := bot.SendPhoto(ctx.EffectiveChat.Id, photo, &gotgbot.SendPhotoOpts{
-		ReplyToMessageId: ctx.EffectiveMessage.MessageId,
-		HasSpoiler:       true,
+	_, err := bot.SendPhoto(ctx.EffectiveChat.Id, gotgbot.InputFileByID(photo), &gotgbot.SendPhotoOpts{
+		ReplyParameters: MakeReplyToMsgID(ctx.EffectiveMessage.MessageId),
+		HasSpoiler:      true,
 	})
 	return err
 }
@@ -38,8 +39,8 @@ func SendRandRacy(bot *gotgbot.Bot, ctx *ext.Context) error {
 		_, err := ctx.EffectiveMessage.Reply(bot, "没有涩图~", nil)
 		return err
 	}
-	_, err := bot.SendPhoto(ctx.EffectiveChat.Id, photo, &gotgbot.SendPhotoOpts{
-		ReplyToMessageId: ctx.EffectiveMessage.MessageId,
+	_, err := bot.SendPhoto(ctx.EffectiveChat.Id, gotgbot.InputFileByID(photo), &gotgbot.SendPhotoOpts{
+		ReplyParameters: MakeReplyToMsgID(ctx.EffectiveMessage.MessageId),
 	})
 	return err
 }
