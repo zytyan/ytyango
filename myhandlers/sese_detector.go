@@ -79,10 +79,7 @@ func replyNsfw(bot *gotgbot.Bot, msg *gotgbot.Message, result *azure.ModeratorV2
 	severity := result.GetSeverityByCategory(azure.ModerateV2CatSexual)
 	isAdult := severity >= 6
 	isRacy := severity >= 4
-	if !isAdult && !isRacy {
-		return false, nil
-	}
-	go saveNsfw(msg.Photo[len(msg.Photo)-1].FileId, isRacy, isAdult)
+	go saveNsfw(msg.Photo[len(msg.Photo)-1].FileId, severity >= 2, isAdult)
 	WithGroupLockToday(msg.Chat.Id, func(g *GroupStatDaily) {
 		if isAdult {
 			g.AdultCount++
@@ -98,6 +95,9 @@ func replyNsfw(bot *gotgbot.Bot, msg *gotgbot.Message, result *azure.ModeratorV2
 		} else if isRacy {
 			_, err := msg.Reply(bot, "好色哦~", nil)
 			return true, err
+		} else if severity >= 2 {
+			_, err := msg.Reply(bot, "涩涩的~", nil)
+			return true, err
 		} else {
 			return false, nil
 		}
@@ -107,6 +107,9 @@ func replyNsfw(bot *gotgbot.Bot, msg *gotgbot.Message, result *azure.ModeratorV2
 			return true, err
 		} else if isRacy {
 			_, err := msg.Reply(bot, "悄悄看一眼~", nil)
+			return true, err
+		} else if severity >= 2 {
+			_, err := msg.Reply(bot, "给bot也看看~", nil)
 			return true, err
 		} else {
 			return false, nil
