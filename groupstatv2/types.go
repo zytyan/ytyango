@@ -3,6 +3,7 @@ package groupstatv2
 import (
 	"bytes"
 	"encoding/gob"
+	"slices"
 	"sync/atomic"
 
 	"github.com/puzpuzpuz/xsync/v3"
@@ -24,6 +25,7 @@ func (c *Counter) GobEncode() ([]byte, error) {
 	}
 	return buf.Bytes(), nil
 }
+
 func (c *Counter) GobDecode(data []byte) error {
 	var v int64
 	buf := bytes.NewBuffer(data)
@@ -34,18 +36,22 @@ func (c *Counter) GobDecode(data []byte) error {
 	return nil
 }
 
+func (c *Counter) Value() any {
+	return c.Load()
+}
+
 type EncodableMap[K comparable, V any] struct {
 	*xsync.MapOf[K, V]
 }
 
 func (e *EncodableMap[K, V]) GobEncode() ([]byte, error) {
-
 	buf := &bytes.Buffer{}
 	tmpMap := xsync.ToPlainMapOf(e.MapOf)
 	enc := gob.NewEncoder(buf)
 	err := enc.Encode(tmpMap)
 	return buf.Bytes(), err
 }
+
 func (e *EncodableMap[K, V]) GobDecode(data []byte) error {
 	tmpMap := make(map[K]V)
 	buf := bytes.NewBuffer(data)
@@ -57,6 +63,26 @@ func (e *EncodableMap[K, V]) GobDecode(data []byte) error {
 		e.Store(k, v)
 	}
 	return nil
+}
+
+func (e *EncodableMap[K, V]) Value() any {
+	return xsync.ToPlainMapOf(e.MapOf)
+}
+
+type MapPair[K comparable, V any] struct {
+	Key   K
+	Value V
+}
+
+func (e *EncodableMap[K, V]) SortedFunc(fn func(p1, p2 MapPair[K, V]) int) []MapPair[K, V] {
+	sz := e.MapOf.Size()
+	arr := make([]MapPair[K, V], 0, sz)
+	e.MapOf.Range(func(key K, value V) bool {
+		arr = append(arr, MapPair[K, V]{key, value})
+		return true
+	})
+	slices.SortFunc(arr, fn)
+	return arr
 }
 
 func NewEncodableMapOf[K comparable, V any](size int) *EncodableMap[K, V] {

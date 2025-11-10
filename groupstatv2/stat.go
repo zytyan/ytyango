@@ -135,6 +135,14 @@ func GetGroup(id int64) *GroupStatTwoDays {
 	return g
 }
 
+func GetGroupToday(id int64) *GroupStatDaily {
+	return GetGroup(id).Today
+}
+
+func AddMsg(msg *gotgbot.Message) {
+	GetGroup(msg.Chat.Id).AddMsg(msg)
+}
+
 func SaveToFile() error {
 	globalMu.Lock()
 	defer globalMu.Unlock()
