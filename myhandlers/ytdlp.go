@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"html"
 	"main/globalcfg"
+	"main/groupstatv2"
 	"main/helpers/ytdlp"
 	"regexp"
 	"strconv"
@@ -349,7 +350,7 @@ func DownloadVideoCallback(bot *gotgbot.Bot, ctx *ext.Context) error {
 		answer(msg, true)
 		return err
 	}
-	AddDownloadVideoCnt(ctx.EffectiveChat.Id)
+	groupstatv2.GetGroupToday(ctx.Message.MessageId).DownloadVideoCount.Inc()
 	answer("视频开始下载", false)
 	msgOpt := &gotgbot.SendMessageOpts{ParseMode: "HTML"}
 	atUser := fmt.Sprintf(`<a href="tg://user?id=%d">%s</a> `,
@@ -393,7 +394,7 @@ func DownloadInlinedBv(bot *gotgbot.Bot, ctx *ext.Context) error {
 		return err
 	}
 	log.Infof("chat id %d, download inlined bv %s", chatId, ctx.CallbackQuery.Data)
-	AddDownloadVideoCnt(chatId)
+	groupstatv2.GetGroupToday(chatId).DownloadVideoCount.Inc()
 	answer("视频开始下载", false)
 	msgOpt := &gotgbot.SendMessageOpts{ParseMode: "HTML"}
 	atUser := fmt.Sprintf(`<a href="tg://user?id=%d">%s</a> `,
@@ -429,7 +430,7 @@ func DownloadVideo(bot *gotgbot.Bot, ctx *ext.Context) error {
 		reply(msg)
 		return err
 	}
-	AddDownloadVideoCnt(ctx.EffectiveChat.Id)
+	groupstatv2.GetGroupToday(ctx.EffectiveChat.Id).DownloadVideoCount.Inc()
 	reply("正在下载，请稍等")
 	result, clean, err := key.Download()
 	defer clean()
@@ -461,7 +462,7 @@ func DownloadAudio(bot *gotgbot.Bot, ctx *ext.Context) error {
 		reply(msg)
 		return err
 	}
-	AddDownloadAudioCnt(ctx.EffectiveChat.Id)
+	groupstatv2.GetGroupToday(ctx.EffectiveChat.Id).DownloadAudioCount.Inc()
 	reply("正在下载，请稍等")
 	result, clean, err := key.Download()
 	defer clean()

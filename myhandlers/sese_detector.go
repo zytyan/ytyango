@@ -3,6 +3,7 @@ package myhandlers
 import (
 	"fmt"
 	"main/globalcfg"
+	"main/groupstatv2"
 	"main/helpers/azure"
 	"strings"
 	"sync"
@@ -83,13 +84,14 @@ func replyNsfw(bot *gotgbot.Bot, msg *gotgbot.Message, result *azure.ModeratorV2
 		return false, nil
 	}
 	go saveNsfw(msg.Photo[len(msg.Photo)-1].FileId, isRacy, isAdult)
-	WithGroupLockToday(msg.Chat.Id, func(g *GroupStatDaily) {
-		if isAdult {
-			g.AdultCount++
-		} else if isRacy {
-			g.RacyCount++
-		}
-	})
+	if isRacy {
+		groupstatv2.GetGroupToday(msg.Chat.Id).RacyCount.Inc()
+	}
+	if isAdult {
+		groupstatv2.GetGroupToday(msg.Chat.Id).AdultCount.Inc()
+	}
+
+
 
 	if !msg.HasMediaSpoiler {
 		if isAdult {

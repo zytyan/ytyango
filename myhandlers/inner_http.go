@@ -3,6 +3,7 @@ package myhandlers
 import (
 	"fmt"
 	"main/globalcfg"
+	"main/groupstatv2"
 	"strconv"
 	"strings"
 	"time"
@@ -24,10 +25,12 @@ func marsCounter(ctx *gin.Context) {
 		ctx.AbortWithStatus(400)
 		return
 	}
-	WithGroupLockToday(marsInfo.GroupID, func(g *GroupStatDaily) {
-		g.MarsCount++
-		g.MaxMarsCount = max(g.MaxMarsCount, marsInfo.MarsCount)
-	})
+	g := groupstatv2.GetGroupToday(marsInfo.GroupID)
+	g.MarsCount.Inc()
+	maxMarsCnt := g.MaxMarsCount.Load()
+	if marsInfo.MarsCount > maxMarsCnt {
+		g.MaxMarsCount.CompareAndSwap(maxMarsCnt, marsInfo.MarsCount)
+	}
 }
 
 const (
@@ -50,14 +53,14 @@ func dioBan(ctx *gin.Context) {
 		ctx.AbortWithStatus(400)
 		return
 	}
-	WithGroupLockToday(dioBanUser.GroupId, func(g *GroupStatDaily) {
-		switch dioBanUser.Action {
-		case DioBanActionAdd:
-			g.DioAddUserCount++
-		case DioBanActionBanByWrongButton, DioBanActionBanByNoButton, DioBanActionBanByNoMsg:
-			g.DioBanUserCount++
-		}
-	})
+	g := groupstatv2.GetGroupToday(dioBanUser.GroupId)
+	switch dioBanUser.Action {
+	case DioBanActionAdd:
+		g.DioAddUserCount.Inc()
+	case DioBanActionBanByWrongButton, DioBanActionBanByNoButton, DioBanActionBanByNoMsg:
+		g.DioBanUserCount.Inc()
+	}
+
 }
 func formatLoggers() string {
 	buf := strings.Builder{}

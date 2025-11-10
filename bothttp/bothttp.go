@@ -45,7 +45,6 @@ func Run() {
 	g := r.Group("/api/v1/tg")
 	g.GET("/username", reqBrowserCache, getUserInfo)
 	g.GET("/profile_photo", reqBrowserCache, getUserProfilePhoto)
-	g.GET("/group_stat", verifyHeader, groupStat)
 	g.Match([]string{http.MethodGet, http.MethodPost},
 		"/search", verifyHeader, searchMessage)
 	err = r.Run("127.0.0.1:4021")
