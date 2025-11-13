@@ -38,9 +38,11 @@ func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 	genCtx, cancel := context.WithTimeout(context.Background(), time.Second*15)
 	defer cancel()
 
-	sysInst := fmt.Sprintf(`这里是一个Telegram聊天 type:%s,name:%s
+	sysInst := fmt.Sprintf(`time:%s
+这里是一个Telegram聊天 type:%s,name:%s
 请使用中文回复消息。
-当前正处于原型测试阶段，不支持多轮对话。`, ctx.EffectiveMessage.Chat.Type, getChatName(&ctx.EffectiveMessage.Chat))
+当前正处于原型测试阶段，不支持多轮对话。`, time.Now().Format("2006-01-02 15:04:05 -07:00"),
+		ctx.EffectiveMessage.Chat.Type, getChatName(&ctx.EffectiveMessage.Chat))
 	config := &genai.GenerateContentConfig{
 		SystemInstruction: genai.NewContentFromText(sysInst, genai.RoleModel),
 	}
