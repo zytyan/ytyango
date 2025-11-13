@@ -64,7 +64,7 @@ func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 		_, _ = ctx.EffectiveMessage.Reply(bot, fmt.Sprintf("error:%s", err), nil)
 		return err
 	}
-	_, err = ctx.EffectiveMessage.Reply(bot, res.Text(), &gotgbot.SendMessageOpts{ParseMode: gotgbot.ParseModeMarkdownV2})
+	_, err = ctx.EffectiveMessage.Reply(bot, res.Text(), nil)
 	return err
 }
 
