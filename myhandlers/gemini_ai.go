@@ -1,0 +1,97 @@
+package myhandlers
+
+import (
+	"context"
+	"fmt"
+	"main/globalcfg"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/PaulSonOfLars/gotgbot/v2"
+	"github.com/PaulSonOfLars/gotgbot/v2/ext"
+	"google.golang.org/genai"
+)
+
+var getGenAiClient = sync.OnceValues(func() (*genai.Client, error) {
+	ctx := context.Background()
+	client, err := genai.NewClient(ctx, &genai.ClientConfig{
+		APIKey:  globalcfg.GetConfig().GeminiKey,
+		Backend: genai.BackendGeminiAPI,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return client, nil
+})
+
+func IsGeminiReq(msg *gotgbot.Message) bool {
+	return strings.Contains(msg.Text, "@"+mainBot.Username)
+}
+
+func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
+
+	client, err := getGenAiClient()
+	if err != nil {
+		return err
+	}
+	genCtx, cancel := context.WithTimeout(context.Background(), time.Second*15)
+	defer cancel()
+
+	sysInst := fmt.Sprintf(`这里是一个Telegram聊天 type:%s,name:%s
+请使用中文回复消息。
+当前正处于原型测试阶段，不支持多轮对话。`, ctx.EffectiveMessage.Chat.Type, getChatName(&ctx.EffectiveMessage.Chat))
+	config := &genai.GenerateContentConfig{
+		SystemInstruction: genai.NewContentFromText(sysInst, genai.RoleModel),
+	}
+	text := getText(ctx)
+	//  "🤓", "👻", "👨‍💻", "👀",
+	_, err = ctx.EffectiveMessage.SetReaction(bot, &gotgbot.SetMessageReactionOpts{
+		Reaction: []gotgbot.ReactionType{gotgbot.ReactionTypeEmoji{Emoji: "👀"}},
+		IsBig:    false,
+	})
+	if err != nil {
+		log.Warnf("set reaction emoji to message %s(%d) failed ", getChatName(&ctx.EffectiveMessage.Chat), ctx.EffectiveMessage.MessageId)
+	}
+	res, err := client.Models.GenerateContent(genCtx, "gemini-2.5-flash-preview-09-2025", genai.Text(text), config)
+	if err != nil {
+		_, _ = ctx.EffectiveMessage.SetReaction(bot, &gotgbot.SetMessageReactionOpts{
+			Reaction: []gotgbot.ReactionType{gotgbot.ReactionTypeEmoji{Emoji: "😭"}},
+			IsBig:    false,
+		})
+		_, _ = ctx.EffectiveMessage.Reply(bot, fmt.Sprintf("error:%s", err), nil)
+		return err
+	}
+	_, err = ctx.EffectiveMessage.Reply(bot, res.Text(), nil)
+	return err
+}
+
+func SetUserTimeZone(bot *gotgbot.Bot, ctx *ext.Context) error {
+	fields := strings.Fields(ctx.EffectiveMessage.Text)
+	const help = "用法: /settimezone +0800"
+	if len(fields) < 2 {
+		_, err := ctx.EffectiveMessage.Reply(bot, help, nil)
+		return err
+	}
+	t, err := time.Parse("-0700", fields[1])
+	if err != nil {
+		_, err := ctx.EffectiveMessage.Reply(bot, help, nil)
+		return err
+	}
+	_, zone := t.Zone()
+	user := GetUser(ctx.EffectiveUser.Id)
+	if user == nil {
+		return fmt.Errorf("user id %d not found", ctx.EffectiveUser.Id)
+	}
+	user.TimeZone.Valid = true
+	user.TimeZone.Int32 = int32(zone)
+	err = globalcfg.GetDb().Model(user).
+		Select("time_zone").
+		Updates(user).Error
+	if err != nil {
+		_, err = ctx.EffectiveMessage.Reply(bot, err.Error(), nil)
+		return err
+	}
+	_, err = ctx.EffectiveMessage.Reply(bot, fmt.Sprintf("设置成功 %d seconds", zone), nil)
+	return err
+}

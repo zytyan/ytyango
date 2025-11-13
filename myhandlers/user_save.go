@@ -41,18 +41,9 @@ func (u *User) Name() string {
 	return strings.TrimSpace(u.FirstName + " " + u.LastName)
 }
 
-func (u *User) GetUpdateTime() time.Time {
-	return time.Unix(u.UpdatedAt, 0)
-}
-
-func (u *User) needUpdate() bool {
-	// 这里主要避免 user profile 被频繁更新
-	return time.Since(u.GetUpdateTime()) > time.Hour
-}
-
 func (u *User) profileNeedUpdate() bool {
 	// 这里会多一次 http bot api 调用，所以冷静一下
-	return time.Since(time.Unix(u.ProfileUpdateAt, 0)) > time.Hour*24*3
+	return time.Since(time.Unix(u.ProfileUpdateAt, 0)) > time.Hour
 }
 
 func (u *User) updateName(firstName, lastName string) error {
