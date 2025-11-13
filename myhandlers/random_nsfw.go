@@ -72,17 +72,20 @@ type NotNsfwPic struct {
 	PicId string `gorm:"uniqueIndex"`
 }
 
-func markPicNsfw(bot *gotgbot.Bot, msg *gotgbot.Message, picId string) error {
+func markPicNotNsfw(bot *gotgbot.Bot, msg *gotgbot.Message, picId string) error {
 	err := globalcfg.GetDb().Exec(`INSERT OR IGNORE INTO not_nsfw_pics (pic_id) VALUES (?)`, picId).Error
-	if err != nil {
-		_, err = msg.Reply(bot, fmt.Sprintf("error: %s", err), nil)
+	err2 := globalcfg.GetDb().Exec(`DELETE FROM nsfw_pic_racies WHERE pic_id = ?`, picId).Error
+	err3 := globalcfg.GetDb().Exec(`DELETE FROM nsfw_pic_adults WHERE pic_id = ?`, picId).Error
+
+	if err != nil || err2 != nil || err3 != nil {
+		_, err = msg.Reply(bot, fmt.Sprintf("error: %s, error2: %s, error3: %s", err, err2, err3), nil)
 	} else {
 		_, err = msg.Reply(bot, "已标记为非色图", nil)
 	}
 	return err
 }
 
-func removePicNsfwMark(bot *gotgbot.Bot, msg *gotgbot.Message, picId string) error {
+func removePicNotNsfwMark(bot *gotgbot.Bot, msg *gotgbot.Message, picId string) error {
 	err := globalcfg.GetDb().Exec(`DELETE FROM not_nsfw_pics WHERE pic_id = ?`, picId).Error
 	if err != nil {
 		_, err = msg.Reply(bot, fmt.Sprintf("error: %s", err), nil)
@@ -104,8 +107,8 @@ func MarkPicNotNsfwOrNot(bot *gotgbot.Bot, ctx *ext.Context) error {
 	}
 	text := getText(ctx)
 	if strings.HasPrefix(text, "/remove_nsfw_mark") {
-		return removePicNsfwMark(bot, ctx.EffectiveMessage, photo.FileId)
+		return removePicNotNsfwMark(bot, ctx.EffectiveMessage, photo.FileId)
 	}
-	return markPicNsfw(bot, ctx.EffectiveMessage, photo.FileId)
+	return markPicNotNsfw(bot, ctx.EffectiveMessage, photo.FileId)
 
 }
