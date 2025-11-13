@@ -26,7 +26,7 @@ var getGenAiClient = sync.OnceValues(func() (*genai.Client, error) {
 })
 
 func IsGeminiReq(msg *gotgbot.Message) bool {
-	return strings.Contains(msg.Text, "@"+mainBot.Username)
+	return !strings.HasPrefix(msg.Text, "/") && strings.Contains(msg.Text, "@"+mainBot.Username)
 }
 
 func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
@@ -64,7 +64,7 @@ func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 		_, _ = ctx.EffectiveMessage.Reply(bot, fmt.Sprintf("error:%s", err), nil)
 		return err
 	}
-	_, err = ctx.EffectiveMessage.Reply(bot, res.Text(), nil)
+	_, err = ctx.EffectiveMessage.Reply(bot, res.Text(), &gotgbot.SendMessageOpts{ParseMode: gotgbot.ParseModeMarkdownV2})
 	return err
 }
 
