@@ -35,7 +35,7 @@ func GetMainBot() *gotgbot.Bot {
 
 func init() {
 	db := globalcfg.GetDb()
-	err := db.AutoMigrate(&User{}, &GroupInfo{}, &prprCache{}, &YtDlResult{}, &CharacterAttr{}, &NsfwPicRacy{}, &NsfwPicAdult{}, &ManualNotNsfwPicAdult{}, &ManualNotNsfwPicRacy{})
+	err := db.AutoMigrate(&User{}, &GroupInfo{}, &prprCache{}, &YtDlResult{}, &CharacterAttr{}, &NsfwPicRacy{}, &NsfwPicAdult{}, &NotNsfwPic{})
 	if err != nil {
 		panic(err)
 	}

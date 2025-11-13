@@ -24,8 +24,9 @@ type GroupInfo struct {
 	AutoCvtBili   bool `btnTxt:"自动转换Bilibili视频链接" pos:"1,1"`
 	AutoCalculate bool `btnTxt:"自动计算算式" pos:"2,1"`
 	AutoExchange  bool `btnTxt:"自动换算汇率" pos:"2,2"`
-	CoCEnabled    bool `btnTxt:"启用CoC辅助" pos:"3,2"`
 	SaveMessages  bool `btnTxt:"保存群组消息" pos:"3,1"`
+	CoCEnabled    bool `btnTxt:"启用CoC辅助" pos:"3,2"`
+	RespNsfwMsg   bool `btnTxt:"响应来张色图" pos:"4,1"` // 响应来张色图
 }
 
 var groupInfoCache = mustNewLru[int64, *GroupInfo](1000)

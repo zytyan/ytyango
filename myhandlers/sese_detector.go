@@ -4,13 +4,11 @@ import (
 	"fmt"
 	"main/globalcfg"
 	"main/helpers/azure"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
-	"gorm.io/gorm/clause"
 )
 
 type groupedMsgK struct {
@@ -35,86 +33,59 @@ type NsfwPicAdult struct {
 	PicId string `gorm:"uniqueIndex"`
 }
 
-type ManualNotNsfwPicAdult struct {
-	PicId string `gorm:"uniqueIndex"`
-}
-
-type ManualNotNsfwPicRacy struct {
-	PicId string `gorm:"uniqueIndex"`
-}
-
-func saveNsfw(picId string, isRacy, isAdult bool) {
-	log.Debugf("picId = %s, isRacy = %t, isAdult = %t", picId, isRacy, isAdult)
-	if !isAdult && !isRacy {
+// saveNsfw
+// param score: [0, 2, 4, 6]
+func saveNsfw(picId string, severity int) {
+	db := globalcfg.GetDb()
+	var tableName string
+	if severity <= 2 {
 		return
-	}
-	if isAdult {
-		if globalcfg.GetDb().Where("pic_id = ?", picId).First(&ManualNotNsfwPicAdult{PicId: picId}).Error == nil {
-			log.Debugf("Image %s in Manul not nsfw pic adult.", picId)
-			return
-		}
-		globalcfg.GetDb().Clauses(
-			clause.OnConflict{
-				DoNothing: true,
-			},
-		).Create(&NsfwPicAdult{
-			PicId: picId,
-		})
+	} else if severity <= 4 {
+		tableName = "nsfw_pic_adults"
 	} else {
-		if globalcfg.GetDb().Where("pic_id = ?", picId).First(&ManualNotNsfwPicRacy{PicId: picId}).Error == nil {
-			log.Debugf("Image %s in Manul not nsfw pic racy.", picId)
-			return
-		}
-		globalcfg.GetDb().Clauses(
-			clause.OnConflict{
-				DoNothing: true,
-			},
-		).Create(&NsfwPicRacy{
-			PicId: picId,
-		})
+		tableName = "nsfw_pic_racies"
 	}
+	sql := fmt.Sprintf(`INSERT OR IGNORE INTO %s (pic_id) 
+       	SELECT ? WHERE NOT EXISTS (SELECT 1 FROM not_nsfw_pics exclude WHERE pic_id = ?)
+       `, tableName)
+
+	tx := db.Exec(sql, picId, picId)
+	if tx.RowsAffected > 0 {
+		log.Debugf("save")
+	}
+	if tx.Error != nil {
+		log.Warnf("saveNsfw err: %s", tx.Error)
+	}
+}
+
+var nsfwReplyMsgList = [2][3]string{
+	{"涩涩的~", "好色哦~", "口夷~"},
+	{"给bot也看看~", "悄悄看一眼~", "不敢看~"},
 }
 
 func replyNsfw(bot *gotgbot.Bot, msg *gotgbot.Message, result *azure.ModeratorV2Result) (bool, error) {
 	severity := result.GetSeverityByCategory(azure.ModerateV2CatSexual)
-	isAdult := severity >= 6
-	isRacy := severity >= 4
-	go saveNsfw(msg.Photo[len(msg.Photo)-1].FileId, severity >= 2, isAdult)
+	if severity < 2 {
+		return false, nil
+	} else if severity > 7 {
+		return false, fmt.Errorf("severity %d is invalid", severity)
+	}
+
+	go saveNsfw(msg.Photo[len(msg.Photo)-1].FileId, severity)
 	WithGroupLockToday(msg.Chat.Id, func(g *GroupStatDaily) {
-		if isAdult {
+		if severity >= 6 {
 			g.AdultCount++
-		} else if isRacy {
+		} else {
 			g.RacyCount++
 		}
 	})
-
-	if !msg.HasMediaSpoiler {
-		if isAdult {
-			_, err := msg.Reply(bot, "口夷~", nil)
-			return true, err
-		} else if isRacy {
-			_, err := msg.Reply(bot, "好色哦~", nil)
-			return true, err
-		} else if severity >= 2 {
-			_, err := msg.Reply(bot, "涩涩的~", nil)
-			return true, err
-		} else {
-			return false, nil
-		}
-	} else {
-		if isAdult {
-			_, err := msg.Reply(bot, "不敢看~", nil)
-			return true, err
-		} else if isRacy {
-			_, err := msg.Reply(bot, "悄悄看一眼~", nil)
-			return true, err
-		} else if severity >= 2 {
-			_, err := msg.Reply(bot, "给bot也看看~", nil)
-			return true, err
-		} else {
-			return false, nil
-		}
+	var spoiler = 0
+	if msg.HasMediaSpoiler {
+		spoiler = 1
 	}
+	replyText := nsfwReplyMsgList[spoiler][severity/2-1]
+	_, err := msg.Reply(bot, replyText, nil)
+	return true, err
 }
 
 func moderateDetectOne(bot *gotgbot.Bot, msg *gotgbot.Message) (replied bool) {
@@ -193,7 +164,7 @@ func CmdScore(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
 		return err
 	}
 	severity := result.GetSeverityByCategory(azure.ModerateV2CatSexual)
-	go saveNsfw(photo.FileId, severity >= 4, severity >= 6)
+	go saveNsfw(photo.FileId, severity)
 	text := fmt.Sprintf("score: %d", severity)
 	_, err = ctx.Message.Reply(bot, text, nil)
 	if err != nil {
@@ -222,58 +193,17 @@ func SeseDetect(bot *gotgbot.Bot, ctx *ext.Context) error {
 	return nil
 }
 
-type manualAddPicCfg struct {
-	addingRacy  bool
-	addingAdult bool
-}
-
-var gAddPicCfg manualAddPicCfg
-
-func HasPhoto(message *gotgbot.Message) bool {
-	photos := message.Photo
-	if len(photos) == 0 {
-		return false
-	}
-	return true
-}
-func SetManualAddPic(bot *gotgbot.Bot, ctx *ext.Context) error {
-	lower := strings.ToLower(ctx.EffectiveMessage.Text)
-	if strings.Contains(lower, "adult") {
-		gAddPicCfg.addingAdult = true
-		gAddPicCfg.addingRacy = false
-	} else if strings.Contains(lower, "racy") {
-		gAddPicCfg.addingAdult = false
-		gAddPicCfg.addingRacy = true
-	} else {
-		gAddPicCfg.addingAdult = false
-		gAddPicCfg.addingRacy = false
-	}
-	_, err := ctx.EffectiveMessage.Reply(bot, fmt.Sprintf("%#v", gAddPicCfg), nil)
-	return err
-}
-
-func ManualAddPic(_ *gotgbot.Bot, ctx *ext.Context) error {
-	if ctx.EffectiveUser.Id != globalcfg.GetConfig().God {
-		return nil
-	}
-	photos := ctx.EffectiveMessage.Photo
-	photo := photos[len(photos)-1]
-	saveNsfw(photo.FileId, gAddPicCfg.addingRacy, gAddPicCfg.addingAdult)
-	return nil
-}
 func CountNsfwPics(bot *gotgbot.Bot, ctx *ext.Context) error {
-	var racyPicCnt, adultPicCnt, manualNotRacyCnt, manualNotAdultCnt int64
+	var racyPicCnt, adultPicCnt, manualNotNsfwCount int64
 	globalcfg.GetDb().Model(NsfwPicRacy{}).Count(&racyPicCnt)
 	globalcfg.GetDb().Model(NsfwPicAdult{}).Count(&adultPicCnt)
 
-	globalcfg.GetDb().Model(ManualNotNsfwPicRacy{}).Count(&manualNotRacyCnt)
-	globalcfg.GetDb().Model(ManualNotNsfwPicAdult{}).Count(&manualNotAdultCnt)
+	globalcfg.GetDb().Model(NotNsfwPic{}).Count(&manualNotNsfwCount)
 	text := fmt.Sprintf(
 		"racy pic count: %d\n"+
 			"adult pic count: %d\n"+
-			"manual not racy pic count: %d\n"+
-			"manual not adult pic count %d",
-		racyPicCnt, adultPicCnt, manualNotRacyCnt, manualNotAdultCnt)
+			"manual not nsfw pic count %d",
+		racyPicCnt, adultPicCnt, manualNotNsfwCount)
 	_, err := ctx.EffectiveMessage.Reply(bot, text, nil)
 	return err
 }
