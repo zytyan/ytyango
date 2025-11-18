@@ -156,7 +156,7 @@ func getBilibiliVideoInfo(url string) (map[string]any, error) {
 	}
 	submatch := reA.FindStringSubmatch(location)
 	if submatch == nil {
-		return nil, fmt.Errorf("cannot found %s", location)
+		return nil, fmt.Errorf("regex cannot found %s", location)
 	}
 	bv := submatch[1]
 	reqUrl := ``
@@ -166,7 +166,7 @@ func getBilibiliVideoInfo(url string) (map[string]any, error) {
 	case 'B', 'b':
 		reqUrl = fmt.Sprintf(`https://api.bilibili.com/x/web-interface/view?bvid=%s`, bv)
 	default:
-		return nil, fmt.Errorf("cannot found %s", location)
+		return nil, fmt.Errorf("localtion AV/BV not in regular %s", location)
 	}
 	resp, err := client.Get(reqUrl)
 	if err != nil {
@@ -179,8 +179,8 @@ func getBilibiliVideoInfo(url string) (map[string]any, error) {
 		return nil, err
 	}
 	var result map[string]any
-	if code, ok := m["code"]; !ok || code != 0 {
-		return nil, fmt.Errorf("cannot found %s", location)
+	if code, ok := m["code"]; !ok || code != 0.0 {
+		return nil, fmt.Errorf("code(%d) is not 0 %s", code, location)
 	}
 	tmp := m["data"].(map[string]interface{})
 	result["title"] = tmp["title"]
