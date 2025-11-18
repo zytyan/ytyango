@@ -5,17 +5,21 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	jsoniter "github.com/json-iterator/go"
 )
 
 var Bin = "yt-dlp"
+var reA = regexp.MustCompile(`(?i)/(BV[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]+|av\d+)`)
 
 type RunError struct {
 	Err      error
@@ -125,7 +129,84 @@ func getFirstFile(path string) (string, error) {
 	return "", fmt.Errorf("%s 目录中没有文件", path)
 }
 
+var client = &http.Client{
+	CheckRedirect: func(req *http.Request, via []*http.Request) error {
+		return http.ErrUseLastResponse
+	},
+	Timeout: 10 * time.Second,
+}
+
+func getBilibiliVideoInfo(url string) (map[string]any, error) {
+	location := url
+	if strings.Contains(location, "b23.tv") {
+		req, err := http.NewRequest(http.MethodGet, url, nil)
+		if err != nil {
+			return nil, err
+		}
+		resp, err := client.Do(req)
+		if err != nil {
+			return nil, err
+		}
+		location = resp.Header.Get("Location")
+		_ = resp.Body.Close()
+		if location == "" {
+			return nil, fmt.Errorf("cannot found %s", url)
+		}
+	}
+	submatch := reA.FindStringSubmatch(location)
+	if submatch == nil {
+		return nil, fmt.Errorf("cannot found %s", location)
+	}
+	bv := submatch[1]
+	reqUrl := ``
+	switch bv[0] {
+	case 'A', 'a':
+		reqUrl = fmt.Sprintf(`https://api.bilibili.com/x/web-interface/view?aid=%s`, bv[2:])
+	case 'B', 'b':
+		reqUrl = fmt.Sprintf(`https://api.bilibili.com/x/web-interface/view?bvid=%s`, bv)
+	default:
+		return nil, fmt.Errorf("cannot found %s", location)
+	}
+	resp, err := client.Get(reqUrl)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	var m map[string]any
+	err = jsoniter.NewDecoder(resp.Body).Decode(&m)
+	if err != nil {
+		return nil, err
+	}
+	var result map[string]any
+	if code, ok := m["code"]; !ok || code != 0 {
+		return nil, fmt.Errorf("cannot found %s", location)
+	}
+	tmp := m["data"].(map[string]interface{})
+	result["title"] = tmp["title"]
+	result["uploader"] = tmp["owner"]
+	desc := tmp["desc"]
+	descv2 := tmp["desc_v2"]
+	if s, ok := desc.(string); ok && s != "" {
+		result["description"] = s
+	}
+	if s, ok := descv2.([]any); ok {
+		result["description"] = s[0].(map[string]any)["raw_text"]
+	}
+	return result, nil
+}
+
 func (c *Req) runWithCtxBBDown(ctx context.Context) (resp *Resp, err error) {
+	resp = &Resp{req: c}
+	wg := sync.WaitGroup{}
+	wg.Go(func() {
+		defer func() {
+			if r := recover(); r != nil {
+				resp.InfoJsonErr = fmt.Errorf("get BilibiliVideoInfo error: %s", r)
+			}
+		}()
+		resp.InfoJson, resp.InfoJsonErr = getBilibiliVideoInfo(c.Url)
+	})
+
 	tmp, err := os.MkdirTemp("", "ytdlp-*")
 	if err != nil {
 		return nil, err
@@ -150,9 +231,7 @@ func (c *Req) runWithCtxBBDown(ctx context.Context) (resp *Resp, err error) {
 			Args:     cmd.Args,
 		}
 	}
-	resp = &Resp{
-		req: c,
-	}
+	wg.Wait()
 	resp.FilePath, err = getFirstFile(tmp)
 	if err != nil {
 		return nil, err
