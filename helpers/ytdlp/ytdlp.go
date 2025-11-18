@@ -111,7 +111,59 @@ func (c *Req) Clean() error {
 	return os.RemoveAll(c.tmpPath)
 }
 
+func getFirstFile(path string) (string, error) {
+	files, err := os.ReadDir(path)
+	if err != nil {
+		return "", fmt.Errorf("读取目录 %s 失败", path)
+	}
+	for _, file := range files {
+		if !file.IsDir() {
+			firstFile := filepath.Join(path, file.Name())
+			return firstFile, nil
+		}
+	}
+	return "", fmt.Errorf("%s 目录中没有文件", path)
+}
+
+func (c *Req) runWithCtxBBDown(ctx context.Context) (resp *Resp, err error) {
+	tmp, err := os.MkdirTemp("", "ytdlp-*")
+	if err != nil {
+		return nil, err
+	}
+	tmp, err = filepath.Abs(tmp)
+	if err != nil {
+		return nil, err
+	}
+	cmd := exec.CommandContext(ctx, "/usr/local/bin/dotnet-tools/BBDown", c.Url, "-e", "hevc,av1,avc", "-q", "720P 高清", "-F", fmt.Sprintf("%s/<bvid>", tmp))
+	outBuf := new(bytes.Buffer)
+	errBuf := new(bytes.Buffer)
+	cmd.Stdout = outBuf
+	cmd.Stderr = errBuf
+	err = cmd.Run()
+	var exitErr *exec.ExitError
+	if err != nil && errors.As(err, &exitErr) {
+		return resp, &RunError{
+			Err:      err,
+			Stdout:   outBuf.String(),
+			Stderr:   errBuf.String(),
+			ExitCode: exitErr.ExitCode(),
+			Args:     cmd.Args,
+		}
+	}
+	resp = &Resp{
+		req: c,
+	}
+	resp.FilePath, err = getFirstFile(tmp)
+	if err != nil {
+		return nil, err
+	}
+	return resp, err
+}
+
 func (c *Req) runWithCtx(ctx context.Context) (resp *Resp, err error) {
+	if strings.Contains(c.Url, "b23.tv") || strings.Contains(c.Url, "bilibili.com") {
+		return c.runWithCtxBBDown(ctx)
+	}
 	resp = &Resp{req: c}
 	err = c.prepare()
 	if err != nil {
