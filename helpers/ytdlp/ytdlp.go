@@ -184,7 +184,7 @@ func getBilibiliVideoInfo(url string) (map[string]any, error) {
 	}
 	tmp := m["data"].(map[string]interface{})
 	result["title"] = tmp["title"]
-	result["uploader"] = tmp["owner"]
+	result["uploader"] = tmp["owner"].(map[string]interface{})["name"]
 	desc := tmp["desc"]
 	descv2 := tmp["desc_v2"]
 	if s, ok := desc.(string); ok && s != "" {
