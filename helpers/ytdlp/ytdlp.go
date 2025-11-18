@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"os/exec"
@@ -205,6 +206,9 @@ func (c *Req) runWithCtxBBDown(ctx context.Context) (resp *Resp, err error) {
 			}
 		}()
 		resp.InfoJson, resp.InfoJsonErr = getBilibiliVideoInfo(c.Url)
+		if resp.InfoJsonErr != nil {
+			log.Println(resp.InfoJsonErr)
+		}
 	})
 
 	tmp, err := os.MkdirTemp("", "ytdlp-*")
