@@ -173,12 +173,12 @@ func getBilibiliVideoInfo(url string) (map[string]any, error) {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	var m map[string]any
+	m := make(map[string]any)
 	err = jsoniter.NewDecoder(resp.Body).Decode(&m)
 	if err != nil {
 		return nil, err
 	}
-	var result map[string]any
+	result := make(map[string]any)
 	if code, ok := m["code"]; !ok || code != 0.0 {
 		return nil, fmt.Errorf("code(%d) is not 0 %s", code, location)
 	}
