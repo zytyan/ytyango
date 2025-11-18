@@ -203,7 +203,9 @@ func (c *Req) runWithCtxBBDown(ctx context.Context) (resp *Resp, err error) {
 		defer func() {
 			if r := recover(); r != nil {
 				resp.InfoJsonErr = fmt.Errorf("get BilibiliVideoInfo error: %s", r)
+				log.Println(resp.InfoJsonErr)
 			}
+
 		}()
 		resp.InfoJson, resp.InfoJsonErr = getBilibiliVideoInfo(c.Url)
 		if resp.InfoJsonErr != nil {
