@@ -157,11 +157,16 @@ func getRandomPicByRate(rate int) string {
 }
 
 func addPicToDb(fileUid, fileId string, botRate int) error {
-
 	stmt := `INSERT INTO saved_pics (file_uid, file_id, bot_rate, rand_key, user_rate) VALUES (?, ?, ?, ?, ?) 
 			 ON CONFLICT(file_uid) DO UPDATE SET
 	             file_id = excluded.file_id,
-	             bot_rate = excluded.bot_rate`
+	             bot_rate = excluded.bot_rate,
+	             user_rate = CASE 
+	                 WHEN excluded.rate_user_count = 0 
+	                     THEN excluded.bot_rate 
+	                 ELSE
+	                     excluded.user_rate END 
+	             `
 	for i := 0; i < 3; i++ {
 		rnd := int64(rand.Uint64())
 		tx := globalcfg.GetDb().Exec(stmt, fileUid, fileId, botRate, rnd, botRate)
