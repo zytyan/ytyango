@@ -147,6 +147,6 @@ func getRandomNsfwRacy() string {
 	if rand.Int()%2 == 0 {
 		return getRandomPicByRate(4)
 	} else {
-		return getRandomPicByRate(2)
+		return getRandomPicByRate(4)
 	}
 }
