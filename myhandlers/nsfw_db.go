@@ -1,6 +1,7 @@
 package myhandlers
 
 import (
+	"database/sql"
 	"errors"
 	"fmt"
 	"main/globalcfg"
@@ -24,7 +25,7 @@ CREATE TABLE IF NOT EXISTS saved_pics
     file_id         TEXT    NOT NULL,   --插入时，若file_uid相同，则更新file_id
     bot_rate        INTEGER NOT NULL,   -- 目前为[-1,7]的整数，-1时相当于删除
     rand_key        INTEGER NOT NULL,
-    user_rate       INTEGER NOT NULL DEFAULT bot_rate, -- 用户的评分，默认是bot的评分
+    user_rate       INTEGER NOT NULL, -- 用户的评分，默认是bot的评分
     user_rating_sum INTEGER NOT NULL DEFAULT 0,
     rate_user_count INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (file_uid),
@@ -50,7 +51,7 @@ BEGIN
     SET user_rating_sum = user_rating_sum + new.rating,
         rate_user_count = rate_user_count + 1,
         user_rate = CASE 
-            WHEN rate_user_count + 1 > 0 THEN ROUND((user_rating_sum + new.rating) * 1.0 / (rate_user_count + 1))
+            WHEN rate_user_count + 1 > 0 THEN CAST(ROUND((user_rating_sum + new.rating) * 1.0 / (rate_user_count + 1)) AS INTEGER)
             ELSE user_rate
         END
     WHERE file_uid = new.file_uid;
@@ -62,7 +63,7 @@ BEGIN
     UPDATE saved_pics
     SET user_rating_sum = user_rating_sum - old.rating + new.rating,
         user_rate = CASE 
-            WHEN rate_user_count > 0 THEN ROUND((user_rating_sum - old.rating + new.rating) * 1.0 / rate_user_count)
+            WHEN rate_user_count > 0 THEN CAST(ROUND((user_rating_sum - old.rating + new.rating) * 1.0 / rate_user_count) AS INTEGER)
             ELSE user_rate
         END
     WHERE file_uid = old.file_uid;
@@ -75,7 +76,7 @@ BEGIN
     SET user_rating_sum = user_rating_sum - old.rating,
         rate_user_count = rate_user_count - 1,
         user_rate = CASE
-            WHEN rate_user_count - 1 > 0 THEN ROUND((user_rating_sum - old.rating) * 1.0 / (rate_user_count - 1))
+            WHEN rate_user_count - 1 > 0 THEN CAST(ROUND((user_rating_sum - old.rating) * 1.0 / (rate_user_count - 1)) AS INTEGER)
             ELSE bot_rate -- 用户评分清空后回到 bot_rate
         END
     WHERE file_uid = old.file_uid;
@@ -88,22 +89,28 @@ func init() {
 	initNsfwPicDb()
 }
 
-func getRandomPicByRate(minRate, maxRate int) string {
+func getRandomPicByRate(rate int) string {
 	rnd := int64(rand.Uint64())
-	sql := `SELECT file_uid, file_id
+	stmt1 := `SELECT file_id
     FROM saved_pics
-    WHERE user_rate >= ? AND user_rate <= ? 
-    ORDER BY (rand_key >= ?) DESC, rand_key
+    WHERE user_rate = ? AND rand_key > ? 
     LIMIT 1`
-	tx := globalcfg.GetDb().Raw(sql, rnd, minRate, maxRate)
-	if tx.Error != nil {
-		log.Errorf("fetch data from database error: %s, maxRate: %d", tx.Error, maxRate)
+	stmt2 := `SELECT file_id 
+			FROM saved_pics 
+			WHERE user_rate = ? 
+			ORDER BY rand_key LIMIT 1`
+	tx := globalcfg.GetDb()
+	tx.Raw(stmt1, rnd, rate)
+	if errors.Is(tx.Error, sql.ErrNoRows) {
+		tx.Raw(stmt2, rate)
+	} else if tx.Error != nil {
+		log.Errorf("fetch data from database error: %s, rate: %d", tx.Error, rate)
 		return ""
 	}
 	var result string
 	err := tx.Row().Scan(&result)
 	if err != nil {
-		log.Errorf("scan data from database error: %s, maxRate: %d", err, maxRate)
+		log.Errorf("scan data from database error: %s, rate: %d", err, rate)
 		return ""
 	}
 	return result
@@ -131,9 +138,9 @@ func addPicToDb(fileUid, fileId string, botRate int) error {
 	return fmt.Errorf("failed after 16 retries (rand_key conflicts)")
 }
 func getRandomNsfwAdult() string {
-	return getRandomPicByRate(6, 6)
+	return getRandomPicByRate(6)
 }
 
 func getRandomNsfwRacy() string {
-	return getRandomPicByRate(2, 4)
+	return getRandomPicByRate(4)
 }
