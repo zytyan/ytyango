@@ -103,7 +103,7 @@ func getRandomPicByRate(rate int) string {
 	tx.Raw(stmt1, rnd, rate)
 	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
 		tx.Raw(stmt2, rate)
-		if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
+		if tx.Error != nil {
 			log.Errorf("can't find random pic by rate %d", rate)
 			return ""
 		}
@@ -112,7 +112,12 @@ func getRandomPicByRate(rate int) string {
 		return ""
 	}
 	var result string
-	err := tx.Row().Scan(&result)
+	row := tx.Row()
+	if row == nil {
+		log.Errorf("can't find random pic by rate %d, row is nil", rate)
+		return ""
+	}
+	err := row.Scan(&result)
 	if err != nil {
 		log.Errorf("scan data from database error: %s, rate: %d", err, rate)
 		return ""
