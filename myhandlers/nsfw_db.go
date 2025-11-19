@@ -105,13 +105,13 @@ func getRandomPicByRate(rate int) string {
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		result, err = gorm.G[string](tx).Raw(stmt2, rnd, rate).First(context.Background())
 		if err != nil {
-			log.Warnf("getRandomPicByRate err:%v stmt2 not found", err)
+			log.Warnf("getRandomPicByRate err:%v. stmt2 not found, rate=%d", err, rate)
 			return ""
 		}
 		return result
 	}
 	if err != nil {
-		log.Warnf("getRandomPicByRate err:%v stmt1 error", err)
+		log.Warnf("getRandomPicByRate err:%v. stmt1 error, rate=%d", err, rate)
 		return ""
 	}
 	return result
