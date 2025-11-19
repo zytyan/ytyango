@@ -1,13 +1,13 @@
 package myhandlers
 
 import (
-	"database/sql"
 	"errors"
 	"fmt"
 	"main/globalcfg"
 	"math/rand"
 
 	"github.com/mattn/go-sqlite3"
+	"gorm.io/gorm"
 )
 
 func check(err error) {
@@ -101,9 +101,9 @@ func getRandomPicByRate(rate int) string {
 			ORDER BY rand_key LIMIT 1`
 	tx := globalcfg.GetDb()
 	tx.Raw(stmt1, rnd, rate)
-	if errors.Is(tx.Error, sql.ErrNoRows) {
+	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
 		tx.Raw(stmt2, rate)
-		if errors.Is(tx.Error, sql.ErrNoRows) {
+		if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
 			log.Errorf("can't find random pic by rate %d", rate)
 			return ""
 		}
