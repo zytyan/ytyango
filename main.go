@@ -5,6 +5,7 @@ import (
 	"main/globalcfg"
 	"main/myhandlers"
 	"net/http"
+	"runtime/debug"
 	"sync"
 	"time"
 
@@ -71,7 +72,8 @@ func main() {
 			return ext.DispatcherActionContinueGroups
 		},
 		Panic: func(b *gotgbot.Bot, ctx *ext.Context, r interface{}) {
-			log.Errorf("a panic occurred while handling update: %s", r)
+			stackBytes := debug.Stack()
+			log.Errorf("a panic occurred while handling update: %s, stack trace: %s", r, stackBytes)
 		},
 		MaxRoutines: ext.DefaultMaxRoutines,
 	}), autoInc: 0, mutex: sync.Mutex{}}
