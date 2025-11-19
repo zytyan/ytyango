@@ -103,6 +103,10 @@ func getRandomPicByRate(rate int) string {
 	tx.Raw(stmt1, rnd, rate)
 	if errors.Is(tx.Error, sql.ErrNoRows) {
 		tx.Raw(stmt2, rate)
+		if errors.Is(tx.Error, sql.ErrNoRows) {
+			log.Errorf("can't find random pic by rate %d", rate)
+			return ""
+		}
 	} else if tx.Error != nil {
 		log.Errorf("fetch data from database error: %s, rate: %d", tx.Error, rate)
 		return ""
