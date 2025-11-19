@@ -110,8 +110,6 @@ func main() {
 	dispatcher.AddCommand("list_attr", myhandlers.ListDndAttr)
 	dispatcher.AddCommand("del_attr", myhandlers.DelDndAttr)
 	dispatcher.AddCommand("new_battle", myhandlers.NewBattle)
-	dispatcher.AddCommand("mark_pic_not_nsfw", myhandlers.MarkPicNotNsfwOrNot)
-	dispatcher.AddCommand("remove_nsfw_mark", myhandlers.MarkPicNotNsfwOrNot)
 	dispatcher.AddCommand("webp2png", myhandlers.WebpToPng)
 	dispatcher.AddCommand("chat_config", myhandlers.ShowChatCfg)
 
