@@ -2,7 +2,6 @@ package myhandlers
 
 import (
 	"fmt"
-	"main/globalcfg"
 	"main/helpers/azure"
 	"sync"
 	"time"
@@ -26,35 +25,12 @@ func HasImage(msg *gotgbot.Message) bool {
 	return true
 }
 
-type NsfwPicRacy struct {
-	PicId string `gorm:"uniqueIndex"`
-}
-type NsfwPicAdult struct {
-	PicId string `gorm:"uniqueIndex"`
-}
-
 // saveNsfw
 // param score: [0, 2, 4, 6]
-func saveNsfw(picId string, severity int) {
-	db := globalcfg.GetDb()
-	var tableName string
-	if severity <= 2 {
-		return
-	} else if severity <= 4 {
-		tableName = "nsfw_pic_adults"
-	} else {
-		tableName = "nsfw_pic_racies"
-	}
-	sql := fmt.Sprintf(`INSERT OR IGNORE INTO %s (pic_id) 
-       	SELECT ? WHERE NOT EXISTS (SELECT 1 FROM not_nsfw_pics exclude WHERE pic_id = ?)
-       `, tableName)
-
-	tx := db.Exec(sql, picId, picId)
-	if tx.RowsAffected > 0 {
-		log.Debugf("save")
-	}
-	if tx.Error != nil {
-		log.Warnf("saveNsfw err: %s", tx.Error)
+func saveNsfw(fileUid, fileId string, severity int) {
+	err := addPicToDb(fileUid, fileId, severity)
+	if err != nil {
+		log.Warnf("save nsfw failed for fileId=%s err=%s", fileId, err)
 	}
 }
 
@@ -70,8 +46,9 @@ func replyNsfw(bot *gotgbot.Bot, msg *gotgbot.Message, result *azure.ModeratorV2
 	} else if severity > 7 {
 		return false, fmt.Errorf("severity %d is invalid", severity)
 	}
+	photo := msg.Photo[len(msg.Photo)-1]
 
-	go saveNsfw(msg.Photo[len(msg.Photo)-1].FileId, severity)
+	go saveNsfw(photo.FileUniqueId, photo.FileId, severity)
 	WithGroupLockToday(msg.Chat.Id, func(g *GroupStatDaily) {
 		if severity >= 6 {
 			g.AdultCount++
@@ -164,7 +141,7 @@ func CmdScore(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
 		return err
 	}
 	severity := result.GetSeverityByCategory(azure.ModerateV2CatSexual)
-	go saveNsfw(photo.FileId, severity)
+	go saveNsfw(photo.FileUniqueId, photo.FileId, severity)
 	text := fmt.Sprintf("score: %d", severity)
 	_, err = ctx.Message.Reply(bot, text, nil)
 	if err != nil {
@@ -195,10 +172,6 @@ func SeseDetect(bot *gotgbot.Bot, ctx *ext.Context) error {
 
 func CountNsfwPics(bot *gotgbot.Bot, ctx *ext.Context) error {
 	var racyPicCnt, adultPicCnt, manualNotNsfwCount int64
-	globalcfg.GetDb().Model(NsfwPicRacy{}).Count(&racyPicCnt)
-	globalcfg.GetDb().Model(NsfwPicAdult{}).Count(&adultPicCnt)
-
-	globalcfg.GetDb().Model(NotNsfwPic{}).Count(&manualNotNsfwCount)
 	text := fmt.Sprintf(
 		"racy pic count: %d\n"+
 			"adult pic count: %d\n"+
