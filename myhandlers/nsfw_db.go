@@ -83,6 +83,44 @@ BEGIN
     WHERE file_uid = old.file_uid;
 END;
 `)
+
+	tx.Exec(`
+CREATE TABLE IF NOT EXISTS pic_rate_counter(
+    rate  INTEGER NOT NULL,
+    count INTEGER NOT NULL,
+    PRIMARY KEY (rate)
+) WITHOUT ROWID , STRICT;
+`)
+	tx.Exec(`
+CREATE TRIGGER IF NOT EXISTS saved_pics_update_trigger
+AFTER UPDATE ON saved_pics
+BEGIN
+UPDATE pic_rate_counter SET count = count + 1 WHERE rate = new.user_rate;
+UPDATE pic_rate_counter SET count = count - 1 WHERE rate = old.user_rate;
+END;
+`)
+	tx.Exec(`
+CREATE TRIGGER IF NOT EXISTS saved_pics_insert_trigger
+AFTER INSERT ON saved_pics
+BEGIN
+    -- 新图片插入时，增加其 user_rate 对应的计数
+    INSERT INTO pic_rate_counter (rate, count) 
+    VALUES (new.user_rate, 1) 
+    ON CONFLICT(rate) DO UPDATE SET count = count + 1;
+END;
+`)
+	tx.Exec(`
+CREATE TRIGGER IF NOT EXISTS saved_pics_delete_trigger
+AFTER DELETE ON saved_pics
+BEGIN
+    -- 旧图片删除时，减少其 user_rate 对应的计数
+    UPDATE pic_rate_counter 
+    SET count = count - 1 
+    WHERE rate = old.user_rate;
+
+    -- 可选：如果计数减到 0，可以考虑删除该行，但通常保留 0 计数行是为了避免再次插入的开销
+    -- DELETE FROM pic_rate_counter WHERE rate = old.user_rate AND count <= 0;
+END;`)
 	check(tx.Error)
 	tx.Commit()
 }
