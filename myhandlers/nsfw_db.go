@@ -1,6 +1,7 @@
 package myhandlers
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"main/globalcfg"
@@ -100,29 +101,21 @@ func getRandomPicByRate(rate int) string {
 			WHERE user_rate = ? 
 			ORDER BY rand_key LIMIT 1`
 	tx := globalcfg.GetDb()
-	tx.Raw(stmt1, rnd, rate)
-	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
-		tx.Raw(stmt2, rate)
-		if tx.Error != nil {
-			log.Errorf("can't find random pic by rate %d", rate)
+	result, err := gorm.G[string](tx).Raw(stmt1, rnd, rate).First(context.Background())
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		result, err = gorm.G[string](tx).Raw(stmt2, rnd, rate).First(context.Background())
+		if err != nil {
+			log.Warnf("getRandomPicByRate err:%v stmt2 not found", err)
 			return ""
 		}
-	} else if tx.Error != nil {
-		log.Errorf("fetch data from database error: %s, rate: %d", tx.Error, rate)
-		return ""
+		return result
 	}
-	var result string
-	row := tx.Row()
-	if row == nil {
-		log.Errorf("can't find random pic by rate %d, row is nil", rate)
-		return ""
-	}
-	err := row.Scan(&result)
 	if err != nil {
-		log.Errorf("scan data from database error: %s, rate: %d", err, rate)
+		log.Warnf("getRandomPicByRate err:%v stmt1 error", err)
 		return ""
 	}
 	return result
+
 }
 
 func addPicToDb(fileUid, fileId string, botRate int) error {
