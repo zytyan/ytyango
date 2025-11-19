@@ -101,7 +101,7 @@ func getRandomPicByRate(rate int) string {
 			WHERE user_rate = ? 
 			ORDER BY rand_key LIMIT 1`
 	tx := globalcfg.GetDb()
-	result, err := gorm.G[string](tx).Raw(stmt1, rnd, rate).First(context.Background())
+	result, err := gorm.G[string](tx).Raw(stmt1, rate, rnd).First(context.Background())
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		result, err = gorm.G[string](tx).Raw(stmt2, rate).First(context.Background())
 		if err != nil {
