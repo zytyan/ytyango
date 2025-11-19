@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS saved_pics_rating
 ) WITHOUT ROWID , STRICT;
 `)
 	tx.Exec(`
-CREATE TRIGGER IF NOT EXISTS saved_pics_rating.insert
+CREATE TRIGGER IF NOT EXISTS saved_pics_rating_insert_trigger
 AFTER INSERT ON saved_pics_rating
 BEGIN
     UPDATE saved_pics
@@ -56,7 +56,7 @@ BEGIN
     WHERE file_uid = new.file_uid;
 END;`)
 	tx.Exec(`
-CREATE TRIGGER IF NOT EXISTS saved_pics_rating.update
+CREATE TRIGGER IF NOT EXISTS saved_pics_rating_update_trigger
 AFTER UPDATE ON saved_pics_rating
 BEGIN
     UPDATE saved_pics
@@ -68,7 +68,7 @@ BEGIN
     WHERE file_uid = old.file_uid;
 END;`)
 	tx.Exec(`
-CREATE TRIGGER IF NOT EXISTS saved_pics_rating.delete
+CREATE TRIGGER IF NOT EXISTS saved_pics_rating_delete_trigger
 AFTER DELETE ON saved_pics_rating
 BEGIN
     UPDATE saved_pics
