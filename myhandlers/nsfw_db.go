@@ -103,7 +103,7 @@ func getRandomPicByRate(rate int) string {
 	tx := globalcfg.GetDb()
 	result, err := gorm.G[string](tx).Raw(stmt1, rnd, rate).First(context.Background())
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		result, err = gorm.G[string](tx).Raw(stmt2, rnd, rate).First(context.Background())
+		result, err = gorm.G[string](tx).Raw(stmt2, rate).First(context.Background())
 		if err != nil {
 			log.Warnf("getRandomPicByRate err:%v. stmt2 not found, rate=%d", err, rate)
 			return ""
