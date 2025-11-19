@@ -151,5 +151,9 @@ func getRandomNsfwAdult() string {
 }
 
 func getRandomNsfwRacy() string {
-	return getRandomPicByRate(4)
+	if rand.Int()%2 == 0 {
+		return getRandomPicByRate(4)
+	} else {
+		return getRandomPicByRate(2)
+	}
 }
