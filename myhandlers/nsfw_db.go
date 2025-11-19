@@ -127,13 +127,13 @@ func getRandomPicByRate(rate int) string {
 
 func addPicToDb(fileUid, fileId string, botRate int) error {
 
-	stmt := `INSERT INTO saved_pics (file_uid, file_id, bot_rate, rand_key) VALUES (?, ?, ?, ?) 
+	stmt := `INSERT INTO saved_pics (file_uid, file_id, bot_rate, rand_key, user_rate) VALUES (?, ?, ?, ?, ?) 
 			 ON CONFLICT(file_uid) DO UPDATE SET
 	             file_id = excluded.file_id,
 	             bot_rate = excluded.bot_rate`
 	for i := 0; i < 3; i++ {
 		rnd := int64(rand.Uint64())
-		tx := globalcfg.GetDb().Exec(stmt, fileUid, fileId, botRate, rnd)
+		tx := globalcfg.GetDb().Exec(stmt, fileUid, fileId, botRate, rnd, botRate)
 		if tx.Error != nil {
 			var err sqlite3.Error
 			if errors.As(tx.Error, &err) && errors.Is(err.Code, sqlite3.ErrConstraint) {
