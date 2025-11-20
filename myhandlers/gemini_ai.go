@@ -16,7 +16,7 @@ import (
 var getGenAiClient = sync.OnceValues(func() (*genai.Client, error) {
 	ctx := context.Background()
 	client, err := genai.NewClient(ctx, &genai.ClientConfig{
-		APIKey:  globalcfg.GetConfig().GeminiKey,
+		APIKey:  g.GetConfig().GeminiKey,
 		Backend: genai.BackendGeminiAPI,
 	})
 	if err != nil {
@@ -65,35 +65,5 @@ func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 		return err
 	}
 	_, err = ctx.EffectiveMessage.Reply(bot, res.Text(), nil)
-	return err
-}
-
-func SetUserTimeZone(bot *gotgbot.Bot, ctx *ext.Context) error {
-	fields := strings.Fields(ctx.EffectiveMessage.Text)
-	const help = "用法: /settimezone +0800"
-	if len(fields) < 2 {
-		_, err := ctx.EffectiveMessage.Reply(bot, help, nil)
-		return err
-	}
-	t, err := time.Parse("-0700", fields[1])
-	if err != nil {
-		_, err := ctx.EffectiveMessage.Reply(bot, help, nil)
-		return err
-	}
-	_, zone := t.Zone()
-	user := GetUser(ctx.EffectiveUser.Id)
-	if user == nil {
-		return fmt.Errorf("user id %d not found", ctx.EffectiveUser.Id)
-	}
-	user.TimeZone.Valid = true
-	user.TimeZone.Int32 = int32(zone)
-	err = globalcfg.GetDb().Model(user).
-		Select("time_zone").
-		Updates(user).Error
-	if err != nil {
-		_, err = ctx.EffectiveMessage.Reply(bot, err.Error(), nil)
-		return err
-	}
-	_, err = ctx.EffectiveMessage.Reply(bot, fmt.Sprintf("设置成功 %d seconds", zone), nil)
 	return err
 }

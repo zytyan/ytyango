@@ -61,7 +61,7 @@ func dioBan(ctx *gin.Context) {
 }
 func formatLoggers() string {
 	buf := strings.Builder{}
-	for name, logger := range globalcfg.GetAllLoggers() {
+	for name, logger := range g.GetAllLoggers() {
 		level := logger.Level.Level()
 		buf.WriteString(
 			fmt.Sprintf("%-16s\t[%d]%s\n", name, level, level.String()),
@@ -80,7 +80,7 @@ func showLoggers(ctx *gin.Context) {
 func setLoggerLevel(ctx *gin.Context) {
 	loggerName := ctx.Params.ByName("name")
 
-	logger, name := globalcfg.GetAllLoggers()[loggerName]
+	logger, name := g.GetAllLoggers()[loggerName]
 	if !name {
 		_, _ = ctx.Writer.WriteString(fmt.Sprintf("logger %s not found\n%s", loggerName, formatLoggers()))
 		return
@@ -98,7 +98,7 @@ func listAllRoutes(ctx *gin.Context) {
 }
 
 func HttpListen4019() {
-	logger := globalcfg.GetLogger("yt-dlp")
+	logger := g.GetLogger("yt-dlp")
 	r := gin.New()
 	r.Use(
 		ginzap.Ginzap(logger.Desugar(), time.RFC3339, false),

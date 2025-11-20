@@ -1,0 +1,28 @@
+version: "2"
+overrides:
+  go:
+    overrides:
+      - db_type: "INT_UNIX_SEC"
+        engine: "sqlite"
+        go_type:
+          type: "UnixTime"
+      - db_type: "INT_BOOL"
+        engine: "sqlite"
+        nullable: false
+        go_type:
+          type: "bool"
+sql:
+  - engine: "sqlite"
+    queries: [ "sql/query_*.sql" ]
+    schema: [ "sql/schema_*.sql" ]
+    gen:
+      go:
+        package: "q"
+        out: "globalcfg/q"
+        output_files_suffix: "_gen"
+        output_db_file_name: "db_gen.go"
+        output_models_file_name: "models_gen.go"
+        output_batch_file_name: "batch_gen.go"
+        output_querier_file_name: "querier_gen.go"
+        query_parameter_limit: 4
+

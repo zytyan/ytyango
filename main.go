@@ -17,7 +17,7 @@ import (
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers/filters/message"
 )
 
-var log = globalcfg.GetLogger("main")
+var log = g.GetLogger("main")
 var compileTime = "unknown"
 
 type GroupedDispatcher struct {
@@ -46,7 +46,7 @@ func newBot(token string) *gotgbot.Bot {
 			Client:             http.Client{},
 			UseTestEnvironment: false,
 			DefaultRequestOpts: &gotgbot.RequestOpts{
-				APIURL:  globalcfg.GetConfig().TgApiUrl,
+				APIURL:  g.GetConfig().TgApiUrl,
 				Timeout: time.Second * 130},
 		}),
 	}
@@ -60,7 +60,7 @@ func newBot(token string) *gotgbot.Bot {
 
 func main() {
 	log.Infof("compile time: %s", compileTime)
-	token := globalcfg.GetConfig().BotToken
+	token := g.GetConfig().BotToken
 	b := newBot(token)
 	myhandlers.SetMainBot(b)
 	go bothttp.Run()
@@ -99,8 +99,8 @@ func main() {
 	dispatcher.AddCommand("score", myhandlers.CmdScore)
 	dispatcher.AddCommand("prpr", myhandlers.GenPrpr)
 	dispatcher.AddCommand("calc", myhandlers.SolveMath)
-	dispatcher.AddCommand("downloadvideo", myhandlers.DownloadVideo)
-	dispatcher.AddCommand("downloadaudio", myhandlers.DownloadAudio)
+	//dispatcher.AddCommand("downloadvideo", myhandlers.DownloadVideo)
+	//dispatcher.AddCommand("downloadaudio", myhandlers.DownloadAudio)
 	dispatcher.AddCommand("getrank", myhandlers.GetRank)
 	dispatcher.AddCommand("diag_groupstat", myhandlers.GroupStatDiagnostic)
 	dispatcher.AddCommand("diag_sendstat", myhandlers.SendGroupStat)
@@ -116,10 +116,9 @@ func main() {
 	dispatcher.AddCommand("chat_config", myhandlers.ShowChatCfg)
 
 	dispatcher.AddCommand("count_nsfw_pics", myhandlers.CountNsfwPics)
-	dispatcher.AddCommand("settimezone", myhandlers.SetUserTimeZone)
 
 	dispatcher.AddHandler(handlers.NewMessage(myhandlers.HasSinaGif, myhandlers.Gif2Mp4))
-	dispatcher.AddHandler(handlers.NewCallback(myhandlers.IsBilibiliBtn, myhandlers.DownloadVideoCallback))
+	//dispatcher.AddHandler(handlers.NewCallback(myhandlers.IsBilibiliBtn, myhandlers.DownloadVideoCallback))
 	dispatcher.AddHandler(handlers.NewMessage(myhandlers.HasImage, myhandlers.SeseDetect))
 	dispatcher.AddHandler(handlers.NewMessage(myhandlers.NeedSolve, myhandlers.SolveMath))
 	dispatcher.AddHandler(handlers.NewMessage(myhandlers.IsCalcExchangeRate, myhandlers.ExchangeRateCalc))
@@ -133,11 +132,11 @@ func main() {
 	dispatcher.AddHandler(handlers.NewCallback(myhandlers.IsNextRound, myhandlers.NextRound))
 	dispatcher.AddHandler(handlers.NewMessage(myhandlers.IsBattleCommand, myhandlers.ExecuteBattleCommand))
 	dispatcher.AddHandler(handlers.NewMessage(myhandlers.IsGeminiReq, myhandlers.GeminiReply))
-	dispatcher.AddHandler(handlers.NewCallback(myhandlers.IsBilibiliInlineBtn, myhandlers.DownloadInlinedBv))
+	//dispatcher.AddHandler(handlers.NewCallback(myhandlers.IsBilibiliInlineBtn, myhandlers.DownloadInlinedBv))
 	dispatcher.AddHandler(handlers.NewCallback(callbackquery.Prefix(myhandlers.GroupConfigModifyPrefix), myhandlers.ModifyGroupConfigByButton))
 
 	err := updater.StartPolling(b, &ext.PollingOpts{
-		DropPendingUpdates:    globalcfg.GetConfig().DropPendingUpdates,
+		DropPendingUpdates:    g.GetConfig().DropPendingUpdates,
 		EnableWebhookDeletion: false,
 		GetUpdatesOpts: &gotgbot.GetUpdatesOpts{
 			Timeout: 120,

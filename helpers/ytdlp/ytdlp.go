@@ -42,7 +42,7 @@ func (e *RunError) Error() string {
 type Req struct {
 	Url             string
 	AudioOnly       bool
-	Resolution      int
+	Resolution      int64
 	EmbedMetadata   bool
 	PostExec        string
 	PriorityFormats []string

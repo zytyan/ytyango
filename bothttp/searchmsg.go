@@ -50,7 +50,7 @@ type MeiliQuery struct {
 
 func meiliSearch(query SearchQuery) (SearchResult, error) {
 	var result SearchResult
-	searchUrl := globalcfg.GetConfig().MeiliConfig.GetSearchUrl()
+	searchUrl := g.GetConfig().MeiliConfig.GetSearchUrl()
 	g := myhandlers.GetGroupInfoUseWebId(int64(query.InsID))
 	if g == nil {
 		return result, GroupNotFound
@@ -71,7 +71,7 @@ func meiliSearch(query SearchQuery) (SearchResult, error) {
 	if err != nil {
 		return result, err
 	}
-	preparedPost.Header.Set("Authorization", "Bearer "+globalcfg.GetConfig().MeiliConfig.MasterKey)
+	preparedPost.Header.Set("Authorization", "Bearer "+g.GetConfig().MeiliConfig.MasterKey)
 	preparedPost.Header.Set("Content-Type", "application/json")
 	post, err := http.DefaultClient.Do(preparedPost)
 	if err != nil {

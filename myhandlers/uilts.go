@@ -2,7 +2,6 @@ package myhandlers
 
 import (
 	"fmt"
-	"main/globalcfg"
 	"net/url"
 	"path/filepath"
 	"sync"
@@ -33,13 +32,6 @@ func GetMainBot() *gotgbot.Bot {
 	return mainBot
 }
 
-func init() {
-	db := globalcfg.GetDb()
-	err := db.AutoMigrate(&User{}, &GroupInfo{}, &prprCache{}, &YtDlResult{}, &CharacterAttr{})
-	if err != nil {
-		panic(err)
-	}
-}
 
 func GetMsgInfo(bot *gotgbot.Bot, ctx *ext.Context) error {
 	data := fmt.Sprintf("获取消息信息：%d", ctx.EffectiveMessage.Chat.Id)

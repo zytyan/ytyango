@@ -13,7 +13,7 @@ import (
 )
 
 var botVerifyKey = func() []byte {
-	var key = globalcfg.GetConfig().BotToken
+	var key = g.GetConfig().BotToken
 	mac := hmac.New(sha256.New, []byte("WebAppData"))
 	mac.Write([]byte(key))
 	return mac.Sum(nil)
@@ -34,7 +34,7 @@ func Run() {
 	if err != nil {
 		panic(err)
 	}
-	logger := globalcfg.GetLogger("bot-http").Desugar()
+	logger := g.GetLogger("bot-http").Desugar()
 	log = logger.Sugar()
 	r.Use(
 		ginzap.Ginzap(logger, time.RFC3339, false),

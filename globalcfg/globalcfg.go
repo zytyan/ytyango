@@ -1,18 +1,18 @@
-package globalcfg
+package g
 
 import (
+	"database/sql"
 	"fmt"
+	"main/globalcfg/q"
 	"main/helpers/azure"
 	"os"
 	"sync"
 
+	_ "github.com/mattn/go-sqlite3"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"gopkg.in/natefinch/lumberjack.v2"
 	"gopkg.in/yaml.v3"
-	"gorm.io/driver/sqlite"
-	"gorm.io/gorm"
-	"moul.io/zapgorm2"
 )
 
 type Azure struct {
@@ -152,16 +152,22 @@ func GetAllLoggers() map[string]LoggerWithLevel {
 	return loggers
 }
 
-var GetDb = sync.OnceValue(func() *gorm.DB {
-	var err error
-	newLogger := zapgorm2.New(GetLogger("gorm").Desugar())
-	newLogger.IgnoreRecordNotFoundError = true
-	db, err := gorm.Open(sqlite.Open(GetConfig().DatabasePath), &gorm.Config{
-		Logger:                                   newLogger,
-		DisableForeignKeyConstraintWhenMigrating: false,
-	})
+var DB = sync.OnceValue(func() *sql.DB {
+	db, err := sql.Open("sqlite3", "ytyan_new.db")
 	if err != nil {
 		panic(err)
 	}
 	return db
 })
+
+var Q = sync.OnceValue(func() *q.Queries {
+	return q.New(DB())
+})
+
+func Tx() (*q.Queries, error) {
+	tx, err := DB().Begin()
+	if err != nil {
+		return nil, err
+	}
+	return Q().WithTx(tx), nil
+}

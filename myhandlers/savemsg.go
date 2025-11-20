@@ -2,6 +2,7 @@ package myhandlers
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"main/globalcfg"
@@ -15,7 +16,7 @@ import (
 )
 
 var saveMsgMeili = &http.Client{}
-var meili = globalcfg.GetConfig().MeiliConfig
+var meili = g.GetConfig().MeiliConfig
 var snowflakeNode = func() *snowflake.Node {
 	node, err := snowflake.NewNode(1)
 	if err != nil {
@@ -42,7 +43,8 @@ func SaveMessage(bot *gotgbot.Bot, ctx *ext.Context) error {
 				log.Errorf("save message panic %s, update id %d", r, ctx.Update.UpdateId)
 			}
 		}()
-		err := SaveUser(bot, ctx)
+		//err := g.Q().GetUserByTg(bot, ctx)
+		var err error
 		if err != nil {
 			log.Errorf("save user error %s, update id %d", err, ctx.Update.UpdateId)
 		}
@@ -91,7 +93,7 @@ func saveMessage(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
 		ImageText: "",
 		QrResult:  "",
 	}
-	if g, err := getGroupInfo(ctx.EffectiveChat.Id); err == nil && g.AutoOcr {
+	if cfg, err := g.Q().GetChatById(context.Background(), ctx.EffectiveChat.Id); err == nil && cfg.AutoOcr {
 		err = setImageText(bot, ctx.Message, meiliMsg)
 		if err != nil {
 			log.Warnf("set image text error %s, update id %d", err, ctx.Update.UpdateId)

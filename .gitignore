@@ -2,3 +2,5 @@
 /.vscode
 /main.exe
 /build/*
+# 忽略生成的sql，由构建时自动生成
+/globalcfg/q/*_gen.go

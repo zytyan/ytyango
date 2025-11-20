@@ -1,6 +1,7 @@
 package myhandlers
 
 import (
+	"context"
 	"main/globalcfg"
 	"main/helpers/imgproc"
 	"os"
@@ -9,27 +10,6 @@ import (
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 )
-
-type prprCache struct {
-	ProfilePhotoUid string `gorm:"unique"`
-	PrprFileId      string
-}
-
-func getPrprCache(profilePhotoFileId string) (string, error) {
-	var cache prprCache
-	err := globalcfg.GetDb().Where(&prprCache{ProfilePhotoUid: profilePhotoFileId}).First(&cache).Error
-	if err != nil {
-		return "", err
-	}
-	return cache.PrprFileId, nil
-}
-
-func setPrprCache(profilePhotoUid, prprFileId string) error {
-	var cache prprCache
-	cache.ProfilePhotoUid = profilePhotoUid
-	cache.PrprFileId = prprFileId
-	return globalcfg.GetDb().Create(&cache).Error
-}
 
 func GenPrpr(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
 	var userID int64
@@ -49,7 +29,7 @@ func GenPrpr(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
 		return
 	}
 	photo := photos.Photos[0][0]
-	prpr, err := getPrprCache(photo.FileUniqueId)
+	prpr, err := g.Q().GetPrprCache(context.Background(), photo.FileUniqueId)
 	if err == nil {
 		_, err = bot.SendSticker(ctx.EffectiveChat.Id, gotgbot.InputFileByID(prpr), nil)
 		return err
@@ -72,6 +52,6 @@ func GenPrpr(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
 	if err != nil {
 		return err
 	}
-	err = setPrprCache(photo.FileUniqueId, send.Sticker.FileId)
+	err = g.Q().SetPrprCache(context.Background(), photo.FileUniqueId, send.Sticker.FileId)
 	return err
 }

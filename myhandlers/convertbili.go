@@ -1,6 +1,7 @@
 package myhandlers
 
 import (
+	"context"
 	"encoding/base64"
 	"fmt"
 	"hash/fnv"
@@ -9,14 +10,12 @@ import (
 	"main/helpers/bili"
 	"strconv"
 	"strings"
-	"sync/atomic"
-	"time"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 )
 
-var log = globalcfg.GetLogger("handlers")
+var log = g.GetLogger("handlers")
 
 func BiliMsgFilter(msg *gotgbot.Message) bool {
 	if !GetGroupInfo(msg.Chat.Id).AutoCvtBili {
@@ -86,31 +85,6 @@ type BiliInlineResult struct {
 	Message int64
 }
 
-func init() {
-	err := globalcfg.GetDb().AutoMigrate(&BiliInlineResult{})
-	if err != nil {
-		panic(err)
-	}
-}
-
-var startEpoch int64 = 1718035200000
-var lastGeneratedMs = atomic.Int64{}
-var idInThisMs = atomic.Int64{}
-
-func GenerateUid() int64 {
-	// generate uid auto increment
-	now := time.Now().UnixMilli()
-	t := (now - startEpoch) << 22
-	last := lastGeneratedMs.Load()
-	if last == t {
-		id := idInThisMs.Add(1)
-		return t | id
-	}
-	lastGeneratedMs.Store(t)
-	idInThisMs.Store(0)
-	return t
-}
-
 const biliCallbackData = "download:bilibili"
 
 func BiliMsgConverterInline(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
@@ -129,7 +103,7 @@ func BiliMsgConverterInline(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
 		return err
 	}
 
-	uid := GenerateUid()
+	uid, err := g.Q().InsertBiliInlineData(context.Background())
 	callbackData := biliInlineCallbackPrefix + strconv.FormatInt(uid, 16)
 	var btns [][]gotgbot.InlineKeyboardButton
 	if bili.HasVideoLink(links.BvText) {
@@ -138,11 +112,6 @@ func BiliMsgConverterInline(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
 			CallbackData: callbackData,
 		}})
 	}
-	globalcfg.GetDb().Model(&BiliInlineResult{}).Create(&BiliInlineResult{
-		Uid:    uid,
-		Text:   links.BvText,
-		ChatId: ctx.InlineQuery.From.Id,
-	})
 	var results []gotgbot.InlineQueryResult
 	results = append(results, buildQueryResult("转换后的链接", links.BvText, btns))
 	if links.HasAv {
@@ -152,37 +121,23 @@ func BiliMsgConverterInline(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
 
 	return err
 }
-func getBiliCallbackDataInMsg(ctx *ext.Context) (uid int64, err error) {
+func getBiliCallbackDataInMsg(ctx *ext.Context) (uid int64) {
 	msg := ctx.EffectiveMessage
-	if msg.ReplyMarkup == nil || len(msg.ReplyMarkup.InlineKeyboard) == 0 {
-		return 0, fmt.Errorf("no inline keyboard")
-	}
 	for _, row := range msg.ReplyMarkup.InlineKeyboard {
 		for _, btn := range row {
 			if strings.HasPrefix(btn.CallbackData, biliInlineCallbackPrefix) {
-				uid, err = strconv.ParseInt(btn.CallbackData[len(biliInlineCallbackPrefix):], 16, 64)
-				return uid, err
+				uid, _ = strconv.ParseInt(btn.CallbackData[len(biliInlineCallbackPrefix):], 16, 64)
+				return uid
 			}
 		}
 	}
-	return 0, fmt.Errorf("no bili inline button")
+	log.Panicf("%s(%d)/%dno bili inline button", msg.Chat.Title, msg.Chat.Id, msg.MessageId)
+	return
 }
 func SaveBiliMsgCallbackMsgId(_ *gotgbot.Bot, ctx *ext.Context) (err error) {
-	uid, err := getBiliCallbackDataInMsg(ctx)
-	if err != nil {
-		return err
-	}
-	var result BiliInlineResult
-	err = globalcfg.GetDb().Model(&BiliInlineResult{}).Where("uid = ?", uid).First(&result).Error
-	if err != nil {
-		return err
-	}
-	result.ChatId = ctx.EffectiveMessage.Chat.Id
-	result.Message = ctx.EffectiveMessage.MessageId
-	err = globalcfg.GetDb().Model(&BiliInlineResult{}).Where("uid = ?", uid).
-		Omit("Uid Text").
-		Updates(&result).Error
-	return err
+	uid := getBiliCallbackDataInMsg(ctx)
+	msg := ctx.EffectiveMessage
+	return g.Q().UpdateBiliInlineMsgId(context.Background(), msg.Text, msg.Chat.Id, msg.MessageId, uid)
 }
 func IsBilibiliBtn(cq *gotgbot.CallbackQuery) bool {
 	return cq.Data == biliCallbackData
@@ -200,7 +155,6 @@ func IsBilibiliInlineBtn2(msg *gotgbot.Message) bool {
 	log.Infoln(msg.ReplyMarkup.InlineKeyboard)
 	for _, row := range msg.ReplyMarkup.InlineKeyboard {
 		for _, btn := range row {
-			fmt.Println(btn.CallbackData)
 			if strings.HasPrefix(btn.CallbackData, biliInlineCallbackPrefix) {
 				return true
 			}

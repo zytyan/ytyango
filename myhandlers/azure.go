@@ -23,7 +23,7 @@ func getPhotoCache(bot *gotgbot.Bot, photo *gotgbot.PhotoSize) (*gotgbot.File, e
 	}
 	file, err := bot.GetFile(photo.FileId, nil)
 	if err != nil {
-		log.Warnf("Download file %s error.", photo.FileUniqueId)
+		log.Warnf("YtDownloadResult file %s error.", photo.FileUniqueId)
 		return nil, err
 	}
 	photoCache.Add(photo.FileUniqueId, file)
@@ -51,11 +51,11 @@ func ocrMsg(bot *gotgbot.Bot, file *gotgbot.PhotoSize) (string, error) {
 
 	localFile, err := getPhotoCache(bot, file)
 	if err != nil {
-		log.Warnf("Download ocr file %s error.", file.FileUniqueId)
+		log.Warnf("YtDownloadResult ocr file %s error.", file.FileUniqueId)
 		return "", err
 	}
 	log.Debugf("start remote ocr file %s", localFile.FilePath)
-	res, err := globalcfg.Ocr.OcrFile(localFile.FilePath)
+	res, err := g.Ocr.OcrFile(localFile.FilePath)
 	if err != nil {
 		log.Warnf("ocr file over, err = %s", err)
 		return "", err
@@ -84,7 +84,7 @@ func moderatorMsg(bot *gotgbot.Bot, file *gotgbot.PhotoSize) (*azure.ModeratorV2
 	}
 	localFile, err := getPhotoCache(bot, file)
 	if err != nil {
-		log.Warnf("Download ocr file %s error.", file.FileUniqueId)
+		log.Warnf("YtDownloadResult ocr file %s error.", file.FileUniqueId)
 		return nil, err
 	}
 	fp, err := os.Open(localFile.FilePath)
@@ -100,7 +100,7 @@ func moderatorMsg(bot *gotgbot.Bot, file *gotgbot.PhotoSize) (*azure.ModeratorV2
 		return nil, NoImage
 	}
 	log.Debugf("start ocr file %s", localFile.FilePath)
-	res, err := globalcfg.Moderator.EvalFile(localFile.FilePath)
+	res, err := g.Moderator.EvalFile(localFile.FilePath)
 	if err != nil {
 		return nil, err
 	}

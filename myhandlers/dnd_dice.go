@@ -1,6 +1,9 @@
 package myhandlers
 
 import (
+	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"main/globalcfg"
 	"main/helpers/cocdice"
@@ -68,38 +71,38 @@ func SetDndAttr(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
 	text := width.Narrow.String(ctx.EffectiveMessage.Text)
 	lines := strings.Split(text, "\n")
 	buf := strings.Builder{}
-	userId, name := getAttrTarget(ctx)
-	buf.WriteString(fmt.Sprintf("用户：%s\n", name))
+	userId, username := getAttrTarget(ctx)
+	buf.WriteString(fmt.Sprintf("用户：%s\n", username))
 	modified := false
 	for _, line := range lines {
 		matches := setAttrRe.FindStringSubmatch(line)
-		attr := CharacterAttr{UserID: userId, AttrName: matches[1]}
-		err = globalcfg.GetDb().Model(&CharacterAttr{}).Where(&attr).First(&attr).Error
-		oldValue := attr.AttrValue
-		if oldValue == "" {
-			oldValue = "empty"
+		name := matches[1]
+		val, err1 := g.Q().GetCocCharAttr(context.Background(), userId, name)
+		if val == "" || errors.Is(err1, sql.ErrNoRows) {
+			val = "empty"
+		} else if err1 != nil {
+			continue
 		}
+		oldVal := val
+
 		switch matches[2] {
 		case "+":
-			if err != nil {
-				continue
-			}
 			fallthrough
 		case "+=":
-			attr.AttrValue = strconv.Itoa(defaultAtoi(attr.AttrValue, 0) + defaultAtoi(matches[3], 0))
+			val = strconv.Itoa(defaultAtoi(val, 0) + defaultAtoi(matches[3], 0))
 		case "-":
-			if err != nil {
-				continue
-			}
 			fallthrough
 		case "-=":
-			attr.AttrValue = strconv.Itoa(defaultAtoi(attr.AttrValue, 0) - defaultAtoi(matches[3], 0))
+			val = strconv.Itoa(defaultAtoi(val, 0) - defaultAtoi(matches[3], 0))
 		default:
-			attr.AttrValue = matches[3]
+			val = matches[3]
 		}
 		modified = true
-		buf.WriteString(fmt.Sprintf("%s : %s -> %s\n", attr.AttrName, oldValue, attr.AttrValue))
-		globalcfg.GetDb().Save(&attr)
+		buf.WriteString(fmt.Sprintf("%s : %s -> %s\n", name, oldVal, val))
+		err = g.Q().SetCocCharAttr(context.Background(), userId, name, val)
+		if err != nil {
+			log.Errorf("SetCocCharAttr err: %v", err)
+		}
 	}
 	if !modified {
 		return nil
@@ -113,19 +116,17 @@ func SetDndAttr(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
 func getAbility(m string, user int64) (int, error) {
 	ability, err := strconv.Atoi(m)
 	if err != nil {
-		attr := CharacterAttr{UserID: user, AttrName: m}
-		err = globalcfg.GetDb().Model(&CharacterAttr{}).Where(&attr).First(&attr).Error
+		val, err := g.Q().GetCocCharAttr(context.Background(), user, m)
 		if err != nil {
 			return 0, err
 		}
-		return strconv.Atoi(attr.AttrValue)
+		return strconv.Atoi(val)
 
 	}
 	return ability, nil
 }
 
 func ListDndAttr(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
-	var attrs []CharacterAttr
 	text := width.Narrow.String(ctx.EffectiveMessage.Text)
 	texts := strings.SplitN(text, " ", 2)
 	var re *regexp.Regexp
@@ -136,7 +137,10 @@ func ListDndAttr(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
 	}
 	log.Infof("text: %s", text)
 	userId, name := getAttrTarget(ctx)
-	globalcfg.GetDb().Model(&CharacterAttr{}).Where("user_id = ?", userId).Find(&attrs)
+	attrs, err := g.Q().GetCocCharAllAttr(context.Background(), userId)
+	if err != nil {
+		return err
+	}
 	var result strings.Builder
 	result.WriteString(fmt.Sprintf("用户：%s\n", name))
 	for _, attr := range attrs {
@@ -158,8 +162,10 @@ func DelDndAttr(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
 	text := width.Narrow.String(ctx.EffectiveMessage.Text)
 	lines := strings.Split(text, "\n")
 	for _, line := range lines[1:] {
-		attr := CharacterAttr{UserID: ctx.EffectiveSender.Id(), AttrName: line}
-		globalcfg.GetDb().Model(&CharacterAttr{}).Where(&attr).Delete(&attr)
+		err = g.Q().DelCocCharAttr(context.Background(), ctx.EffectiveSender.Id(), line)
+		if err != nil {
+			log.Errorf("DelCocCharAttr err: %v", err)
+		}
 	}
 	_, err = ctx.EffectiveMessage.Reply(bot, "删除成功", nil)
 	return err

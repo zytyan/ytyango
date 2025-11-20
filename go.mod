@@ -10,7 +10,6 @@ require (
 	github.com/gin-gonic/gin v1.11.0
 	github.com/go-co-op/gocron v1.37.0
 	github.com/google/uuid v1.6.0
-	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/json-iterator/go v1.1.12
 	github.com/kolesa-team/go-webp v1.0.5
 	github.com/kr/pretty v0.3.1
@@ -23,9 +22,6 @@ require (
 	google.golang.org/genai v1.34.0
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 	gopkg.in/yaml.v3 v3.0.1
-	gorm.io/driver/sqlite v1.6.0
-	gorm.io/gorm v1.31.1
-	moul.io/zapgorm2 v1.3.0
 )
 
 require (
