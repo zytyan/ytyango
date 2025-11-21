@@ -25,9 +25,9 @@ VALUES (?,
 RETURNING id, web_id, auto_cvt_bili, auto_ocr, auto_calculate, auto_exchange, auto_check_adult, save_messages, enable_coc, resp_nsfw_msg
 `
 
-func (q *Queries) CreateNewChatDefaultCfg(ctx context.Context, id int64) (ChatCfg, error) {
+func (q *Queries) CreateNewChatDefaultCfg(ctx context.Context, id int64) (chatCfg, error) {
 	row := q.db.QueryRowContext(ctx, createNewChatDefaultCfg, id)
-	var i ChatCfg
+	var i chatCfg
 	err := row.Scan(
 		&i.ID,
 		&i.WebID,
@@ -49,9 +49,9 @@ FROM chat_cfg
 WHERE id = ?
 `
 
-func (q *Queries) getChatById(ctx context.Context, id int64) (ChatCfg, error) {
+func (q *Queries) getChatById(ctx context.Context, id int64) (chatCfg, error) {
 	row := q.db.QueryRowContext(ctx, getChatById, id)
-	var i ChatCfg
+	var i chatCfg
 	err := row.Scan(
 		&i.ID,
 		&i.WebID,

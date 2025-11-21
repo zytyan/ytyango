@@ -45,11 +45,11 @@ RETURNING id
 `
 
 type updateUserBaseParams struct {
-	UpdatedAt UnixTime
-	UserID    int64
-	FirstName string
-	LastName  sql.NullString
-	TimeZone  sql.NullInt64
+	UpdatedAt UnixTime       `json:"updated_at"`
+	UserID    int64          `json:"user_id"`
+	FirstName string         `json:"first_name"`
+	LastName  sql.NullString `json:"last_name"`
+	TimeZone  sql.NullInt64  `json:"time_zone"`
 }
 
 // encoding: utf-8

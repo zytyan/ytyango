@@ -7,9 +7,11 @@ import (
 	"time"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
+	"github.com/puzpuzpuz/xsync/v3"
 )
 
-var userCache = NewWeakMap[int64, User]()
+// TODO: 将这里的xsync.MapOf替换为WeakMap(若可能）或LRU Map，避免内存泄漏的问题
+var userCache = xsync.NewMapOf[int64, *User]()
 
 func (q *Queries) GetUserByTg(ctx context.Context, tgUser *gotgbot.User) (*User, error) {
 	var err error
@@ -49,7 +51,8 @@ func (q *Queries) GetUserById(ctx context.Context, id int64) *User {
 	return &user
 }
 
-var chatCache = NewWeakMap[int64, ChatCfg]()
+// TODO: 将这里的xsync.MapOf替换为WeakMap(若可能）或LRU Map，避免内存泄漏的问题
+var chatCache = xsync.NewMapOf[int64, *ChatCfg]()
 
 func (q *Queries) GetChatById(ctx context.Context, id int64) (*ChatCfg, error) {
 	var err error

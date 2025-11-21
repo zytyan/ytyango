@@ -56,11 +56,11 @@ ON CONFLICT(file_uid) DO UPDATE SET file_id   = excluded.file_id,
 `
 
 type insertPicParams struct {
-	FileUid  string
-	FileID   string
-	BotRate  int64
-	RandKey  int64
-	UserRate int64
+	FileUid  string `json:"file_uid"`
+	FileID   string `json:"file_id"`
+	BotRate  int64  `json:"bot_rate"`
+	RandKey  int64  `json:"rand_key"`
+	UserRate int64  `json:"user_rate"`
 }
 
 func (q *Queries) insertPic(ctx context.Context, arg insertPicParams) error {

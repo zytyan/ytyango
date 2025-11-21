@@ -17,9 +17,9 @@ WHERE uid = ?
 `
 
 type GetBiliInlineDataRow struct {
-	Text   string
-	ChatID int64
-	MsgID  int64
+	Text   string `json:"text"`
+	ChatID int64  `json:"chat_id"`
+	MsgID  int64  `json:"msg_id"`
 }
 
 // encoding: utf-8
@@ -34,7 +34,7 @@ const insertBiliInlineData = `-- name: InsertBiliInlineData :one
 INSERT INTO bili_inline_results
     DEFAULT
 VALUES
-/*这里只插入一个uid，并由数据库返回，因为chat
+RETURNING uid
 `
 
 func (q *Queries) InsertBiliInlineData(ctx context.Context) (int64, error) {
@@ -45,11 +45,11 @@ func (q *Queries) InsertBiliInlineData(ctx context.Context) (int64, error) {
 }
 
 const updateBiliInlineMsgId = `-- name: UpdateBiliInlineMsgId :exec
-d和msg id只有发出去了之后才知道*/
-RETURNING uid;
-
 UPDATE bili_inline_results
-SET
+SET text    = ?,
+    chat_id = ?,
+    msg_id  = ?
+WHERE uid = ?
 `
 
 func (q *Queries) UpdateBiliInlineMsgId(ctx context.Context, text string, chatID int64, msgID int64, uid int64) error {

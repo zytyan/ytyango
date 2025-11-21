@@ -28,8 +28,8 @@ WHERE user_id = ?
 `
 
 type GetCocCharAllAttrRow struct {
-	AttrName  string
-	AttrValue string
+	AttrName  string `json:"attr_name"`
+	AttrValue string `json:"attr_value"`
 }
 
 func (q *Queries) GetCocCharAllAttr(ctx context.Context, userID int64) ([]GetCocCharAllAttrRow, error) {

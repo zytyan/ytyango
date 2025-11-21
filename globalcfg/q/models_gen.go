@@ -9,75 +9,75 @@ import (
 )
 
 type BiliInlineResult struct {
-	Uid    int64
-	Text   string
-	ChatID int64
-	MsgID  int64
+	Uid    int64  `json:"uid"`
+	Text   string `json:"text"`
+	ChatID int64  `json:"chat_id"`
+	MsgID  int64  `json:"msg_id"`
 }
 
 type CharacterAttr struct {
-	UserID    int64
-	AttrName  string
-	AttrValue string
-}
-
-type ChatCfg struct {
-	ID             int64
-	WebID          sql.NullInt64
-	AutoCvtBili    bool
-	AutoOcr        bool
-	AutoCalculate  bool
-	AutoExchange   bool
-	AutoCheckAdult bool
-	SaveMessages   bool
-	EnableCoc      bool
-	RespNsfwMsg    bool
+	UserID    int64  `json:"user_id"`
+	AttrName  string `json:"attr_name"`
+	AttrValue string `json:"attr_value"`
 }
 
 type PicRateCounter struct {
-	Rate  int64
-	Count int64
+	Rate  int64 `json:"rate"`
+	Count int64 `json:"count"`
 }
 
 type PrprCach struct {
-	ProfilePhotoUid string
-	PrprFileID      string
+	ProfilePhotoUid string `json:"profile_photo_uid"`
+	PrprFileID      string `json:"prpr_file_id"`
 }
 
 type SavedPic struct {
-	FileUid       string
-	FileID        string
-	BotRate       int64
-	RandKey       int64
-	UserRate      int64
-	UserRatingSum int64
-	RateUserCount int64
+	FileUid       string `json:"file_uid"`
+	FileID        string `json:"file_id"`
+	BotRate       int64  `json:"bot_rate"`
+	RandKey       int64  `json:"rand_key"`
+	UserRate      int64  `json:"user_rate"`
+	UserRatingSum int64  `json:"user_rating_sum"`
+	RateUserCount int64  `json:"rate_user_count"`
 }
 
 type SavedPicsRating struct {
-	FileUid string
-	UserID  int64
-	Rating  int64
+	FileUid string `json:"file_uid"`
+	UserID  int64  `json:"user_id"`
+	Rating  int64  `json:"rating"`
 }
 
 type User struct {
-	ID              int64
-	UpdatedAt       UnixTime
-	UserID          int64
-	FirstName       string
-	LastName        sql.NullString
-	ProfileUpdateAt UnixTime
-	ProfilePhoto    sql.NullString
-	TimeZone        sql.NullInt64
+	ID              int64          `json:"id"`
+	UpdatedAt       UnixTime       `json:"updated_at"`
+	UserID          int64          `json:"user_id"`
+	FirstName       string         `json:"first_name"`
+	LastName        sql.NullString `json:"last_name"`
+	ProfileUpdateAt UnixTime       `json:"profile_update_at"`
+	ProfilePhoto    sql.NullString `json:"profile_photo"`
+	TimeZone        sql.NullInt64  `json:"time_zone"`
 }
 
 type YtDlResult struct {
-	Url         string
-	AudioOnly   bool
-	Resolution  int64
-	FileID      string
-	Title       sql.NullString
-	Description sql.NullString
-	Uploader    sql.NullString
-	UploadCount int64
+	Url         string         `json:"url"`
+	AudioOnly   bool           `json:"audio_only"`
+	Resolution  int64          `json:"resolution"`
+	FileID      string         `json:"file_id"`
+	Title       sql.NullString `json:"title"`
+	Description sql.NullString `json:"description"`
+	Uploader    sql.NullString `json:"uploader"`
+	UploadCount int64          `json:"upload_count"`
+}
+
+type chatCfg struct {
+	ID             int64         `json:"id"`
+	WebID          sql.NullInt64 `json:"web_id"`
+	AutoCvtBili    bool          `json:"auto_cvt_bili"`
+	AutoOcr        bool          `json:"auto_ocr"`
+	AutoCalculate  bool          `json:"auto_calculate"`
+	AutoExchange   bool          `json:"auto_exchange"`
+	AutoCheckAdult bool          `json:"auto_check_adult"`
+	SaveMessages   bool          `json:"save_messages"`
+	EnableCoc      bool          `json:"enable_coc"`
+	RespNsfwMsg    bool          `json:"resp_nsfw_msg"`
 }

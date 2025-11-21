@@ -24,5 +24,8 @@ sql:
         output_models_file_name: "models_gen.go"
         output_batch_file_name: "batch_gen.go"
         output_querier_file_name: "querier_gen.go"
+        emit_json_tags: true
         query_parameter_limit: 4
+        rename:
+          chat_cfg: chatCfg
 

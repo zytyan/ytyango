@@ -48,13 +48,13 @@ ON CONFLICT DO UPDATE
 `
 
 type UpdateYtDlpCacheParams struct {
-	Url         string
-	AudioOnly   bool
-	Resolution  int64
-	FileID      string
-	Title       sql.NullString
-	Description sql.NullString
-	Uploader    sql.NullString
+	Url         string         `json:"url"`
+	AudioOnly   bool           `json:"audio_only"`
+	Resolution  int64          `json:"resolution"`
+	FileID      string         `json:"file_id"`
+	Title       sql.NullString `json:"title"`
+	Description sql.NullString `json:"description"`
+	Uploader    sql.NullString `json:"uploader"`
 }
 
 func (q *Queries) UpdateYtDlpCache(ctx context.Context, arg UpdateYtDlpCacheParams) error {
