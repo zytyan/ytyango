@@ -7,6 +7,9 @@ package q
 
 import (
 	"context"
+	"time"
+
+	"go.uber.org/zap"
 )
 
 const getBiliInlineData = `-- name: GetBiliInlineData :one
@@ -24,9 +27,19 @@ type GetBiliInlineDataRow struct {
 
 // encoding: utf-8
 func (q *Queries) GetBiliInlineData(ctx context.Context, uid int64) (GetBiliInlineDataRow, error) {
-	row := q.db.QueryRowContext(ctx, getBiliInlineData, uid)
+	var logFields []zap.Field
+	var start time.Time
+	if q.logger != nil {
+		logFields = make([]zap.Field, 0, 1+5)
+		start = time.Now()
+		logFields = append(logFields,
+			zap.Int64("uid", uid),
+		)
+	}
+	row := q.queryRow(ctx, q.getBiliInlineDataStmt, getBiliInlineData, uid)
 	var i GetBiliInlineDataRow
 	err := row.Scan(&i.Text, &i.ChatID, &i.MsgID)
+	q.logQuery(getBiliInlineData, logFields, err, start)
 	return i, err
 }
 
@@ -38,9 +51,16 @@ RETURNING uid
 `
 
 func (q *Queries) InsertBiliInlineData(ctx context.Context) (int64, error) {
-	row := q.db.QueryRowContext(ctx, insertBiliInlineData)
+	var logFields []zap.Field
+	var start time.Time
+	if q.logger != nil {
+		logFields = make([]zap.Field, 0, 0+5)
+		start = time.Now()
+	}
+	row := q.queryRow(ctx, q.insertBiliInlineDataStmt, insertBiliInlineData)
 	var uid int64
 	err := row.Scan(&uid)
+	q.logQuery(insertBiliInlineData, logFields, err, start)
 	return uid, err
 }
 
@@ -53,11 +73,24 @@ WHERE uid = ?
 `
 
 func (q *Queries) UpdateBiliInlineMsgId(ctx context.Context, text string, chatID int64, msgID int64, uid int64) error {
-	_, err := q.db.ExecContext(ctx, updateBiliInlineMsgId,
+	var logFields []zap.Field
+	var start time.Time
+	if q.logger != nil {
+		logFields = make([]zap.Field, 0, 4+5)
+		start = time.Now()
+		logFields = append(logFields,
+			zap.String("text", text),
+			zap.Int64("chat_id", chatID),
+			zap.Int64("msg_id", msgID),
+			zap.Int64("uid", uid),
+		)
+	}
+	_, err := q.exec(ctx, q.updateBiliInlineMsgIdStmt, updateBiliInlineMsgId,
 		text,
 		chatID,
 		msgID,
 		uid,
 	)
+	q.logQuery(updateBiliInlineMsgId, logFields, err, start)
 	return err
 }

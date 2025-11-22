@@ -8,6 +8,9 @@ package q
 import (
 	"context"
 	"database/sql"
+	"time"
+
+	"go.uber.org/zap"
 )
 
 const createNewChatDefaultCfg = `-- name: CreateNewChatDefaultCfg :one
@@ -27,7 +30,16 @@ RETURNING id, web_id, auto_cvt_bili, auto_ocr, auto_calculate, auto_exchange, au
 `
 
 func (q *Queries) CreateNewChatDefaultCfg(ctx context.Context, id int64) (chatCfg, error) {
-	row := q.db.QueryRowContext(ctx, createNewChatDefaultCfg, id)
+	var logFields []zap.Field
+	var start time.Time
+	if q.logger != nil {
+		logFields = make([]zap.Field, 0, 1+5)
+		start = time.Now()
+		logFields = append(logFields,
+			zap.Int64("id", id),
+		)
+	}
+	row := q.queryRow(ctx, q.createNewChatDefaultCfgStmt, createNewChatDefaultCfg, id)
 	var i chatCfg
 	err := row.Scan(
 		&i.ID,
@@ -41,6 +53,7 @@ func (q *Queries) CreateNewChatDefaultCfg(ctx context.Context, id int64) (chatCf
 		&i.EnableCoc,
 		&i.RespNsfwMsg,
 	)
+	q.logQuery(createNewChatDefaultCfg, logFields, err, start)
 	return i, err
 }
 
@@ -53,7 +66,16 @@ WHERE id = ?
 
 // encoding: utf-8
 func (q *Queries) getChatById(ctx context.Context, id int64) (chatCfg, error) {
-	row := q.db.QueryRowContext(ctx, getChatById, id)
+	var logFields []zap.Field
+	var start time.Time
+	if q.logger != nil {
+		logFields = make([]zap.Field, 0, 1+5)
+		start = time.Now()
+		logFields = append(logFields,
+			zap.Int64("id", id),
+		)
+	}
+	row := q.queryRow(ctx, q.getChatByIdStmt, getChatById, id)
 	var i chatCfg
 	err := row.Scan(
 		&i.ID,
@@ -67,6 +89,7 @@ func (q *Queries) getChatById(ctx context.Context, id int64) (chatCfg, error) {
 		&i.EnableCoc,
 		&i.RespNsfwMsg,
 	)
+	q.logQuery(getChatById, logFields, err, start)
 	return i, err
 }
 
@@ -77,9 +100,19 @@ WHERE web_id = ?
 `
 
 func (q *Queries) getChatIdByWebId(ctx context.Context, webID sql.NullInt64) (int64, error) {
-	row := q.db.QueryRowContext(ctx, getChatIdByWebId, webID)
+	var logFields []zap.Field
+	var start time.Time
+	if q.logger != nil {
+		logFields = make([]zap.Field, 0, 1+5)
+		start = time.Now()
+		logFields = append(logFields,
+			zapNullInt64("web_id", webID),
+		)
+	}
+	row := q.queryRow(ctx, q.getChatIdByWebIdStmt, getChatIdByWebId, webID)
 	var id int64
 	err := row.Scan(&id)
+	q.logQuery(getChatIdByWebId, logFields, err, start)
 	return id, err
 }
 
@@ -109,7 +142,24 @@ type updateChatParams struct {
 }
 
 func (q *Queries) updateChat(ctx context.Context, arg updateChatParams) error {
-	_, err := q.db.ExecContext(ctx, updateChat,
+	var logFields []zap.Field
+	var start time.Time
+	if q.logger != nil {
+		logFields = make([]zap.Field, 0, 9+5)
+		start = time.Now()
+		logFields = append(logFields,
+			zap.Bool("auto_cvt_bili", arg.AutoCvtBili),
+			zap.Bool("auto_ocr", arg.AutoOcr),
+			zap.Bool("auto_calculate", arg.AutoCalculate),
+			zap.Bool("auto_exchange", arg.AutoExchange),
+			zap.Bool("auto_check_adult", arg.AutoCheckAdult),
+			zap.Bool("save_messages", arg.SaveMessages),
+			zap.Bool("enable_coc", arg.EnableCoc),
+			zap.Bool("resp_nsfw_msg", arg.RespNsfwMsg),
+			zap.Int64("id", arg.ID),
+		)
+	}
+	_, err := q.exec(ctx, q.updateChatStmt, updateChat,
 		arg.AutoCvtBili,
 		arg.AutoOcr,
 		arg.AutoCalculate,
@@ -120,5 +170,6 @@ func (q *Queries) updateChat(ctx context.Context, arg updateChatParams) error {
 		arg.RespNsfwMsg,
 		arg.ID,
 	)
+	q.logQuery(updateChat, logFields, err, start)
 	return err
 }

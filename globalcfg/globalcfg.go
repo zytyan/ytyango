@@ -1,11 +1,13 @@
 package g
 
 import (
+	"context"
 	"database/sql"
 	"main/globalcfg/q"
 	"main/helpers/azure"
 	"os"
 	"sync"
+	"time"
 
 	_ "github.com/mattn/go-sqlite3"
 	"go.uber.org/zap"
@@ -162,8 +164,15 @@ func NewTx() (*q.Queries, error) {
 }
 
 func init() {
+	var err error
 	config = initConfig()
 	gWriteSyncer = initWriteSyncer()
 	db = initDatabase()
-	Q = q.New(db)
+	logger := GetLogger("database")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	Q, err = q.PrepareWithLogger(ctx, db, logger.Desugar())
+	if err != nil {
+		panic(err)
+	}
 }

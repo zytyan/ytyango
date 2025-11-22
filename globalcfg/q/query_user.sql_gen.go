@@ -8,6 +8,9 @@ package q
 import (
 	"context"
 	"database/sql"
+	"time"
+
+	"go.uber.org/zap"
 )
 
 const getPrprCache = `-- name: GetPrprCache :one
@@ -17,9 +20,19 @@ WHERE profile_photo_uid = ?
 `
 
 func (q *Queries) GetPrprCache(ctx context.Context, profilePhotoUid string) (string, error) {
-	row := q.db.QueryRowContext(ctx, getPrprCache, profilePhotoUid)
+	var logFields []zap.Field
+	var start time.Time
+	if q.logger != nil {
+		logFields = make([]zap.Field, 0, 1+5)
+		start = time.Now()
+		logFields = append(logFields,
+			zap.String("profile_photo_uid", profilePhotoUid),
+		)
+	}
+	row := q.queryRow(ctx, q.getPrprCacheStmt, getPrprCache, profilePhotoUid)
 	var prpr_file_id string
 	err := row.Scan(&prpr_file_id)
+	q.logQuery(getPrprCache, logFields, err, start)
 	return prpr_file_id, err
 }
 
@@ -29,7 +42,18 @@ VALUES (?, ?)
 `
 
 func (q *Queries) SetPrprCache(ctx context.Context, profilePhotoUid string, prprFileID string) error {
-	_, err := q.db.ExecContext(ctx, setPrprCache, profilePhotoUid, prprFileID)
+	var logFields []zap.Field
+	var start time.Time
+	if q.logger != nil {
+		logFields = make([]zap.Field, 0, 2+5)
+		start = time.Now()
+		logFields = append(logFields,
+			zap.String("profile_photo_uid", profilePhotoUid),
+			zap.String("prpr_file_id", prprFileID),
+		)
+	}
+	_, err := q.exec(ctx, q.setPrprCacheStmt, setPrprCache, profilePhotoUid, prprFileID)
+	q.logQuery(setPrprCache, logFields, err, start)
 	return err
 }
 
@@ -49,7 +73,21 @@ type createNewUserParams struct {
 }
 
 func (q *Queries) createNewUser(ctx context.Context, arg createNewUserParams) (int64, error) {
-	row := q.db.QueryRowContext(ctx, createNewUser,
+	var logFields []zap.Field
+	var start time.Time
+	if q.logger != nil {
+		logFields = make([]zap.Field, 0, 6+5)
+		start = time.Now()
+		logFields = append(logFields,
+			zap.Any("updated_at", arg.UpdatedAt),
+			zap.Int64("user_id", arg.UserID),
+			zap.String("first_name", arg.FirstName),
+			zapNullString("last_name", arg.LastName),
+			zapNullString("profile_photo", arg.ProfilePhoto),
+			zap.Int64("timezone", arg.Timezone),
+		)
+	}
+	row := q.queryRow(ctx, q.createNewUserStmt, createNewUser,
 		arg.UpdatedAt,
 		arg.UserID,
 		arg.FirstName,
@@ -59,6 +97,7 @@ func (q *Queries) createNewUser(ctx context.Context, arg createNewUserParams) (i
 	)
 	var id int64
 	err := row.Scan(&id)
+	q.logQuery(createNewUser, logFields, err, start)
 	return id, err
 }
 
@@ -71,7 +110,16 @@ WHERE user_id = ?
 
 // encoding: utf-8
 func (q *Queries) getUserById(ctx context.Context, userID int64) (User, error) {
-	row := q.db.QueryRowContext(ctx, getUserById, userID)
+	var logFields []zap.Field
+	var start time.Time
+	if q.logger != nil {
+		logFields = make([]zap.Field, 0, 1+5)
+		start = time.Now()
+		logFields = append(logFields,
+			zap.Int64("user_id", userID),
+		)
+	}
+	row := q.queryRow(ctx, q.getUserByIdStmt, getUserById, userID)
 	var i User
 	err := row.Scan(
 		&i.ID,
@@ -83,6 +131,7 @@ func (q *Queries) getUserById(ctx context.Context, userID int64) (User, error) {
 		&i.ProfilePhoto,
 		&i.Timezone,
 	)
+	q.logQuery(getUserById, logFields, err, start)
 	return i, err
 }
 
@@ -96,7 +145,19 @@ RETURNING id
 `
 
 func (q *Queries) updateUserBase(ctx context.Context, userID int64, updatedAt UnixTime, firstName string, lastName sql.NullString) (int64, error) {
-	row := q.db.QueryRowContext(ctx, updateUserBase,
+	var logFields []zap.Field
+	var start time.Time
+	if q.logger != nil {
+		logFields = make([]zap.Field, 0, 4+5)
+		start = time.Now()
+		logFields = append(logFields,
+			zap.Int64("user_id", userID),
+			zap.Any("updated_at", updatedAt),
+			zap.String("first_name", firstName),
+			zapNullString("last_name", lastName),
+		)
+	}
+	row := q.queryRow(ctx, q.updateUserBaseStmt, updateUserBase,
 		userID,
 		updatedAt,
 		firstName,
@@ -104,6 +165,7 @@ func (q *Queries) updateUserBase(ctx context.Context, userID int64, updatedAt Un
 	)
 	var id int64
 	err := row.Scan(&id)
+	q.logQuery(updateUserBase, logFields, err, start)
 	return id, err
 }
 
@@ -115,7 +177,19 @@ WHERE user_id = ?1
 `
 
 func (q *Queries) updateUserProfilePhoto(ctx context.Context, userID int64, profileUpdateAt UnixTime, profilePhoto sql.NullString) error {
-	_, err := q.db.ExecContext(ctx, updateUserProfilePhoto, userID, profileUpdateAt, profilePhoto)
+	var logFields []zap.Field
+	var start time.Time
+	if q.logger != nil {
+		logFields = make([]zap.Field, 0, 3+5)
+		start = time.Now()
+		logFields = append(logFields,
+			zap.Int64("user_id", userID),
+			zap.Any("profile_update_at", profileUpdateAt),
+			zapNullString("profile_photo", profilePhoto),
+		)
+	}
+	_, err := q.exec(ctx, q.updateUserProfilePhotoStmt, updateUserProfilePhoto, userID, profileUpdateAt, profilePhoto)
+	q.logQuery(updateUserProfilePhoto, logFields, err, start)
 	return err
 }
 
@@ -128,6 +202,18 @@ RETURNING id
 `
 
 func (q *Queries) updateUserTimeZone(ctx context.Context, userID int64, updatedAt UnixTime, timezone int64) error {
-	_, err := q.db.ExecContext(ctx, updateUserTimeZone, userID, updatedAt, timezone)
+	var logFields []zap.Field
+	var start time.Time
+	if q.logger != nil {
+		logFields = make([]zap.Field, 0, 3+5)
+		start = time.Now()
+		logFields = append(logFields,
+			zap.Int64("user_id", userID),
+			zap.Any("updated_at", updatedAt),
+			zap.Int64("timezone", timezone),
+		)
+	}
+	_, err := q.exec(ctx, q.updateUserTimeZoneStmt, updateUserTimeZone, userID, updatedAt, timezone)
+	q.logQuery(updateUserTimeZone, logFields, err, start)
 	return err
 }

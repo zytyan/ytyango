@@ -7,6 +7,9 @@ package q
 
 import (
 	"context"
+	"time"
+
+	"go.uber.org/zap"
 )
 
 const getPicByRateAndRandKey = `-- name: getPicByRateAndRandKey :one
@@ -20,9 +23,20 @@ LIMIT 1
 
 // encoding: utf-8
 func (q *Queries) getPicByRateAndRandKey(ctx context.Context, userRate int64, randKey int64) (string, error) {
-	row := q.db.QueryRowContext(ctx, getPicByRateAndRandKey, userRate, randKey)
+	var logFields []zap.Field
+	var start time.Time
+	if q.logger != nil {
+		logFields = make([]zap.Field, 0, 2+5)
+		start = time.Now()
+		logFields = append(logFields,
+			zap.Int64("user_rate", userRate),
+			zap.Int64("rand_key", randKey),
+		)
+	}
+	row := q.queryRow(ctx, q.getPicByRateAndRandKeyStmt, getPicByRateAndRandKey, userRate, randKey)
 	var file_id string
 	err := row.Scan(&file_id)
+	q.logQuery(getPicByRateAndRandKey, logFields, err, start)
 	return file_id, err
 }
 
@@ -35,9 +49,19 @@ LIMIT 1
 `
 
 func (q *Queries) getPicByRateFirst(ctx context.Context, userRate int64) (string, error) {
-	row := q.db.QueryRowContext(ctx, getPicByRateFirst, userRate)
+	var logFields []zap.Field
+	var start time.Time
+	if q.logger != nil {
+		logFields = make([]zap.Field, 0, 1+5)
+		start = time.Now()
+		logFields = append(logFields,
+			zap.Int64("user_rate", userRate),
+		)
+	}
+	row := q.queryRow(ctx, q.getPicByRateFirstStmt, getPicByRateFirst, userRate)
 	var file_id string
 	err := row.Scan(&file_id)
+	q.logQuery(getPicByRateFirst, logFields, err, start)
 	return file_id, err
 }
 
@@ -64,12 +88,26 @@ type insertPicParams struct {
 }
 
 func (q *Queries) insertPic(ctx context.Context, arg insertPicParams) error {
-	_, err := q.db.ExecContext(ctx, insertPic,
+	var logFields []zap.Field
+	var start time.Time
+	if q.logger != nil {
+		logFields = make([]zap.Field, 0, 5+5)
+		start = time.Now()
+		logFields = append(logFields,
+			zap.String("file_uid", arg.FileUid),
+			zap.String("file_id", arg.FileID),
+			zap.Int64("bot_rate", arg.BotRate),
+			zap.Int64("rand_key", arg.RandKey),
+			zap.Int64("user_rate", arg.UserRate),
+		)
+	}
+	_, err := q.exec(ctx, q.insertPicStmt, insertPic,
 		arg.FileUid,
 		arg.FileID,
 		arg.BotRate,
 		arg.RandKey,
 		arg.UserRate,
 	)
+	q.logQuery(insertPic, logFields, err, start)
 	return err
 }

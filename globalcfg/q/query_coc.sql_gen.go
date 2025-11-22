@@ -7,6 +7,9 @@ package q
 
 import (
 	"context"
+	"time"
+
+	"go.uber.org/zap"
 )
 
 const delCocCharAttr = `-- name: DelCocCharAttr :exec
@@ -17,7 +20,18 @@ WHERE user_id = ?
 `
 
 func (q *Queries) DelCocCharAttr(ctx context.Context, userID int64, attrName string) error {
-	_, err := q.db.ExecContext(ctx, delCocCharAttr, userID, attrName)
+	var logFields []zap.Field
+	var start time.Time
+	if q.logger != nil {
+		logFields = make([]zap.Field, 0, 2+5)
+		start = time.Now()
+		logFields = append(logFields,
+			zap.Int64("user_id", userID),
+			zap.String("attr_name", attrName),
+		)
+	}
+	_, err := q.exec(ctx, q.delCocCharAttrStmt, delCocCharAttr, userID, attrName)
+	q.logQuery(delCocCharAttr, logFields, err, start)
 	return err
 }
 
@@ -33,23 +47,36 @@ type GetCocCharAllAttrRow struct {
 }
 
 func (q *Queries) GetCocCharAllAttr(ctx context.Context, userID int64) ([]GetCocCharAllAttrRow, error) {
-	rows, err := q.db.QueryContext(ctx, getCocCharAllAttr, userID)
+	var logFields []zap.Field
+	var start time.Time
+	if q.logger != nil {
+		logFields = make([]zap.Field, 0, 1+5)
+		start = time.Now()
+		logFields = append(logFields,
+			zap.Int64("user_id", userID),
+		)
+	}
+	rows, err := q.query(ctx, q.getCocCharAllAttrStmt, getCocCharAllAttr, userID)
 	if err != nil {
+		q.logQuery(getCocCharAllAttr, logFields, err, start)
 		return nil, err
 	}
 	defer rows.Close()
 	var items []GetCocCharAllAttrRow
 	for rows.Next() {
 		var i GetCocCharAllAttrRow
-		if err := rows.Scan(&i.AttrName, &i.AttrValue); err != nil {
+		if err = rows.Scan(&i.AttrName, &i.AttrValue); err != nil {
+			q.logQuery(getCocCharAllAttr, logFields, err, start)
 			return nil, err
 		}
 		items = append(items, i)
 	}
-	if err := rows.Close(); err != nil {
+	if err = rows.Close(); err != nil {
+		q.logQuery(getCocCharAllAttr, logFields, err, start)
 		return nil, err
 	}
-	if err := rows.Err(); err != nil {
+	if err = rows.Err(); err != nil {
+		q.logQuery(getCocCharAllAttr, logFields, err, start)
 		return nil, err
 	}
 	return items, nil
@@ -65,9 +92,20 @@ WHERE user_id = ?
 
 // encoding: utf-8
 func (q *Queries) GetCocCharAttr(ctx context.Context, userID int64, attrName string) (string, error) {
-	row := q.db.QueryRowContext(ctx, getCocCharAttr, userID, attrName)
+	var logFields []zap.Field
+	var start time.Time
+	if q.logger != nil {
+		logFields = make([]zap.Field, 0, 2+5)
+		start = time.Now()
+		logFields = append(logFields,
+			zap.Int64("user_id", userID),
+			zap.String("attr_name", attrName),
+		)
+	}
+	row := q.queryRow(ctx, q.getCocCharAttrStmt, getCocCharAttr, userID, attrName)
 	var attr_value string
 	err := row.Scan(&attr_value)
+	q.logQuery(getCocCharAttr, logFields, err, start)
 	return attr_value, err
 }
 
@@ -79,6 +117,18 @@ ON CONFLICT DO UPDATE SET attr_value=excluded.attr_value
 `
 
 func (q *Queries) SetCocCharAttr(ctx context.Context, userID int64, attrName string, attrValue string) error {
-	_, err := q.db.ExecContext(ctx, setCocCharAttr, userID, attrName, attrValue)
+	var logFields []zap.Field
+	var start time.Time
+	if q.logger != nil {
+		logFields = make([]zap.Field, 0, 3+5)
+		start = time.Now()
+		logFields = append(logFields,
+			zap.Int64("user_id", userID),
+			zap.String("attr_name", attrName),
+			zap.String("attr_value", attrValue),
+		)
+	}
+	_, err := q.exec(ctx, q.setCocCharAttrStmt, setCocCharAttr, userID, attrName, attrValue)
+	q.logQuery(setCocCharAttr, logFields, err, start)
 	return err
 }

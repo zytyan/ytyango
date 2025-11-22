@@ -7,6 +7,10 @@ package q
 import (
 	"context"
 	"database/sql"
+	"fmt"
+	"time"
+
+	"go.uber.org/zap"
 )
 
 type DBTX interface {
@@ -20,12 +24,377 @@ func New(db DBTX) *Queries {
 	return &Queries{db: db}
 }
 
+func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
+	q := Queries{db: db}
+	var err error
+	if q.createNewChatDefaultCfgStmt, err = db.PrepareContext(ctx, createNewChatDefaultCfg); err != nil {
+		return nil, fmt.Errorf("error preparing query CreateNewChatDefaultCfg: %w", err)
+	}
+	if q.delCocCharAttrStmt, err = db.PrepareContext(ctx, delCocCharAttr); err != nil {
+		return nil, fmt.Errorf("error preparing query DelCocCharAttr: %w", err)
+	}
+	if q.getBiliInlineDataStmt, err = db.PrepareContext(ctx, getBiliInlineData); err != nil {
+		return nil, fmt.Errorf("error preparing query GetBiliInlineData: %w", err)
+	}
+	if q.getCocCharAllAttrStmt, err = db.PrepareContext(ctx, getCocCharAllAttr); err != nil {
+		return nil, fmt.Errorf("error preparing query GetCocCharAllAttr: %w", err)
+	}
+	if q.getCocCharAttrStmt, err = db.PrepareContext(ctx, getCocCharAttr); err != nil {
+		return nil, fmt.Errorf("error preparing query GetCocCharAttr: %w", err)
+	}
+	if q.getPrprCacheStmt, err = db.PrepareContext(ctx, getPrprCache); err != nil {
+		return nil, fmt.Errorf("error preparing query GetPrprCache: %w", err)
+	}
+	if q.getYtDlpDbCacheStmt, err = db.PrepareContext(ctx, getYtDlpDbCache); err != nil {
+		return nil, fmt.Errorf("error preparing query GetYtDlpDbCache: %w", err)
+	}
+	if q.incYtDlUploadCountStmt, err = db.PrepareContext(ctx, incYtDlUploadCount); err != nil {
+		return nil, fmt.Errorf("error preparing query IncYtDlUploadCount: %w", err)
+	}
+	if q.insertBiliInlineDataStmt, err = db.PrepareContext(ctx, insertBiliInlineData); err != nil {
+		return nil, fmt.Errorf("error preparing query InsertBiliInlineData: %w", err)
+	}
+	if q.setCocCharAttrStmt, err = db.PrepareContext(ctx, setCocCharAttr); err != nil {
+		return nil, fmt.Errorf("error preparing query SetCocCharAttr: %w", err)
+	}
+	if q.setPrprCacheStmt, err = db.PrepareContext(ctx, setPrprCache); err != nil {
+		return nil, fmt.Errorf("error preparing query SetPrprCache: %w", err)
+	}
+	if q.updateBiliInlineMsgIdStmt, err = db.PrepareContext(ctx, updateBiliInlineMsgId); err != nil {
+		return nil, fmt.Errorf("error preparing query UpdateBiliInlineMsgId: %w", err)
+	}
+	if q.updateYtDlpCacheStmt, err = db.PrepareContext(ctx, updateYtDlpCache); err != nil {
+		return nil, fmt.Errorf("error preparing query UpdateYtDlpCache: %w", err)
+	}
+	if q.createNewUserStmt, err = db.PrepareContext(ctx, createNewUser); err != nil {
+		return nil, fmt.Errorf("error preparing query createNewUser: %w", err)
+	}
+	if q.getChatByIdStmt, err = db.PrepareContext(ctx, getChatById); err != nil {
+		return nil, fmt.Errorf("error preparing query getChatById: %w", err)
+	}
+	if q.getChatIdByWebIdStmt, err = db.PrepareContext(ctx, getChatIdByWebId); err != nil {
+		return nil, fmt.Errorf("error preparing query getChatIdByWebId: %w", err)
+	}
+	if q.getPicByRateAndRandKeyStmt, err = db.PrepareContext(ctx, getPicByRateAndRandKey); err != nil {
+		return nil, fmt.Errorf("error preparing query getPicByRateAndRandKey: %w", err)
+	}
+	if q.getPicByRateFirstStmt, err = db.PrepareContext(ctx, getPicByRateFirst); err != nil {
+		return nil, fmt.Errorf("error preparing query getPicByRateFirst: %w", err)
+	}
+	if q.getUserByIdStmt, err = db.PrepareContext(ctx, getUserById); err != nil {
+		return nil, fmt.Errorf("error preparing query getUserById: %w", err)
+	}
+	if q.insertPicStmt, err = db.PrepareContext(ctx, insertPic); err != nil {
+		return nil, fmt.Errorf("error preparing query insertPic: %w", err)
+	}
+	if q.updateChatStmt, err = db.PrepareContext(ctx, updateChat); err != nil {
+		return nil, fmt.Errorf("error preparing query updateChat: %w", err)
+	}
+	if q.updateUserBaseStmt, err = db.PrepareContext(ctx, updateUserBase); err != nil {
+		return nil, fmt.Errorf("error preparing query updateUserBase: %w", err)
+	}
+	if q.updateUserProfilePhotoStmt, err = db.PrepareContext(ctx, updateUserProfilePhoto); err != nil {
+		return nil, fmt.Errorf("error preparing query updateUserProfilePhoto: %w", err)
+	}
+	if q.updateUserTimeZoneStmt, err = db.PrepareContext(ctx, updateUserTimeZone); err != nil {
+		return nil, fmt.Errorf("error preparing query updateUserTimeZone: %w", err)
+	}
+	return &q, nil
+}
+
+func (q *Queries) Close() error {
+	var err error
+	if q.createNewChatDefaultCfgStmt != nil {
+		if cerr := q.createNewChatDefaultCfgStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing createNewChatDefaultCfgStmt: %w", cerr)
+		}
+	}
+	if q.delCocCharAttrStmt != nil {
+		if cerr := q.delCocCharAttrStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing delCocCharAttrStmt: %w", cerr)
+		}
+	}
+	if q.getBiliInlineDataStmt != nil {
+		if cerr := q.getBiliInlineDataStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getBiliInlineDataStmt: %w", cerr)
+		}
+	}
+	if q.getCocCharAllAttrStmt != nil {
+		if cerr := q.getCocCharAllAttrStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getCocCharAllAttrStmt: %w", cerr)
+		}
+	}
+	if q.getCocCharAttrStmt != nil {
+		if cerr := q.getCocCharAttrStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getCocCharAttrStmt: %w", cerr)
+		}
+	}
+	if q.getPrprCacheStmt != nil {
+		if cerr := q.getPrprCacheStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getPrprCacheStmt: %w", cerr)
+		}
+	}
+	if q.getYtDlpDbCacheStmt != nil {
+		if cerr := q.getYtDlpDbCacheStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getYtDlpDbCacheStmt: %w", cerr)
+		}
+	}
+	if q.incYtDlUploadCountStmt != nil {
+		if cerr := q.incYtDlUploadCountStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing incYtDlUploadCountStmt: %w", cerr)
+		}
+	}
+	if q.insertBiliInlineDataStmt != nil {
+		if cerr := q.insertBiliInlineDataStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing insertBiliInlineDataStmt: %w", cerr)
+		}
+	}
+	if q.setCocCharAttrStmt != nil {
+		if cerr := q.setCocCharAttrStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing setCocCharAttrStmt: %w", cerr)
+		}
+	}
+	if q.setPrprCacheStmt != nil {
+		if cerr := q.setPrprCacheStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing setPrprCacheStmt: %w", cerr)
+		}
+	}
+	if q.updateBiliInlineMsgIdStmt != nil {
+		if cerr := q.updateBiliInlineMsgIdStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing updateBiliInlineMsgIdStmt: %w", cerr)
+		}
+	}
+	if q.updateYtDlpCacheStmt != nil {
+		if cerr := q.updateYtDlpCacheStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing updateYtDlpCacheStmt: %w", cerr)
+		}
+	}
+	if q.createNewUserStmt != nil {
+		if cerr := q.createNewUserStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing createNewUserStmt: %w", cerr)
+		}
+	}
+	if q.getChatByIdStmt != nil {
+		if cerr := q.getChatByIdStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getChatByIdStmt: %w", cerr)
+		}
+	}
+	if q.getChatIdByWebIdStmt != nil {
+		if cerr := q.getChatIdByWebIdStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getChatIdByWebIdStmt: %w", cerr)
+		}
+	}
+	if q.getPicByRateAndRandKeyStmt != nil {
+		if cerr := q.getPicByRateAndRandKeyStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getPicByRateAndRandKeyStmt: %w", cerr)
+		}
+	}
+	if q.getPicByRateFirstStmt != nil {
+		if cerr := q.getPicByRateFirstStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getPicByRateFirstStmt: %w", cerr)
+		}
+	}
+	if q.getUserByIdStmt != nil {
+		if cerr := q.getUserByIdStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getUserByIdStmt: %w", cerr)
+		}
+	}
+	if q.insertPicStmt != nil {
+		if cerr := q.insertPicStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing insertPicStmt: %w", cerr)
+		}
+	}
+	if q.updateChatStmt != nil {
+		if cerr := q.updateChatStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing updateChatStmt: %w", cerr)
+		}
+	}
+	if q.updateUserBaseStmt != nil {
+		if cerr := q.updateUserBaseStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing updateUserBaseStmt: %w", cerr)
+		}
+	}
+	if q.updateUserProfilePhotoStmt != nil {
+		if cerr := q.updateUserProfilePhotoStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing updateUserProfilePhotoStmt: %w", cerr)
+		}
+	}
+	if q.updateUserTimeZoneStmt != nil {
+		if cerr := q.updateUserTimeZoneStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing updateUserTimeZoneStmt: %w", cerr)
+		}
+	}
+	return err
+}
+
+func (q *Queries) exec(ctx context.Context, stmt *sql.Stmt, query string, args ...interface{}) (sql.Result, error) {
+	switch {
+	case stmt != nil && q.tx != nil:
+		return q.tx.StmtContext(ctx, stmt).ExecContext(ctx, args...)
+	case stmt != nil:
+		return stmt.ExecContext(ctx, args...)
+	default:
+		return q.db.ExecContext(ctx, query, args...)
+	}
+}
+
+func (q *Queries) query(ctx context.Context, stmt *sql.Stmt, query string, args ...interface{}) (*sql.Rows, error) {
+	switch {
+	case stmt != nil && q.tx != nil:
+		return q.tx.StmtContext(ctx, stmt).QueryContext(ctx, args...)
+	case stmt != nil:
+		return stmt.QueryContext(ctx, args...)
+	default:
+		return q.db.QueryContext(ctx, query, args...)
+	}
+}
+
+func (q *Queries) queryRow(ctx context.Context, stmt *sql.Stmt, query string, args ...interface{}) *sql.Row {
+	switch {
+	case stmt != nil && q.tx != nil:
+		return q.tx.StmtContext(ctx, stmt).QueryRowContext(ctx, args...)
+	case stmt != nil:
+		return stmt.QueryRowContext(ctx, args...)
+	default:
+		return q.db.QueryRowContext(ctx, query, args...)
+	}
+}
+
 type Queries struct {
-	db DBTX
+	db                          DBTX
+	logger                      *zap.Logger
+	SlowQueryThreshold          time.Duration
+	txID                        string
+	tx                          *sql.Tx
+	createNewChatDefaultCfgStmt *sql.Stmt
+	delCocCharAttrStmt          *sql.Stmt
+	getBiliInlineDataStmt       *sql.Stmt
+	getCocCharAllAttrStmt       *sql.Stmt
+	getCocCharAttrStmt          *sql.Stmt
+	getPrprCacheStmt            *sql.Stmt
+	getYtDlpDbCacheStmt         *sql.Stmt
+	incYtDlUploadCountStmt      *sql.Stmt
+	insertBiliInlineDataStmt    *sql.Stmt
+	setCocCharAttrStmt          *sql.Stmt
+	setPrprCacheStmt            *sql.Stmt
+	updateBiliInlineMsgIdStmt   *sql.Stmt
+	updateYtDlpCacheStmt        *sql.Stmt
+	createNewUserStmt           *sql.Stmt
+	getChatByIdStmt             *sql.Stmt
+	getChatIdByWebIdStmt        *sql.Stmt
+	getPicByRateAndRandKeyStmt  *sql.Stmt
+	getPicByRateFirstStmt       *sql.Stmt
+	getUserByIdStmt             *sql.Stmt
+	insertPicStmt               *sql.Stmt
+	updateChatStmt              *sql.Stmt
+	updateUserBaseStmt          *sql.Stmt
+	updateUserProfilePhotoStmt  *sql.Stmt
+	updateUserTimeZoneStmt      *sql.Stmt
 }
 
 func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 	return &Queries{
-		db: tx,
+		db:                          tx,
+		logger:                      q.logger,
+		SlowQueryThreshold:          q.SlowQueryThreshold,
+		txID:                        fmt.Sprintf("%p", tx),
+		tx:                          tx,
+		createNewChatDefaultCfgStmt: q.createNewChatDefaultCfgStmt,
+		delCocCharAttrStmt:          q.delCocCharAttrStmt,
+		getBiliInlineDataStmt:       q.getBiliInlineDataStmt,
+		getCocCharAllAttrStmt:       q.getCocCharAllAttrStmt,
+		getCocCharAttrStmt:          q.getCocCharAttrStmt,
+		getPrprCacheStmt:            q.getPrprCacheStmt,
+		getYtDlpDbCacheStmt:         q.getYtDlpDbCacheStmt,
+		incYtDlUploadCountStmt:      q.incYtDlUploadCountStmt,
+		insertBiliInlineDataStmt:    q.insertBiliInlineDataStmt,
+		setCocCharAttrStmt:          q.setCocCharAttrStmt,
+		setPrprCacheStmt:            q.setPrprCacheStmt,
+		updateBiliInlineMsgIdStmt:   q.updateBiliInlineMsgIdStmt,
+		updateYtDlpCacheStmt:        q.updateYtDlpCacheStmt,
+		createNewUserStmt:           q.createNewUserStmt,
+		getChatByIdStmt:             q.getChatByIdStmt,
+		getChatIdByWebIdStmt:        q.getChatIdByWebIdStmt,
+		getPicByRateAndRandKeyStmt:  q.getPicByRateAndRandKeyStmt,
+		getPicByRateFirstStmt:       q.getPicByRateFirstStmt,
+		getUserByIdStmt:             q.getUserByIdStmt,
+		insertPicStmt:               q.insertPicStmt,
+		updateChatStmt:              q.updateChatStmt,
+		updateUserBaseStmt:          q.updateUserBaseStmt,
+		updateUserProfilePhotoStmt:  q.updateUserProfilePhotoStmt,
+		updateUserTimeZoneStmt:      q.updateUserTimeZoneStmt,
 	}
+}
+
+func (q *Queries) logQuery(query string, params []zap.Field, err error, start time.Time) {
+	if q.logger == nil {
+		return
+	}
+
+	duration := time.Since(start)
+	fields := make([]zap.Field, 0, len(params)+4)
+	fields = append(fields,
+		zap.Time("ts", start),
+		zap.String("sql", query),
+	)
+	if q.txID != "" {
+		fields = append(fields, zap.String("txID", q.txID))
+	}
+	fields = append(fields, params...)
+	fields = append(fields, zap.Duration("duration", duration))
+	if err != nil {
+		fields = append(fields, zap.Error(err))
+	}
+
+	if q.SlowQueryThreshold > 0 && duration > q.SlowQueryThreshold {
+		q.logger.Warn("slow query", fields...)
+		return
+	}
+	if err != nil {
+		q.logger.Error("query failed", fields...)
+		return
+	}
+	q.logger.Info("query", fields...)
+}
+
+func zapNullString(key string, v sql.NullString) zap.Field {
+	if v.Valid {
+		return zap.String(key, v.String)
+	}
+	return zap.String(key, "<nil>")
+}
+
+func zapNullBool(key string, v sql.NullBool) zap.Field {
+	if v.Valid {
+		return zap.Bool(key, v.Bool)
+	}
+	return zap.String(key, "<nil>")
+}
+
+func zapNullInt32(key string, v sql.NullInt32) zap.Field {
+	if v.Valid {
+		return zap.Int32(key, v.Int32)
+	}
+	return zap.String(key, "<nil>")
+}
+
+func zapNullInt64(key string, v sql.NullInt64) zap.Field {
+	if v.Valid {
+		return zap.Int64(key, v.Int64)
+	}
+	return zap.String(key, "<nil>")
+}
+
+func zapNullFloat64(key string, v sql.NullFloat64) zap.Field {
+	if v.Valid {
+		return zap.Float64(key, v.Float64)
+	}
+	return zap.String(key, "<nil>")
+}
+
+func zapNullTime(key string, v sql.NullTime) zap.Field {
+	if v.Valid {
+		return zap.Time(key, v.Time)
+	}
+	return zap.String(key, "<nil>")
 }

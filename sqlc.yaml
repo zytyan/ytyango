@@ -1,4 +1,9 @@
 version: "2"
+plugins:
+- name: mygen
+  wasm:
+    url: file://sql/plugins/sqlc-gen-go.wasm
+    sha256: "e681e92d0a944fe61128937a4115dba8627afe63a4ee7d41737f357d5882a51f"
 overrides:
   go:
     overrides:
@@ -27,8 +32,10 @@ sql:
       - "sql/schema_pics.sql"
       - "sql/schema_user.sql"
       - "sql/schema_ytdl.sql"
-    gen:
-      go:
+    codegen:
+    - out: globalcfg/q
+      plugin: mygen
+      options:
         package: "q"
         out: "globalcfg/q"
         output_files_suffix: "_gen"
@@ -38,8 +45,19 @@ sql:
         output_querier_file_name: "querier_gen.go"
         emit_json_tags: true
         query_parameter_limit: 4
+        emit_prepared_queries: true
         rename:
           chat_cfg: chatCfg
+        overrides:
+        - db_type: "INT_UNIX_SEC"
+          engine: "sqlite"
+          go_type:
+            type: "UnixTime"
+        - db_type: "INT_BOOL"
+          engine: "sqlite"
+          nullable: false
+          go_type:
+            type: "bool"
   # - engine: "sqlite"
   #   queries:
   #     - "sql/query_saved_msg.sql"
