@@ -157,9 +157,9 @@ func parseBilibiliJsonData(body io.Reader) (Info, error) {
 	}
 	info := Info{}
 	info.Title = defaultJsonString(data, `data.title`, "未知标题")
-	info.Uploader = defaultJsonString(data, `data.uploader`, "未知上传者")
+	info.Uploader = defaultJsonString(data, `data.owner.name`, "未知上传者")
 	info.Desc = defaultJsonString(data, `data.desc`, "")
-	info.Desc = defaultJsonString(data, `data.desc_v2[0].raw_text`, "-")
+	info.Desc = defaultJsonString(data, `data.desc_v2.*.raw_text`, "-")
 	return info, nil
 }
 
