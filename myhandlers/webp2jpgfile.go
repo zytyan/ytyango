@@ -1,6 +1,7 @@
 package myhandlers
 
 import (
+	"main/globalcfg/h"
 	"os"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
@@ -51,7 +52,7 @@ func WebpToPng(bot *gotgbot.Bot, ctx *ext.Context) error {
 	}
 	msg := ctx.Message
 	defer os.Remove(pngFile)
-	_, err = bot.SendDocument(msg.Chat.Id, fileSchema(pngFile), &gotgbot.SendDocumentOpts{
+	_, err = bot.SendDocument(msg.Chat.Id, h.LocalFile(pngFile), &gotgbot.SendDocumentOpts{
 		ReplyParameters: MakeReplyToMsgID(msg.Chat.Id),
 	})
 	return err

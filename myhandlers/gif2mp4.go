@@ -3,6 +3,7 @@ package myhandlers
 import (
 	"fmt"
 	"io"
+	"main/globalcfg/h"
 	"net/http"
 	"net/url"
 	"os"
@@ -94,7 +95,7 @@ func gif2Mp4(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
 	}
 	defer os.Remove(mp4File)
 	defer os.Remove(gifFile)
-	_, err = bot.SendVideo(ctx.EffectiveChat.Id, fileSchema(mp4File), nil)
+	_, err = bot.SendVideo(ctx.EffectiveChat.Id, h.LocalFile(mp4File), nil)
 	if err != nil {
 		return err
 	}

@@ -2,8 +2,6 @@ package myhandlers
 
 import (
 	"fmt"
-	"net/url"
-	"path/filepath"
 	"sync"
 	"time"
 
@@ -11,17 +9,6 @@ import (
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 	lru "github.com/hashicorp/golang-lru/v2"
 )
-
-func fileSchema(filename string) gotgbot.InputFileOrString {
-	if !filepath.IsAbs(filename) {
-		var err error
-		filename, err = filepath.Abs(filename)
-		if err != nil {
-			log.Panic(err)
-		}
-	}
-	return gotgbot.InputFileByURL("file://" + url.PathEscape(filename))
-}
 
 var mainBot *gotgbot.Bot
 
@@ -46,6 +33,7 @@ func cutString(s string, length int) string {
 	}
 	return string(rl[:length-3]) + "..."
 }
+
 func MakeReplyToMsgID(msgId int64) *gotgbot.ReplyParameters {
 	if msgId == 0 {
 		return nil
@@ -54,6 +42,7 @@ func MakeReplyToMsgID(msgId int64) *gotgbot.ReplyParameters {
 		MessageId: msgId,
 	}
 }
+
 func MakeDebounceReply(bot *gotgbot.Bot, ctx *ext.Context, interval time.Duration) (func(s string) (*gotgbot.Message, error), func() error) {
 	var l sync.Mutex
 	var timer *time.Timer

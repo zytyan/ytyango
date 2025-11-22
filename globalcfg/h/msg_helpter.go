@@ -3,7 +3,8 @@ package h
 import (
 	"fmt"
 	"html"
-	"regexp"
+	"net/url"
+	"path/filepath"
 	"strings"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
@@ -63,17 +64,13 @@ func MentionUserHtml(user *gotgbot.User) string {
 	return fmt.Sprintf(`<a href="tg://user?id=%d">%s</a>`, user.Id, html.EscapeString(name))
 }
 
-var reCmd = regexp.MustCompile(`^/[a-zA-Z\d_]+(@[a-zA-Z\d_]+)?(\s+|\b|$)`)
-
-// TrimCmd 去除聊天中的命令开头，返回去除命令后的文本
-// 例: "/calc 4 + 7-5"  => "4 + 7-5"
-func TrimCmd(text string) string {
-	if text == "" {
-		return ""
+func LocalFile(filename string)gotgbot.InputFileOrString {
+	if !filepath.IsAbs(filename) {
+		var err error
+		filename, err = filepath.Abs(filename)
+		if err != nil {
+			panic(err)
+		}
 	}
-	loc := reCmd.FindStringIndex(text)
-	if len(loc) == 2 && loc[0] == 0 {
-		text = text[loc[1]:]
-	}
-	return strings.TrimLeft(text, " \t")
+	return gotgbot.InputFileByURL("file://" + url.PathEscape(filename))
 }

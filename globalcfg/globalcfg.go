@@ -147,6 +147,9 @@ func initDatabase() *sql.DB {
 	if err != nil {
 		panic(err)
 	}
+	d.Exec("PRAGMA journal_mode=WAL;")
+	d.Exec("PRAGMA synchronous=OFF;")
+	d.Exec("PRAGMA cache_size=-80000;")
 	return d
 }
 

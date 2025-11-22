@@ -3,6 +3,7 @@ package myhandlers
 import (
 	"context"
 	"main/globalcfg"
+	"main/globalcfg/h"
 	"main/helpers/imgproc"
 	"os"
 	"path/filepath"
@@ -48,7 +49,7 @@ func GenPrpr(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
 	if err != nil {
 		return err
 	}
-	send, err := bot.SendSticker(ctx.EffectiveChat.Id, fileSchema(filePath), nil)
+	send, err := bot.SendSticker(ctx.EffectiveChat.Id, h.LocalFile(filePath), nil)
 	if err != nil {
 		return err
 	}

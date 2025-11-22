@@ -191,7 +191,7 @@ func sendAudio(bot *gotgbot.Bot, result *DlResult, user *gotgbot.User, msgId, ch
 			ReplyParameters: MakeReplyToMsgID(msgId),
 		})
 	}
-	return bot.SendAudio(chatId, fileSchema(result.file), &gotgbot.SendAudioOpts{
+	return bot.SendAudio(chatId, h.LocalFile(result.file), &gotgbot.SendAudioOpts{
 		Caption:         caption,
 		ParseMode:       gotgbot.ParseModeHTML,
 		ReplyParameters: MakeReplyToMsgID(msgId),

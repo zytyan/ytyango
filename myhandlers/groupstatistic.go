@@ -13,6 +13,7 @@ import (
 	"time"
 
 	g2 "main/globalcfg"
+	"main/globalcfg/h"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
@@ -315,7 +316,7 @@ func GroupStatDiagnostic(bot *gotgbot.Bot, ctx *ext.Context) error {
 		_, _ = t.WriteString(pretty.Sprintf("last day: %# v\n", v.LastDay))
 		return true
 	})
-	_, err = bot.SendDocument(ctx.EffectiveChat.Id, fileSchema(filename), nil)
+	_, err = bot.SendDocument(ctx.EffectiveChat.Id, h.LocalFile(filename), nil)
 	return err
 }
 

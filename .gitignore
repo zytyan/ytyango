@@ -3,3 +3,4 @@
 /main.exe
 /build/*
 /main
+__pycache__
