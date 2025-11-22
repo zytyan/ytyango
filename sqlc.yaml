@@ -13,8 +13,20 @@ overrides:
           type: "bool"
 sql:
   - engine: "sqlite"
-    queries: [ "sql/query_*.sql" ]
-    schema: [ "sql/schema_*.sql" ]
+    queries:
+      - "sql/query_bilibili.sql"
+      - "sql/query_chat.sql"
+      - "sql/query_coc.sql"
+      - "sql/query_pics.sql"
+      - "sql/query_user.sql"
+      - "sql/query_ytdl.sql"
+    schema:
+      - "sql/schema_bilibili.sql"
+      - "sql/schema_chat.sql"
+      - "sql/schema_coc.sql"
+      - "sql/schema_pics.sql"
+      - "sql/schema_user.sql"
+      - "sql/schema_ytdl.sql"
     gen:
       go:
         package: "q"
@@ -28,4 +40,19 @@ sql:
         query_parameter_limit: 4
         rename:
           chat_cfg: chatCfg
-
+  - engine: "sqlite"
+    queries:
+      - "sql/query_saved_msg.sql"
+    schema:
+      - "sql/schema_saved_msg.sql"
+    gen:
+      go:
+        package: "savedmsg"
+        out: "globalcfg/savedmsg"
+        output_files_suffix: "_gen"
+        output_db_file_name: "db_gen.go"
+        output_models_file_name: "models_gen.go"
+        output_batch_file_name: "batch_gen.go"
+        output_querier_file_name: "querier_gen.go"
+        emit_json_tags: true
+        query_parameter_limit: 5

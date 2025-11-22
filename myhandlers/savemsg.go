@@ -5,7 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
-	"main/globalcfg"
+	g "main/globalcfg"
 	"main/globalcfg/h"
 	"net/http"
 	"strings"
@@ -44,7 +44,7 @@ func SaveMessage(bot *gotgbot.Bot, ctx *ext.Context) error {
 				log.Errorf("save message panic %s, update id %d", r, ctx.Update.UpdateId)
 			}
 		}()
-		if err := SaveUser(bot, ctx); err != nil {
+		if err := UpdateUser(bot, ctx); err != nil {
 			log.Errorf("save user error %s, update id %d", err, ctx.Update.UpdateId)
 		}
 		err := saveMessage(bot, ctx)
