@@ -5,19 +5,24 @@ SELECT *
 FROM users
 WHERE user_id = ?;
 
+-- name: createNewUser :one
+INSERT INTO users (updated_at, user_id, first_name, last_name, profile_update_at, profile_photo, timezone)
+VALUES (?1, ?2, ?3, ?4, ?1, ?5, ?6)
+RETURNING id;
+
 -- name: updateUserBase :one
-INSERT INTO users (updated_at, user_id, first_name, last_name)
-VALUES (?, ?, ?, ?)
-ON CONFLICT DO UPDATE SET updated_at=excluded.updated_at,
-                          first_name=excluded.first_name,
-                          last_name =excluded.last_name
+UPDATE users
+SET updated_at=?,
+    first_name=?,
+    last_name =?
+WHERE user_id = ?
 RETURNING id;
 
 -- name: updateUserProfilePhoto :exec
-INSERT INTO users (user_id, profile_update_at, profile_photo)
-VALUES (?, ?, ?)
-ON CONFLICT DO UPDATE SET profile_update_at = excluded.profile_update_at,
-                          profile_photo     = excluded.profile_photo;
+UPDATE users
+SET profile_update_at = ?,
+    profile_photo     = ?
+WHERE user_id = ?;
 
 -- name: updateUserTimeZone :exec
 INSERT INTO users (user_id, updated_at, timezone)

@@ -33,6 +33,35 @@ func (q *Queries) SetPrprCache(ctx context.Context, profilePhotoUid string, prpr
 	return err
 }
 
+const createNewUser = `-- name: createNewUser :one
+INSERT INTO users (updated_at, user_id, first_name, last_name, profile_update_at, profile_photo, timezone)
+VALUES (?1, ?2, ?3, ?4, ?1, ?5, ?6)
+RETURNING id
+`
+
+type createNewUserParams struct {
+	UpdatedAt    UnixTime       `json:"updated_at"`
+	UserID       int64          `json:"user_id"`
+	FirstName    string         `json:"first_name"`
+	LastName     sql.NullString `json:"last_name"`
+	ProfilePhoto sql.NullString `json:"profile_photo"`
+	Timezone     int64          `json:"timezone"`
+}
+
+func (q *Queries) createNewUser(ctx context.Context, arg createNewUserParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, createNewUser,
+		arg.UpdatedAt,
+		arg.UserID,
+		arg.FirstName,
+		arg.LastName,
+		arg.ProfilePhoto,
+		arg.Timezone,
+	)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
+}
+
 const getUserById = `-- name: getUserById :one
 
 SELECT id, updated_at, user_id, first_name, last_name, profile_update_at, profile_photo, timezone
@@ -58,20 +87,20 @@ func (q *Queries) getUserById(ctx context.Context, userID int64) (User, error) {
 }
 
 const updateUserBase = `-- name: updateUserBase :one
-INSERT INTO users (updated_at, user_id, first_name, last_name)
-VALUES (?, ?, ?, ?)
-ON CONFLICT DO UPDATE SET updated_at=excluded.updated_at,
-                          first_name=excluded.first_name,
-                          last_name =excluded.last_name
+UPDATE users
+SET updated_at=?,
+    first_name=?,
+    last_name =?
+WHERE user_id = ?
 RETURNING id
 `
 
-func (q *Queries) updateUserBase(ctx context.Context, updatedAt UnixTime, userID int64, firstName string, lastName sql.NullString) (int64, error) {
+func (q *Queries) updateUserBase(ctx context.Context, updatedAt UnixTime, firstName string, lastName sql.NullString, userID int64) (int64, error) {
 	row := q.db.QueryRowContext(ctx, updateUserBase,
 		updatedAt,
-		userID,
 		firstName,
 		lastName,
+		userID,
 	)
 	var id int64
 	err := row.Scan(&id)
@@ -79,14 +108,14 @@ func (q *Queries) updateUserBase(ctx context.Context, updatedAt UnixTime, userID
 }
 
 const updateUserProfilePhoto = `-- name: updateUserProfilePhoto :exec
-INSERT INTO users (user_id, profile_update_at, profile_photo)
-VALUES (?, ?, ?)
-ON CONFLICT DO UPDATE SET profile_update_at = excluded.profile_update_at,
-                          profile_photo     = excluded.profile_photo
+UPDATE users
+SET profile_update_at = ?,
+    profile_photo     = ?
+WHERE user_id = ?
 `
 
-func (q *Queries) updateUserProfilePhoto(ctx context.Context, userID int64, profileUpdateAt UnixTime, profilePhoto sql.NullString) error {
-	_, err := q.db.ExecContext(ctx, updateUserProfilePhoto, userID, profileUpdateAt, profilePhoto)
+func (q *Queries) updateUserProfilePhoto(ctx context.Context, profileUpdateAt UnixTime, profilePhoto sql.NullString, userID int64) error {
+	_, err := q.db.ExecContext(ctx, updateUserProfilePhoto, profileUpdateAt, profilePhoto, userID)
 	return err
 }
 

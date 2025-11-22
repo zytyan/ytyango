@@ -27,8 +27,14 @@ func (q *Queries) GetUserByTg(ctx context.Context, tgUser *gotgbot.User) (*User,
 				ProfileUpdateAt: UnixTime{time.Unix(0, 0)},
 				ProfilePhoto:    sql.NullString{},
 			}
-			id, _ := q.updateUserBase(ctx, u.UpdatedAt, u.UserID, u.FirstName, u.LastName)
-			u.ID = id
+			param := createNewUserParams{
+				UpdatedAt: UnixTime{time.Now()},
+				UserID:    userId,
+				FirstName: tgUser.FirstName,
+				LastName:  sql.NullString{String: tgUser.LastName, Valid: tgUser.LastName != ""},
+				Timezone:  480,
+			}
+			u.ID, err = q.createNewUser(ctx, param)
 			return u
 		}
 		if erri != nil {

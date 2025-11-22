@@ -82,6 +82,7 @@ def exec_schema(conn: sqlite3.Connection, include_saved_msgs: bool) -> None:
     if include_saved_msgs:
         schema_files.append(SAVED_MESSAGE_SCHEMA)
     for schema_file in schema_files:
+        print(schema_file)
         sql = schema_file.read_text(encoding="utf-8")
         conn.executescript(sql)
 

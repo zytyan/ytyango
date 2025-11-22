@@ -4,3 +4,4 @@
 /build/*
 /main
 __pycache__
+*.db
