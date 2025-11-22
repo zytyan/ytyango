@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS chat_cfg
     save_messages    INT_BOOL            NOT NULL CHECK ( save_messages in (0, 1)),
     enable_coc       INT_BOOL            NOT NULL CHECK ( enable_coc in (0, 1)),
     resp_nsfw_msg    INT_BOOL            NOT NULL CHECK ( resp_nsfw_msg in (0, 1))
-) WITHOUT ROWID;
+);
 
 CREATE INDEX IF NOT EXISTS idx_chat_cfg
     ON chat_cfg (web_id);

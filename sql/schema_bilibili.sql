@@ -5,4 +5,4 @@ CREATE TABLE IF NOT EXISTS bili_inline_results
     text    TEXT    NOT NULL DEFAULT '',
     chat_id INTEGER NOT NULL DEFAULT 0,
     msg_id  INTEGER NOT NULL DEFAULT 0
-) WITHOUT ROWID;
+);
