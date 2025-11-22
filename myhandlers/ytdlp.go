@@ -149,11 +149,11 @@ func buildCaption(result *DlResult, user *gotgbot.User) string {
 func buildYtDlKey(text string, audioOnly bool) (*dlKey, error) {
 	url := reDownload.FindString(text)
 	if url == "" {
-		return nil, errNoURL
+		return nil, fmt.Errorf("没有在聊天 %s 中找到任何可下载的链接", text)
 	}
 	resolutionPattern := strings.TrimRight(reResolution.FindString(text), "pP")
 	resolution := int64(parseIntDefault(resolutionPattern, 720))
-
+	url = "https://" + url
 	return &dlKey{
 		Url:        url,
 		Resolution: resolution,
