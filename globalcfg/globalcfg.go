@@ -181,4 +181,5 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
+	logger.Infof("Database initialized")
 }
