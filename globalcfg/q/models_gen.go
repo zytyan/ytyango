@@ -59,14 +59,14 @@ type User struct {
 }
 
 type YtDlResult struct {
-	Url         string         `json:"url"`
-	AudioOnly   bool           `json:"audio_only"`
-	Resolution  int64          `json:"resolution"`
-	FileID      string         `json:"file_id"`
-	Title       sql.NullString `json:"title"`
-	Description sql.NullString `json:"description"`
-	Uploader    sql.NullString `json:"uploader"`
-	UploadCount int64          `json:"upload_count"`
+	Url         string `json:"url"`
+	AudioOnly   bool   `json:"audio_only"`
+	Resolution  int64  `json:"resolution"`
+	FileID      string `json:"file_id"`
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	Uploader    string `json:"uploader"`
+	UploadCount int64  `json:"upload_count"`
 }
 
 type chatCfg struct {
