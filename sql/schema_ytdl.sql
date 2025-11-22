@@ -10,5 +10,5 @@ CREATE TABLE IF NOT EXISTS yt_dl_results
     description  TEXT     NOT NULL,
     uploader     TEXT     NOT NULL,
     upload_count INTEGER  NOT NULL DEFAULT 0,
-    PRIMARY (url, audio_only, resolution)
+    PRIMARY KEY (url, audio_only, resolution)
 ) WITHOUT ROWID;
