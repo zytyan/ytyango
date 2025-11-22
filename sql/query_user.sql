@@ -12,17 +12,17 @@ RETURNING id;
 
 -- name: updateUserBase :one
 UPDATE users
-SET updated_at=?,
-    first_name=?,
-    last_name =?
-WHERE user_id = ?
+SET updated_at=?2,
+    first_name=?3,
+    last_name =?4
+WHERE user_id = ?1
 RETURNING id;
 
 -- name: updateUserProfilePhoto :exec
 UPDATE users
-SET profile_update_at = ?,
-    profile_photo     = ?
-WHERE user_id = ?;
+SET profile_update_at = ?2,
+    profile_photo     = ?3
+WHERE user_id = ?1;
 
 -- name: updateUserTimeZone :exec
 INSERT INTO users (user_id, updated_at, timezone)

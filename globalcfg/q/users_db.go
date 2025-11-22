@@ -112,7 +112,7 @@ func (u *User) TryUpdate(q *Queries, tgUser *gotgbot.User) error {
 		needCommit = true
 	}
 	if needCommit {
-		_, err := q.updateUserBase(context.Background(), UnixTime{time.Now()}, u.UserID, u.FirstName, u.LastName)
+		_, err := q.updateUserBase(context.Background(), u.UserID, UnixTime{time.Now()}, u.FirstName, u.LastName)
 		return err
 	}
 	return nil
@@ -129,10 +129,7 @@ func (u *User) Name() string {
 }
 
 func (q *Queries) UpdateUserProfilePhoto(ctx context.Context, userID int64, profilePhoto string) error {
-	return q.updateUserProfilePhoto(ctx, userID, UnixTime{time.Now()}, sql.NullString{
-		String: profilePhoto,
-		Valid:  profilePhoto != "",
-	})
+	return q.updateUserProfilePhoto(ctx, userID, UnixTime{time.Now()}, sql.NullString{String: profilePhoto, Valid: profilePhoto != ""})
 }
 
 func (q *Queries) UpdateUserTimeZone(ctx context.Context, user *User, zone int64) error {

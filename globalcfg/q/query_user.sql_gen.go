@@ -88,19 +88,19 @@ func (q *Queries) getUserById(ctx context.Context, userID int64) (User, error) {
 
 const updateUserBase = `-- name: updateUserBase :one
 UPDATE users
-SET updated_at=?,
-    first_name=?,
-    last_name =?
-WHERE user_id = ?
+SET updated_at=?2,
+    first_name=?3,
+    last_name =?4
+WHERE user_id = ?1
 RETURNING id
 `
 
-func (q *Queries) updateUserBase(ctx context.Context, updatedAt UnixTime, firstName string, lastName sql.NullString, userID int64) (int64, error) {
+func (q *Queries) updateUserBase(ctx context.Context, userID int64, updatedAt UnixTime, firstName string, lastName sql.NullString) (int64, error) {
 	row := q.db.QueryRowContext(ctx, updateUserBase,
+		userID,
 		updatedAt,
 		firstName,
 		lastName,
-		userID,
 	)
 	var id int64
 	err := row.Scan(&id)
@@ -109,13 +109,13 @@ func (q *Queries) updateUserBase(ctx context.Context, updatedAt UnixTime, firstN
 
 const updateUserProfilePhoto = `-- name: updateUserProfilePhoto :exec
 UPDATE users
-SET profile_update_at = ?,
-    profile_photo     = ?
-WHERE user_id = ?
+SET profile_update_at = ?2,
+    profile_photo     = ?3
+WHERE user_id = ?1
 `
 
-func (q *Queries) updateUserProfilePhoto(ctx context.Context, profileUpdateAt UnixTime, profilePhoto sql.NullString, userID int64) error {
-	_, err := q.db.ExecContext(ctx, updateUserProfilePhoto, profileUpdateAt, profilePhoto, userID)
+func (q *Queries) updateUserProfilePhoto(ctx context.Context, userID int64, profileUpdateAt UnixTime, profilePhoto sql.NullString) error {
+	_, err := q.db.ExecContext(ctx, updateUserProfilePhoto, userID, profileUpdateAt, profilePhoto)
 	return err
 }
 
