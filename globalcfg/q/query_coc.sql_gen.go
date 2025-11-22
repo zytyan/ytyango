@@ -79,6 +79,7 @@ func (q *Queries) GetCocCharAllAttr(ctx context.Context, userID int64) ([]GetCoc
 		q.logQuery(getCocCharAllAttr, logFields, err, start)
 		return nil, err
 	}
+	q.logQuery(getCocCharAllAttr, logFields, err, start)
 	return items, nil
 }
 
