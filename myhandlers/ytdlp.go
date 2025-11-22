@@ -30,11 +30,13 @@ func initReDownload() *regexp.Regexp {
 		"youtube.com",
 	}
 	buf := strings.Builder{}
+	buf.WriteRune('(')
 	buf.WriteString(regexp.QuoteMeta(validUrl[0]))
 	for i := 1; i < len(validUrl); i++ {
 		buf.WriteRune('|')
 		buf.WriteString(regexp.QuoteMeta(validUrl[i]))
 	}
+	buf.WriteRune(')')
 	return regexp.MustCompile(`(?i)` + buf.String() + `/[a-zA-Z\d_%.~:/?#\[\]@!$&'()*+,;=\-]+`)
 }
 
