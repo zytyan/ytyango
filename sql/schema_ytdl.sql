@@ -6,9 +6,9 @@ CREATE TABLE IF NOT EXISTS yt_dl_results
     audio_only   INT_BOOL NOT NULL CHECK (audio_only IN (0, 1)),
     resolution   INTEGER  NOT NULL,
     file_id      TEXT     NOT NULL, -- 其实有可能为NULL，但是golang的NULL很不爽，所以改用了空字符串作为NULL
-    title        TEXT,
-    description  TEXT,
-    uploader     TEXT,
-    upload_count INTEGER  NOT NULL DEFAULT 1,
+    title        TEXT     NOT NULL,
+    description  TEXT     NOT NULL,
+    uploader     TEXT     NOT NULL,
+    upload_count INTEGER  NOT NULL DEFAULT 0,
     UNIQUE (url, audio_only, resolution)
 ) WITHOUT ROWID;

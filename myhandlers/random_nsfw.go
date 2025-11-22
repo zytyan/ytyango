@@ -1,6 +1,7 @@
 package myhandlers
 
 import (
+	"main/globalcfg/h"
 	"regexp"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
@@ -38,7 +39,7 @@ func IsRequiredAdult(msg *gotgbot.Message) bool {
 	if len(msg.Text) == 0 {
 		return false
 	}
-	if !GetGroupInfo(msg.Chat.Id).RespNsfwMsg {
+	if !h.ChatRespNsfwMsg(msg.Chat.Id) {
 		return false
 	}
 	return false
@@ -48,7 +49,7 @@ func IsRequiredRacy(msg *gotgbot.Message) bool {
 	if len(msg.Text) == 0 {
 		return false
 	}
-	if !GetGroupInfo(msg.Chat.Id).RespNsfwMsg {
+	if !h.ChatRespNsfwMsg(msg.Chat.Id) {
 		return false
 	}
 	return reRacyPattern.MatchString(msg.Text)

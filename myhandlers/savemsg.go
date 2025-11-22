@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"io"
 	"main/globalcfg"
+	"main/globalcfg/h"
 	"net/http"
 	"strings"
 
@@ -43,7 +44,7 @@ func SaveMessage(bot *gotgbot.Bot, ctx *ext.Context) error {
 				log.Errorf("save message panic %s, update id %d", r, ctx.Update.UpdateId)
 			}
 		}()
-		//err := g.Q().GetUserByTg(bot, ctx)
+		//err := g.Q.GetUserByTg(bot, ctx)
 		var err error
 		if err != nil {
 			log.Errorf("save user error %s, update id %d", err, ctx.Update.UpdateId)
@@ -79,21 +80,21 @@ func setImageText(bot *gotgbot.Bot, msg *gotgbot.Message, meili *MeiliMsg) error
 }
 
 func saveMessage(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
-	if ctx.Message == nil {
-		return
+	if !h.ChatSaveMessages(ctx.EffectiveChat.Id) {
+		return nil
 	}
 	mongoId := snowflakeNode().Generate().Base32()
 	meiliMsg := &MeiliMsg{
 		MongoId:   mongoId,
 		PeerId:    ctx.EffectiveChat.Id,
 		FromId:    ctx.EffectiveSender.User.Id,
-		MsgId:     ctx.Message.MessageId,
+		MsgId:     ctx.EffectiveMessage.MessageId,
 		Date:      float64(ctx.Message.Date),
 		Message:   getText(ctx),
 		ImageText: "",
 		QrResult:  "",
 	}
-	if cfg, err := g.Q().GetChatById(context.Background(), ctx.EffectiveChat.Id); err == nil && cfg.AutoOcr {
+	if cfg, err := g.Q.GetChatById(context.Background(), ctx.EffectiveChat.Id); err == nil && cfg.AutoOcr {
 		err = setImageText(bot, ctx.Message, meiliMsg)
 		if err != nil {
 			log.Warnf("set image text error %s, update id %d", err, ctx.Update.UpdateId)

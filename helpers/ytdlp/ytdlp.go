@@ -5,7 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
+	"io"
 	"net/http"
 	"os"
 	"os/exec"
@@ -17,6 +17,7 @@ import (
 	"time"
 
 	jsoniter "github.com/json-iterator/go"
+	"github.com/tidwall/gjson"
 )
 
 var Bin = "yt-dlp"
@@ -46,16 +47,28 @@ type Req struct {
 	EmbedMetadata   bool
 	PostExec        string
 	PriorityFormats []string
-	WriteInfoJson   bool
 
 	tmpPath  string
 	prepared bool
 }
 
+type Info struct {
+	Title    string
+	Uploader string
+	Desc     string
+}
+
+func defaultJsonString(j []byte, path, defaultStr string) string {
+	if s := gjson.GetBytes(j, path).String(); s != "" {
+		return s
+	}
+	return defaultStr
+}
+
 type Resp struct {
 	req         *Req
 	FilePath    string
-	InfoJson    map[string]interface{}
+	Info        Info
 	InfoJsonErr error // 考虑到info json不是必须的，所以不返回错误，而是在这里附加上
 }
 
@@ -84,14 +97,11 @@ func (c *Req) args() []string {
 		filepath.Join(c.tmpPath, "%(title).150B.%(ext)s"),
 		"--quiet",
 		"--print", "after_move:%(filepath)j",
-		"--windows-filenames",
+		"--windows-filenames", "--write-info-json",
 	}
 	if strings.Contains(c.Url, "youtu") {
 		// 目前就油管用到了这个能力，在B站启用反而会导致下载失败的问题
 		args = append(args, "--format", `bestvideo+bestaudio/best`)
-	}
-	if c.WriteInfoJson {
-		args = append(args, "--write-info-json")
 	}
 	// 分辨率
 	formats := strings.Join(c.PriorityFormats, ":")
@@ -137,26 +147,47 @@ var client = &http.Client{
 	Timeout: 10 * time.Second,
 }
 
-func getBilibiliVideoInfo(url string) (map[string]any, error) {
+func parseBilibiliJsonData(body io.Reader) (Info, error) {
+	data, err := io.ReadAll(body)
+	if err != nil {
+		return Info{}, err
+	}
+	if code := gjson.GetBytes(data, `code`).Int(); code != 0 {
+		return Info{}, fmt.Errorf("code %d != 0, error", code)
+	}
+	info := Info{}
+	info.Title = defaultJsonString(data, `data.title`, "未知标题")
+	info.Uploader = defaultJsonString(data, `data.uploader`, "未知上传者")
+	info.Desc = defaultJsonString(data, `data.desc`, "")
+	info.Desc = defaultJsonString(data, `data.desc_v2[0].raw_text`, "-")
+	return info, nil
+}
+
+func getBilibiliVideoInfo(url string) (info Info, err error) {
+	info = Info{
+		Title:    "未知标题",
+		Uploader: "未知上传者",
+		Desc:     "-",
+	}
 	location := url
 	if strings.Contains(location, "b23.tv") {
 		req, err := http.NewRequest(http.MethodGet, url, nil)
 		if err != nil {
-			return nil, err
+			return info, err
 		}
 		resp, err := client.Do(req)
 		if err != nil {
-			return nil, err
+			return info, err
 		}
 		location = resp.Header.Get("Location")
 		_ = resp.Body.Close()
 		if location == "" {
-			return nil, fmt.Errorf("cannot found %s", url)
+			return info, fmt.Errorf("cannot found %s", url)
 		}
 	}
 	submatch := reA.FindStringSubmatch(location)
 	if submatch == nil {
-		return nil, fmt.Errorf("regex cannot found %s", location)
+		return info, fmt.Errorf("regex cannot found %s", location)
 	}
 	bv := submatch[1]
 	reqUrl := ``
@@ -166,34 +197,14 @@ func getBilibiliVideoInfo(url string) (map[string]any, error) {
 	case 'B', 'b':
 		reqUrl = fmt.Sprintf(`https://api.bilibili.com/x/web-interface/view?bvid=%s`, bv)
 	default:
-		return nil, fmt.Errorf("localtion AV/BV not in regular %s", location)
+		return info, fmt.Errorf("localtion AV/BV not in regular %s", location)
 	}
 	resp, err := client.Get(reqUrl)
 	if err != nil {
-		return nil, err
+		return info, err
 	}
 	defer resp.Body.Close()
-	m := make(map[string]any)
-	err = jsoniter.NewDecoder(resp.Body).Decode(&m)
-	if err != nil {
-		return nil, err
-	}
-	result := make(map[string]any)
-	if code, ok := m["code"]; !ok || code != 0.0 {
-		return nil, fmt.Errorf("code(%d) is not 0 %s", code, location)
-	}
-	tmp := m["data"].(map[string]interface{})
-	result["title"] = tmp["title"]
-	result["uploader"] = tmp["owner"].(map[string]interface{})["name"]
-	desc := tmp["desc"]
-	descv2 := tmp["desc_v2"]
-	if s, ok := desc.(string); ok && s != "" {
-		result["description"] = s
-	}
-	if s, ok := descv2.([]any); ok {
-		result["description"] = s[0].(map[string]any)["raw_text"]
-	}
-	return result, nil
+	return parseBilibiliJsonData(resp.Body)
 }
 
 func (c *Req) runWithCtxBBDown(ctx context.Context) (resp *Resp, err error) {
@@ -203,14 +214,10 @@ func (c *Req) runWithCtxBBDown(ctx context.Context) (resp *Resp, err error) {
 		defer func() {
 			if r := recover(); r != nil {
 				resp.InfoJsonErr = fmt.Errorf("get BilibiliVideoInfo error: %s", r)
-				log.Println(resp.InfoJsonErr)
 			}
 
 		}()
-		resp.InfoJson, resp.InfoJsonErr = getBilibiliVideoInfo(c.Url)
-		if resp.InfoJsonErr != nil {
-			log.Println(resp.InfoJsonErr)
-		}
+		resp.Info, resp.InfoJsonErr = getBilibiliVideoInfo(c.Url)
 	})
 
 	tmp, err := os.MkdirTemp("", "ytdlp-*")
@@ -275,19 +282,18 @@ func (c *Req) runWithCtx(ctx context.Context) (resp *Resp, err error) {
 	if err != nil {
 		return resp, err
 	}
-	if c.WriteInfoJson {
-		ext := filepath.Ext(resp.FilePath)
-		infoJsonPath := resp.FilePath[:len(resp.FilePath)-len(ext)] + ".info.json"
-		infoJsonFile, err := os.ReadFile(infoJsonPath)
-		if err != nil {
-			resp.InfoJsonErr = err
-		} else {
-			err = jsoniter.Unmarshal(infoJsonFile, &resp.InfoJson)
-			if err != nil {
-				resp.InfoJsonErr = err
-			}
-		}
+
+	ext := filepath.Ext(resp.FilePath)
+	infoJsonPath := resp.FilePath[:len(resp.FilePath)-len(ext)] + ".info.json"
+	infoJsonFile, err := os.ReadFile(infoJsonPath)
+	if err != nil {
+		resp.InfoJsonErr = err
+	} else {
+		resp.Info.Title = defaultJsonString(infoJsonFile, ``, `未知标题`)
+		resp.Info.Uploader = defaultJsonString(infoJsonFile, ``, `未知上传者`)
+		resp.Info.Desc = defaultJsonString(infoJsonFile, ``, `-`)
 	}
+
 	return resp, nil
 }
 
@@ -295,61 +301,4 @@ func (c *Req) RunWithTimeout(timeout time.Duration) (*Resp, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	return c.runWithCtx(ctx)
-}
-
-func (r *Resp) Uploader() string {
-	if !r.req.WriteInfoJson || r.InfoJson == nil {
-		return ""
-	}
-	uploader, _ := r.InfoJson["uploader"].(string)
-	return uploader
-}
-
-func (r *Resp) Title() string {
-	if !r.req.WriteInfoJson || r.InfoJson == nil {
-		return ""
-	}
-	title, _ := r.InfoJson["title"].(string)
-	return title
-}
-
-func (r *Resp) Description() string {
-	if !r.req.WriteInfoJson || r.InfoJson == nil {
-		return ""
-	}
-	description, _ := r.InfoJson["description"].(string)
-	return description
-}
-
-func (r *Resp) Thumbnail() (string, error) {
-	if !r.req.WriteInfoJson || r.InfoJson == nil {
-		return "", nil
-	}
-	thumbnail, _ := r.InfoJson["thumbnail"].(string)
-	if thumbnail == "" {
-		return "", nil
-	}
-	return ExtractFirstFrame(thumbnail)
-}
-
-func ExtractFirstFrame(path string) (string, error) {
-	outPath := path + ".jpg"
-	cmd := exec.Command("ffmpeg", "-i", path, "-vframes", "1", "-q:v", "2", outPath)
-	stdout := new(bytes.Buffer)
-	stderr := new(bytes.Buffer)
-	cmd.Stdout = stdout
-	cmd.Stderr = stderr
-	err := cmd.Run()
-	var exitErr *exec.ExitError
-	if err != nil && errors.As(err, &exitErr) {
-		return "", &RunError{
-			Err:      err,
-			Stdout:   stdout.String(),
-			Stderr:   stderr.String(),
-			ExitCode: exitErr.ExitCode(),
-		}
-	} else if err != nil {
-		return "", err
-	}
-	return outPath, nil
 }

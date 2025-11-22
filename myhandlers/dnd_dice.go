@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"main/globalcfg"
+	"main/globalcfg/h"
 	"main/helpers/cocdice"
 	"regexp"
 	"strconv"
@@ -36,7 +37,7 @@ func defaultAtoi(s string, d int) int {
 }
 
 func IsDndDice(msg *gotgbot.Message) bool {
-	if msg.Chat.Type != "private" && !GetGroupInfo(msg.Chat.Id).CoCEnabled {
+	if !h.ChatEnableCoc(msg.Chat.Id) {
 		return false
 	}
 	text := width.Narrow.String(msg.Text)
@@ -44,7 +45,7 @@ func IsDndDice(msg *gotgbot.Message) bool {
 }
 
 func IsSetDndAttr(msg *gotgbot.Message) bool {
-	if msg.Chat.Type != "private" && !GetGroupInfo(msg.Chat.Id).CoCEnabled {
+	if !h.ChatEnableCoc(msg.Chat.Id) {
 		return false
 	}
 	text := width.Narrow.String(msg.Text)
@@ -77,7 +78,7 @@ func SetDndAttr(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
 	for _, line := range lines {
 		matches := setAttrRe.FindStringSubmatch(line)
 		name := matches[1]
-		val, err1 := g.Q().GetCocCharAttr(context.Background(), userId, name)
+		val, err1 := g.Q.GetCocCharAttr(context.Background(), userId, name)
 		if val == "" || errors.Is(err1, sql.ErrNoRows) {
 			val = "empty"
 		} else if err1 != nil {
@@ -99,7 +100,7 @@ func SetDndAttr(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
 		}
 		modified = true
 		buf.WriteString(fmt.Sprintf("%s : %s -> %s\n", name, oldVal, val))
-		err = g.Q().SetCocCharAttr(context.Background(), userId, name, val)
+		err = g.Q.SetCocCharAttr(context.Background(), userId, name, val)
 		if err != nil {
 			log.Errorf("SetCocCharAttr err: %v", err)
 		}
@@ -116,7 +117,7 @@ func SetDndAttr(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
 func getAbility(m string, user int64) (int, error) {
 	ability, err := strconv.Atoi(m)
 	if err != nil {
-		val, err := g.Q().GetCocCharAttr(context.Background(), user, m)
+		val, err := g.Q.GetCocCharAttr(context.Background(), user, m)
 		if err != nil {
 			return 0, err
 		}
@@ -137,7 +138,7 @@ func ListDndAttr(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
 	}
 	log.Infof("text: %s", text)
 	userId, name := getAttrTarget(ctx)
-	attrs, err := g.Q().GetCocCharAllAttr(context.Background(), userId)
+	attrs, err := g.Q.GetCocCharAllAttr(context.Background(), userId)
 	if err != nil {
 		return err
 	}
@@ -162,7 +163,7 @@ func DelDndAttr(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
 	text := width.Narrow.String(ctx.EffectiveMessage.Text)
 	lines := strings.Split(text, "\n")
 	for _, line := range lines[1:] {
-		err = g.Q().DelCocCharAttr(context.Background(), ctx.EffectiveSender.Id(), line)
+		err = g.Q.DelCocCharAttr(context.Background(), ctx.EffectiveSender.Id(), line)
 		if err != nil {
 			log.Errorf("DelCocCharAttr err: %v", err)
 		}

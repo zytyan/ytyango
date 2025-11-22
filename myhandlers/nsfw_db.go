@@ -7,7 +7,7 @@ import (
 )
 
 func getRandomPicByRate(rate int) string {
-	r, err := g.Q().GetPicByUserRate(context.Background(), rate)
+	r, err := g.Q.GetPicByUserRate(context.Background(), rate)
 	if err != nil {
 		log.Errorf("getRandomPicByRate err:%v", err)
 	}

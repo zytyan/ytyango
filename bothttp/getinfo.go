@@ -1,7 +1,8 @@
 package bothttp
 
 import (
-	"main/myhandlers"
+	"context"
+	g "main/globalcfg"
 	"os"
 	"strconv"
 
@@ -29,7 +30,7 @@ func getUserInfo(ctx *gin.Context) {
 		ctx.JSON(400, UserNotFound.Msg("user not found"))
 		return
 	}
-	user := myhandlers.GetUser(userId)
+	user := g.Q.GetUserById(context.Background(), userId)
 	if user == nil {
 		ctx.JSON(400, UserNotFound.Msg("user not found"))
 		return

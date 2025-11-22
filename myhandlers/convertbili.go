@@ -7,6 +7,7 @@ import (
 	"hash/fnv"
 	"html"
 	"main/globalcfg"
+	"main/globalcfg/h"
 	"main/helpers/bili"
 	"strconv"
 	"strings"
@@ -18,7 +19,7 @@ import (
 var log = g.GetLogger("handlers")
 
 func BiliMsgFilter(msg *gotgbot.Message) bool {
-	if !GetGroupInfo(msg.Chat.Id).AutoCvtBili {
+	if h.ChatAutoCvtBili(msg.Chat.Id) {
 		return false
 	}
 	if msg.ViaBot != nil || strings.HasPrefix(msg.Text, "/") {
@@ -103,7 +104,7 @@ func BiliMsgConverterInline(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
 		return err
 	}
 
-	uid, err := g.Q().InsertBiliInlineData(context.Background())
+	uid, err := g.Q.InsertBiliInlineData(context.Background())
 	callbackData := biliInlineCallbackPrefix + strconv.FormatInt(uid, 16)
 	var btns [][]gotgbot.InlineKeyboardButton
 	if bili.HasVideoLink(links.BvText) {
@@ -137,7 +138,7 @@ func getBiliCallbackDataInMsg(ctx *ext.Context) (uid int64) {
 func SaveBiliMsgCallbackMsgId(_ *gotgbot.Bot, ctx *ext.Context) (err error) {
 	uid := getBiliCallbackDataInMsg(ctx)
 	msg := ctx.EffectiveMessage
-	return g.Q().UpdateBiliInlineMsgId(context.Background(), msg.Text, msg.Chat.Id, msg.MessageId, uid)
+	return g.Q.UpdateBiliInlineMsgId(context.Background(), msg.Text, msg.Chat.Id, msg.MessageId, uid)
 }
 func IsBilibiliBtn(cq *gotgbot.CallbackQuery) bool {
 	return cq.Data == biliCallbackData

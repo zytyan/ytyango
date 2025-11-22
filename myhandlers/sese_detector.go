@@ -30,7 +30,7 @@ func HasImage(msg *gotgbot.Message) bool {
 // saveNsfw
 // param score: [0, 2, 4, 6]
 func saveNsfw(fileUid, fileId string, severity int) {
-	err := g.Q().AddPic(context.Background(), fileUid, fileId, severity)
+	err := g.Q.AddPic(context.Background(), fileUid, fileId, severity)
 	if err != nil {
 		log.Warnf("save nsfw failed for fileId=%s err=%s", fileId, err)
 	}
@@ -164,7 +164,7 @@ func SafeGo(f func()) {
 }
 
 func SeseDetect(bot *gotgbot.Bot, ctx *ext.Context) error {
-	groupInfo, err := g.Q().GetChatCfg(context.Background(), ctx.EffectiveChat)
+	groupInfo, err := g.Q.GetChatCfg(context.Background(), ctx.EffectiveChat)
 	if err != nil {
 		return err
 	}

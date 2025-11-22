@@ -11,9 +11,10 @@ import (
 )
 
 const createNewChatDefaultCfg = `-- name: CreateNewChatDefaultCfg :one
-INSERT INTO chat_cfg (id, auto_cvt_bili, auto_ocr, auto_calculate, auto_exchange, auto_check_adult,
+INSERT INTO chat_cfg (id, web_id, auto_cvt_bili, auto_ocr, auto_calculate, auto_exchange, auto_check_adult,
                       save_messages, enable_coc, resp_nsfw_msg)
 VALUES (?,
+        NULL,
         FALSE,
         FALSE,
         FALSE,
@@ -44,11 +45,13 @@ func (q *Queries) CreateNewChatDefaultCfg(ctx context.Context, id int64) (chatCf
 }
 
 const getChatById = `-- name: getChatById :one
+
 SELECT id, web_id, auto_cvt_bili, auto_ocr, auto_calculate, auto_exchange, auto_check_adult, save_messages, enable_coc, resp_nsfw_msg
 FROM chat_cfg
 WHERE id = ?
 `
 
+// encoding: utf-8
 func (q *Queries) getChatById(ctx context.Context, id int64) (chatCfg, error) {
 	row := q.db.QueryRowContext(ctx, getChatById, id)
 	var i chatCfg
@@ -80,26 +83,42 @@ func (q *Queries) getChatIdByWebId(ctx context.Context, webID sql.NullInt64) (in
 	return id, err
 }
 
-const getUserById = `-- name: getUserById :one
-
-SELECT id, updated_at, user_id, first_name, last_name, profile_update_at, profile_photo, time_zone
-FROM users
-WHERE user_id = ?
+const updateChat = `-- name: updateChat :exec
+UPDATE chat_cfg
+SET auto_cvt_bili=?,
+    auto_ocr=?,
+    auto_calculate=?,
+    auto_exchange=?,
+    auto_check_adult=?,
+    save_messages=?,
+    enable_coc=?,
+    resp_nsfw_msg=?
+WHERE id = ?
 `
 
-// encoding: utf-8
-func (q *Queries) getUserById(ctx context.Context, userID int64) (User, error) {
-	row := q.db.QueryRowContext(ctx, getUserById, userID)
-	var i User
-	err := row.Scan(
-		&i.ID,
-		&i.UpdatedAt,
-		&i.UserID,
-		&i.FirstName,
-		&i.LastName,
-		&i.ProfileUpdateAt,
-		&i.ProfilePhoto,
-		&i.TimeZone,
+type updateChatParams struct {
+	AutoCvtBili    bool  `json:"auto_cvt_bili"`
+	AutoOcr        bool  `json:"auto_ocr"`
+	AutoCalculate  bool  `json:"auto_calculate"`
+	AutoExchange   bool  `json:"auto_exchange"`
+	AutoCheckAdult bool  `json:"auto_check_adult"`
+	SaveMessages   bool  `json:"save_messages"`
+	EnableCoc      bool  `json:"enable_coc"`
+	RespNsfwMsg    bool  `json:"resp_nsfw_msg"`
+	ID             int64 `json:"id"`
+}
+
+func (q *Queries) updateChat(ctx context.Context, arg updateChatParams) error {
+	_, err := q.db.ExecContext(ctx, updateChat,
+		arg.AutoCvtBili,
+		arg.AutoOcr,
+		arg.AutoCalculate,
+		arg.AutoExchange,
+		arg.AutoCheckAdult,
+		arg.SaveMessages,
+		arg.EnableCoc,
+		arg.RespNsfwMsg,
+		arg.ID,
 	)
-	return i, err
+	return err
 }

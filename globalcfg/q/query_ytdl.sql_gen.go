@@ -7,7 +7,6 @@ package q
 
 import (
 	"context"
-	"database/sql"
 )
 
 const getYtDlpDbCache = `-- name: GetYtDlpDbCache :one
@@ -36,6 +35,17 @@ func (q *Queries) GetYtDlpDbCache(ctx context.Context, url string, audioOnly boo
 	return i, err
 }
 
+const incYtDlUploadCount = `-- name: IncYtDlUploadCount :exec
+UPDATE yt_dl_results
+SET upload_count=upload_count + 1
+WHERE file_id = ?
+`
+
+func (q *Queries) IncYtDlUploadCount(ctx context.Context, fileID string) error {
+	_, err := q.db.ExecContext(ctx, incYtDlUploadCount, fileID)
+	return err
+}
+
 const updateYtDlpCache = `-- name: UpdateYtDlpCache :exec
 INSERT INTO yt_dl_results
 (url, audio_only, resolution, file_id, title, description, uploader, upload_count)
@@ -48,13 +58,13 @@ ON CONFLICT DO UPDATE
 `
 
 type UpdateYtDlpCacheParams struct {
-	Url         string         `json:"url"`
-	AudioOnly   bool           `json:"audio_only"`
-	Resolution  int64          `json:"resolution"`
-	FileID      string         `json:"file_id"`
-	Title       sql.NullString `json:"title"`
-	Description sql.NullString `json:"description"`
-	Uploader    sql.NullString `json:"uploader"`
+	Url         string `json:"url"`
+	AudioOnly   bool   `json:"audio_only"`
+	Resolution  int64  `json:"resolution"`
+	FileID      string `json:"file_id"`
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	Uploader    string `json:"uploader"`
 }
 
 func (q *Queries) UpdateYtDlpCache(ctx context.Context, arg UpdateYtDlpCacheParams) error {
@@ -67,16 +77,5 @@ func (q *Queries) UpdateYtDlpCache(ctx context.Context, arg UpdateYtDlpCachePara
 		arg.Description,
 		arg.Uploader,
 	)
-	return err
-}
-
-const uploadYtDlpByFileId = `-- name: UploadYtDlpByFileId :exec
-UPDATE yt_dl_results
-SET upload_count=upload_count + 1
-WHERE file_id = ?
-`
-
-func (q *Queries) UploadYtDlpByFileId(ctx context.Context, fileID string) error {
-	_, err := q.db.ExecContext(ctx, uploadYtDlpByFileId, fileID)
 	return err
 }

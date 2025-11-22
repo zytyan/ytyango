@@ -175,7 +175,7 @@ func (g *GroupStatDaily) String(groupId int64) string {
 		actMaxCnt = count[0]
 	}
 	for i := 0; i < 3 && i < len(actUser); i++ {
-		act3Users = append(act3Users, g2.Q().GetUserById(context.Background(), actUser[i]).Name())
+		act3Users = append(act3Users, g2.Q.GetUserById(context.Background(), actUser[i]).Name())
 	}
 	if len(act3Users) == 0 {
 		act3UsersName = "没有人"
@@ -227,7 +227,7 @@ func (g *GroupStatDaily) GetRank() string {
 		if i >= 10 {
 			break
 		}
-		res = append(res, fmt.Sprintf("%s: %d", g2.Q().GetUserById(context.Background(), v.user).Name(), v.count))
+		res = append(res, fmt.Sprintf("%s: %d", g2.Q.GetUserById(context.Background(), v.user).Name(), v.count))
 	}
 	if len(res) > 10 {
 		sum := 0

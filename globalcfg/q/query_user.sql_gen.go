@@ -33,8 +33,31 @@ func (q *Queries) SetPrprCache(ctx context.Context, profilePhotoUid string, prpr
 	return err
 }
 
-const updateUserBase = `-- name: updateUserBase :one
+const getUserById = `-- name: getUserById :one
 
+SELECT id, updated_at, user_id, first_name, last_name, profile_update_at, profile_photo, time_zone
+FROM users
+WHERE user_id = ?
+`
+
+// encoding: utf-8
+func (q *Queries) getUserById(ctx context.Context, userID int64) (User, error) {
+	row := q.db.QueryRowContext(ctx, getUserById, userID)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.UpdatedAt,
+		&i.UserID,
+		&i.FirstName,
+		&i.LastName,
+		&i.ProfileUpdateAt,
+		&i.ProfilePhoto,
+		&i.TimeZone,
+	)
+	return i, err
+}
+
+const updateUserBase = `-- name: updateUserBase :one
 INSERT INTO users (updated_at, user_id, first_name, last_name, time_zone)
 VALUES (?, ?, ?, ?, ?)
 ON CONFLICT DO UPDATE SET updated_at=excluded.updated_at,
@@ -52,7 +75,6 @@ type updateUserBaseParams struct {
 	TimeZone  sql.NullInt64  `json:"time_zone"`
 }
 
-// encoding: utf-8
 func (q *Queries) updateUserBase(ctx context.Context, arg updateUserBaseParams) (int64, error) {
 	row := q.db.QueryRowContext(ctx, updateUserBase,
 		arg.UpdatedAt,

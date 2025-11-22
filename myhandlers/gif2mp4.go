@@ -70,9 +70,6 @@ func downloadSinaGif(sinaUrl string) (gifFile string, err error) {
 var sinaGifRe = regexp.MustCompile(`https?://wx\d+\.(sinaimg\.cn|moyu\.im)/[\w/\-_]+\.gif`)
 
 func HasSinaGif(msg *gotgbot.Message) bool {
-	if g, err := getGroupInfo(msg.Chat.Id); err != nil || !g.AutoCvtBili {
-		return false
-	}
 	return sinaGifRe.MatchString(getTextMsg(msg))
 }
 

@@ -1,9 +1,11 @@
 package bothttp
 
 import (
+	"context"
 	"fmt"
 	"image"
 	_ "image/jpeg"
+	g "main/globalcfg"
 	"main/myhandlers"
 	"os"
 	"strconv"
@@ -39,18 +41,14 @@ func webpConvert(in, out string) error {
 	return nil
 }
 func getUserProfilePhotoWebp(userId int64) (string, error) {
-	user := myhandlers.GetUser(userId)
+	user := g.Q.GetUserById(context.Background(), userId)
 	if user == nil {
 		return "", UserNotFound
 	}
-	err := user.UpdateProfilePhoto(myhandlers.GetMainBot())
-	if err != nil {
-		return "", err
-	}
-	if user.ProfilePhoto == "" {
+	if !user.ProfilePhoto.Valid {
 		return "", UserNoProfilePhoto
 	}
-	photoPath := fmt.Sprintf("data/profile_photo/p_%s.webp", user.ProfilePhoto)
+	photoPath := fmt.Sprintf("data/profile_photo/p_%s.webp", user.ProfilePhoto.String)
 	if fileExists(photoPath) {
 		return photoPath, nil
 	}

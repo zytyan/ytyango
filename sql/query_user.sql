@@ -1,5 +1,10 @@
 -- encoding: utf-8
 
+-- name: getUserById :one
+SELECT *
+FROM users
+WHERE user_id = ?;
+
 -- name: updateUserBase :one
 INSERT INTO users (updated_at, user_id, first_name, last_name, time_zone)
 VALUES (?, ?, ?, ?, ?)

@@ -2,6 +2,7 @@ package myhandlers
 
 import (
 	"fmt"
+	"main/globalcfg/h"
 	"main/helpers/mathparser"
 	"math/big"
 	"strings"
@@ -59,7 +60,7 @@ var mathReplacer = func() *strings.Replacer {
 }()
 
 func NeedSolve(msg *gotgbot.Message) bool {
-	if !GetGroupInfo(msg.Chat.Id).AutoCalculate {
+	if !h.ChatAutoCalculate(msg.Chat.Id){
 		return false
 	}
 	text := msg.Text

@@ -17,7 +17,7 @@ ON CONFLICT DO UPDATE
         description=description,
         uploader=uploader;
 
--- name: UploadYtDlpByFileId :exec
+-- name: IncYtDlUploadCount :exec
 UPDATE yt_dl_results
 SET upload_count=upload_count + 1
 WHERE file_id = ?;

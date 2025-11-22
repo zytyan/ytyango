@@ -2,6 +2,7 @@ package bothttp
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"io"
 	"main/globalcfg"
@@ -51,14 +52,14 @@ type MeiliQuery struct {
 func meiliSearch(query SearchQuery) (SearchResult, error) {
 	var result SearchResult
 	searchUrl := g.GetConfig().MeiliConfig.GetSearchUrl()
-	g := myhandlers.GetGroupInfoUseWebId(int64(query.InsID))
-	if g == nil {
+	chat, err := g.Q.GetChatByWebId(context.Background(), int64(query.InsID))
+	if chat == nil {
 		return result, GroupNotFound
 	}
 	limit := query.GetLimit()
 	meiliQuery := MeiliQuery{
 		Q:      query.Query,
-		Filter: "peer_id = " + strconv.FormatInt(g.GroupID, 10),
+		Filter: "peer_id = " + strconv.FormatInt(chat.ID, 10),
 		Limit:  limit,
 		Offset: (query.Page - 1) * limit,
 		Sort:   []string{"date:desc"},

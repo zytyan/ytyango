@@ -29,7 +29,7 @@ func GenPrpr(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
 		return
 	}
 	photo := photos.Photos[0][0]
-	prpr, err := g.Q().GetPrprCache(context.Background(), photo.FileUniqueId)
+	prpr, err := g.Q.GetPrprCache(context.Background(), photo.FileUniqueId)
 	if err == nil {
 		_, err = bot.SendSticker(ctx.EffectiveChat.Id, gotgbot.InputFileByID(prpr), nil)
 		return err
@@ -52,6 +52,6 @@ func GenPrpr(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
 	if err != nil {
 		return err
 	}
-	err = g.Q().SetPrprCache(context.Background(), photo.FileUniqueId, send.Sticker.FileId)
+	err = g.Q.SetPrprCache(context.Background(), photo.FileUniqueId, send.Sticker.FileId)
 	return err
 }

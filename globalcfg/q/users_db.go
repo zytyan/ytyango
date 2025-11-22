@@ -62,7 +62,7 @@ func (q *Queries) GetChatById(ctx context.Context, id int64) (*ChatCfg, error) {
 			err = erri
 			return nil
 		}
-		return &chat
+		return fromInnerCfg(&chat)
 	})
 	return c, err
 }
@@ -74,12 +74,12 @@ func (q *Queries) GetChatCfg(ctx context.Context, tgChat *gotgbot.Chat) (*ChatCf
 		chat, erri := q.getChatById(ctx, chatId)
 		if errors.Is(erri, sql.ErrNoRows) {
 			chat, err = q.CreateNewChatDefaultCfg(ctx, chatId)
-			return &chat
+			return fromInnerCfg(&chat)
 		} else if erri != nil {
 			err = erri
 			return nil
 		}
-		return &chat
+		return fromInnerCfg(&chat)
 	})
 	return c, err
 
@@ -129,4 +129,19 @@ func (u *User) Name() string {
 		return u.FirstName
 	}
 	return u.FirstName + " " + u.LastName.String
+}
+
+func (c *ChatCfg) Save(q *Queries) error {
+	return q.updateChat(context.Background(), updateChatParams{
+		AutoCvtBili:    c.AutoCvtBili,
+		AutoOcr:        c.AutoOcr,
+		AutoCalculate:  c.AutoCalculate,
+		AutoExchange:   c.AutoExchange,
+		AutoCheckAdult: c.AutoCheckAdult,
+		SaveMessages:   c.SaveMessages,
+		EnableCoc:      c.EnableCoc,
+		RespNsfwMsg:    c.RespNsfwMsg,
+		ID:             c.ID,
+	})
+
 }
