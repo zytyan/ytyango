@@ -139,7 +139,11 @@ var db *sql.DB
 var Q *q.Queries
 
 func initDatabase() *sql.DB {
-	d, err := sql.Open("sqlite3", "ytyan_new.db")
+	dbPath := config.DatabasePath
+	if dbPath == "" {
+		dbPath = "ytyan_new.db"
+	}
+	d, err := sql.Open("sqlite3", dbPath)
 	if err != nil {
 		panic(err)
 	}

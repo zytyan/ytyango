@@ -11,11 +11,13 @@ import (
 	"main/globalcfg/q"
 	"main/helpers/ytdlp"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
+	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 	"github.com/puzpuzpuz/xsync/v3"
 )
 
@@ -38,6 +40,7 @@ func initReDownload() *regexp.Regexp {
 
 var reDownload = initReDownload()
 var reResolution = regexp.MustCompile(`(?i)\b(144|360|480|720|1080)p?\b`)
+var errNoURL = errors.New("no downloadable url found")
 
 type dlKey struct {
 	Url        string
@@ -58,7 +61,13 @@ var downloading = xsync.NewMapOf[dlKey, *DlResult]()
 func (d *dlKey) downloadToFile() *DlResult {
 	const maxConcurrentDownloads = 5
 	result, loaded := downloading.LoadOrCompute(*d, func() *DlResult {
-		dl := &DlResult{}
+		dl := &DlResult{
+			YtDlResult: q.YtDlResult{
+				Url:        d.Url,
+				AudioOnly:  d.AudioOnly,
+				Resolution: d.Resolution,
+			},
+		}
 		if downloading.Size() >= maxConcurrentDownloads {
 			dl.err = fmt.Errorf("当前正在进行的下载过多(%d >= %d)，请稍后再试", downloading.Size(), maxConcurrentDownloads)
 			return dl
@@ -98,7 +107,7 @@ func (d *dlKey) downloadToFile() *DlResult {
 
 func (d *dlKey) findInDb() *DlResult {
 	result, err := g.Q.GetYtDlpDbCache(context.Background(), d.Url, d.AudioOnly, d.Resolution)
-	if !errors.Is(err, sql.ErrNoRows) {
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		log.Warnf("query database %s err %v", d.Url, err)
 	}
 	if err != nil {
@@ -135,8 +144,11 @@ func buildCaption(result *DlResult, user *gotgbot.User) string {
 	return s
 }
 
-func buildYtDlKey(text string, audioOnly bool) *dlKey {
+func buildYtDlKey(text string, audioOnly bool) (*dlKey, error) {
 	url := reDownload.FindString(text)
+	if url == "" {
+		return nil, errNoURL
+	}
 	resolutionPattern := strings.TrimRight(reResolution.FindString(text), "pP")
 	resolution := int64(parseIntDefault(resolutionPattern, 720))
 
@@ -144,55 +156,173 @@ func buildYtDlKey(text string, audioOnly bool) *dlKey {
 		Url:        url,
 		Resolution: resolution,
 		AudioOnly:  audioOnly,
-	}
+	}, nil
 }
 
-func downloadVideo(bot *gotgbot.Bot, key *dlKey, user *gotgbot.User, msgId, chatId int64) (err error) {
-	msgOpt := &gotgbot.SendMessageOpts{
-		ReplyParameters: &gotgbot.ReplyParameters{MessageId: msgId, ChatId: chatId},
+func buildYtDlKeyFromContext(ctx *ext.Context, audioOnly bool) (*dlKey, error) {
+	if ctx == nil || ctx.EffectiveMessage == nil {
+		return nil, errNoURL
 	}
-	if key.Url == "" {
-		_, err = bot.SendMessage(chatId, "bot没有找到任何有效的视频链接", msgOpt)
-		return err
+	text := h.GetAllTextIncludeReply(ctx.EffectiveMessage)
+	return buildYtDlKey(text, audioOnly)
+}
+
+func sendVideo(bot *gotgbot.Bot, result *DlResult, user *gotgbot.User, msgId, chatId int64) (*gotgbot.Message, error) {
+	caption := buildCaption(result, user)
+	if result.FileID != "" {
+		return bot.SendVideo(chatId, gotgbot.InputFileByID(result.FileID), &gotgbot.SendVideoOpts{
+			Caption:         caption,
+			ParseMode:       gotgbot.ParseModeHTML,
+			ReplyParameters: MakeReplyToMsgID(msgId),
+		})
+	}
+	file, opt := h.PrepareTgVideo(result.file, msgId)
+	opt.Caption = caption
+	opt.ParseMode = gotgbot.ParseModeHTML
+	return bot.SendVideo(chatId, file, opt)
+}
+
+func sendAudio(bot *gotgbot.Bot, result *DlResult, user *gotgbot.User, msgId, chatId int64) (*gotgbot.Message, error) {
+	caption := buildCaption(result, user)
+	if result.FileID != "" {
+		return bot.SendAudio(chatId, gotgbot.InputFileByID(result.FileID), &gotgbot.SendAudioOpts{
+			Caption:         caption,
+			ParseMode:       gotgbot.ParseModeHTML,
+			ReplyParameters: MakeReplyToMsgID(msgId),
+		})
+	}
+	return bot.SendAudio(chatId, fileSchema(result.file), &gotgbot.SendAudioOpts{
+		Caption:         caption,
+		ParseMode:       gotgbot.ParseModeHTML,
+		ReplyParameters: MakeReplyToMsgID(msgId),
+	})
+}
+
+func downloadMedia(bot *gotgbot.Bot, key *dlKey, user *gotgbot.User, msgId, chatId int64) (err error) {
+	msgOpt := &gotgbot.SendMessageOpts{
+		ReplyParameters: MakeReplyToMsgID(msgId),
+	}
+	if key == nil || key.Url == "" {
+		_, err = bot.SendMessage(chatId, "bot没有找到任何有效的链接", msgOpt)
+		return errNoURL
 	}
 	if dbr := key.findInDb(); dbr != nil {
-		// 如果数据库里有现成的，就用现成的。
-		_, err = bot.SendVideo(chatId, gotgbot.InputFileByID(dbr.FileID), nil)
+		if key.AudioOnly {
+			_, err = sendAudio(bot, dbr, user, msgId, chatId)
+		} else {
+			_, err = sendVideo(bot, dbr, user, msgId, chatId)
+		}
+		if err == nil && dbr.FileID != "" {
+			_ = g.Q.IncYtDlUploadCount(context.Background(), dbr.FileID)
+		}
 		return err
 	}
 	result := key.downloadToFile()
 	if result.err != nil {
-		_, err = bot.SendMessage(chatId, "下载视频过程中遇到错误: "+result.err.Error(), msgOpt)
+		_, err = bot.SendMessage(chatId, "下载过程中遇到错误: "+result.err.Error(), msgOpt)
 		return err
 	}
-	uploaded := false
 	result.uploadFileOnce.Do(func() {
-		uploaded = true
-		file, opt := h.PrepareTgVideo(result.file, msgId)
-		opt.Caption = buildCaption(result, user)
-		opt.ParseMode = gotgbot.ParseModeHTML
 		var sent *gotgbot.Message
-		sent, err = bot.SendVideo(chatId, file, opt)
+		if key.AudioOnly {
+			sent, err = sendAudio(bot, result, user, msgId, chatId)
+			if err == nil && sent != nil && sent.Audio != nil {
+				result.FileID = sent.Audio.FileId
+			}
+		} else {
+			sent, err = sendVideo(bot, result, user, msgId, chatId)
+			if err == nil && sent != nil && sent.Video != nil {
+				result.FileID = sent.Video.FileId
+			}
+		}
 		if err != nil {
 			result.err = err
-			log.Warnf("DownloadVideo: send video error: %v", err)
+			log.Warnf("download send media error: %v", err)
 			downloading.Delete(*key)
 			return
 		}
-		result.FileID = sent.Video.FileId
-		err = result.Save(context.Background(), g.Q)
-		if err != nil {
-			log.Warnf("DownloadVideo: save video to database error: %v", err)
+		if saveErr := result.Save(context.Background(), g.Q); saveErr != nil {
+			log.Warnf("save download result to database error: %v", saveErr)
 		}
-
 	})
-	if uploaded {
-		return
-	}
 	if result.err != nil {
 		_, _ = bot.SendMessage(chatId, "下载失败，遇到错误: "+result.err.Error(), msgOpt)
 		return result.err
 	}
-	_, err = bot.SendVideo(chatId, gotgbot.InputFileByID(result.FileID), nil)
+	return nil
+}
+
+func DownloadVideo(bot *gotgbot.Bot, ctx *ext.Context) error {
+	reply, done := MakeDebounceMustReply(bot, ctx, time.Second)
+	key, err := buildYtDlKeyFromContext(ctx, false)
+	if err != nil {
+		reply("没有找到视频链接")
+		return err
+	}
+	reply("正在下载，请稍等")
+	err = downloadMedia(bot, key, ctx.EffectiveUser, ctx.EffectiveMessage.MessageId, ctx.EffectiveChat.Id)
+	if err != nil {
+		reply("下载失败")
+		return err
+	}
+	done()
+	return nil
+}
+
+func DownloadAudio(bot *gotgbot.Bot, ctx *ext.Context) error {
+	reply, done := MakeDebounceMustReply(bot, ctx, time.Second)
+	key, err := buildYtDlKeyFromContext(ctx, true)
+	if err != nil {
+		reply("没有找到音频链接")
+		return err
+	}
+	key.Resolution = 0
+	reply("正在下载，请稍等")
+	err = downloadMedia(bot, key, ctx.EffectiveUser, ctx.EffectiveMessage.MessageId, ctx.EffectiveChat.Id)
+	if err != nil {
+		reply("下载失败")
+		return err
+	}
+	done()
+	return nil
+}
+
+func DownloadVideoCallback(bot *gotgbot.Bot, ctx *ext.Context) error {
+	answer := MakeAnswerCallback(bot, ctx)
+	key, err := buildYtDlKeyFromContext(ctx, false)
+	if err != nil {
+		answer("没有找到视频链接", true)
+		return err
+	}
+	answer("视频开始下载", false)
+	err = downloadMedia(bot, key, &ctx.CallbackQuery.From, ctx.EffectiveMessage.MessageId, ctx.EffectiveMessage.Chat.Id)
+	if err != nil {
+		answer("下载失败:"+err.Error(), true)
+	}
+	return err
+}
+
+func DownloadInlinedBv(bot *gotgbot.Bot, ctx *ext.Context) error {
+	answer := MakeAnswerCallback(bot, ctx)
+	uid, err := strconv.ParseInt(ctx.CallbackQuery.Data[len(biliInlineCallbackPrefix):], 16, 64)
+	if err != nil {
+		answer("没有找到视频链接", true)
+		return err
+	}
+	inlineData, err := g.Q.GetBiliInlineData(context.Background(), uid)
+	if err != nil {
+		answer("没有找到视频链接，可能是数据库错误", true)
+		return err
+	}
+	key, err := buildYtDlKey(inlineData.Text, false)
+	if err != nil {
+		answer("没有找到视频链接", true)
+		return err
+	}
+	answer("视频开始下载", false)
+	err = downloadMedia(bot, key, &ctx.CallbackQuery.From, inlineData.MsgID, inlineData.ChatID)
+	if err != nil {
+		answer("下载失败:"+err.Error(), true)
+	}
 	return err
 }

@@ -2,7 +2,7 @@ package main
 
 import (
 	"main/bothttp"
-	"main/globalcfg"
+	g "main/globalcfg"
 	"main/myhandlers"
 	"net/http"
 	"runtime/debug"
@@ -99,8 +99,8 @@ func main() {
 	dispatcher.AddCommand("score", myhandlers.CmdScore)
 	dispatcher.AddCommand("prpr", myhandlers.GenPrpr)
 	dispatcher.AddCommand("calc", myhandlers.SolveMath)
-	//dispatcher.AddCommand("downloadvideo", myhandlers.DownloadVideo)
-	//dispatcher.AddCommand("downloadaudio", myhandlers.DownloadAudio)
+	dispatcher.AddCommand("downloadvideo", myhandlers.DownloadVideo)
+	dispatcher.AddCommand("downloadaudio", myhandlers.DownloadAudio)
 	dispatcher.AddCommand("getrank", myhandlers.GetRank)
 	dispatcher.AddCommand("diag_groupstat", myhandlers.GroupStatDiagnostic)
 	dispatcher.AddCommand("diag_sendstat", myhandlers.SendGroupStat)
@@ -116,9 +116,10 @@ func main() {
 	dispatcher.AddCommand("chat_config", myhandlers.ShowChatCfg)
 
 	dispatcher.AddCommand("count_nsfw_pics", myhandlers.CountNsfwPics)
+	dispatcher.AddCommand("settimezone", myhandlers.SetUserTimeZone)
 
 	dispatcher.AddHandler(handlers.NewMessage(myhandlers.HasSinaGif, myhandlers.Gif2Mp4))
-	//dispatcher.AddHandler(handlers.NewCallback(myhandlers.IsBilibiliBtn, myhandlers.DownloadVideoCallback))
+	dispatcher.AddHandler(handlers.NewCallback(myhandlers.IsBilibiliBtn, myhandlers.DownloadVideoCallback))
 	dispatcher.AddHandler(handlers.NewMessage(myhandlers.HasImage, myhandlers.SeseDetect))
 	dispatcher.AddHandler(handlers.NewMessage(myhandlers.NeedSolve, myhandlers.SolveMath))
 	dispatcher.AddHandler(handlers.NewMessage(myhandlers.IsCalcExchangeRate, myhandlers.ExchangeRateCalc))
@@ -132,7 +133,7 @@ func main() {
 	dispatcher.AddHandler(handlers.NewCallback(myhandlers.IsNextRound, myhandlers.NextRound))
 	dispatcher.AddHandler(handlers.NewMessage(myhandlers.IsBattleCommand, myhandlers.ExecuteBattleCommand))
 	dispatcher.AddHandler(handlers.NewMessage(myhandlers.IsGeminiReq, myhandlers.GeminiReply))
-	//dispatcher.AddHandler(handlers.NewCallback(myhandlers.IsBilibiliInlineBtn, myhandlers.DownloadInlinedBv))
+	dispatcher.AddHandler(handlers.NewCallback(myhandlers.IsBilibiliInlineBtn, myhandlers.DownloadInlinedBv))
 	dispatcher.AddHandler(handlers.NewCallback(callbackquery.Prefix(myhandlers.GroupConfigModifyPrefix), myhandlers.ModifyGroupConfigByButton))
 
 	err := updater.StartPolling(b, &ext.PollingOpts{

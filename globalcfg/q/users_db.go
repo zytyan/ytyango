@@ -27,13 +27,7 @@ func (q *Queries) GetUserByTg(ctx context.Context, tgUser *gotgbot.User) (*User,
 				ProfileUpdateAt: UnixTime{time.Unix(0, 0)},
 				ProfilePhoto:    sql.NullString{},
 			}
-			id, _ := q.updateUserBase(ctx, updateUserBaseParams{
-				UpdatedAt: u.UpdatedAt,
-				UserID:    u.UserID,
-				FirstName: u.FirstName,
-				LastName:  u.LastName,
-				TimeZone:  u.TimeZone,
-			})
+			id, _ := q.updateUserBase(ctx, u.UpdatedAt, u.UserID, u.FirstName, u.LastName)
 			u.ID = id
 			return u
 		}
@@ -58,7 +52,10 @@ func (q *Queries) GetChatById(ctx context.Context, id int64) (*ChatCfg, error) {
 	var err error
 	c, _ := chatCache.LoadOrCompute(id, func() *ChatCfg {
 		chat, erri := q.getChatById(ctx, id)
-		if erri != nil {
+		if errors.Is(erri, sql.ErrNoRows) {
+			chat, err = q.CreateNewChatDefaultCfg(ctx, id)
+			return fromInnerCfg(&chat)
+		} else if erri != nil {
 			err = erri
 			return nil
 		}
@@ -109,13 +106,7 @@ func (u *User) TryUpdate(q *Queries, tgUser *gotgbot.User) error {
 		needCommit = true
 	}
 	if needCommit {
-		_, err := q.updateUserBase(context.Background(), updateUserBaseParams{
-			UpdatedAt: UnixTime{time.Now()},
-			UserID:    u.UserID,
-			FirstName: u.FirstName,
-			LastName:  u.LastName,
-			TimeZone:  u.TimeZone,
-		})
+		_, err := q.updateUserBase(context.Background(), UnixTime{time.Now()}, u.UserID, u.FirstName, u.LastName)
 		return err
 	}
 	return nil
@@ -129,6 +120,22 @@ func (u *User) Name() string {
 		return u.FirstName
 	}
 	return u.FirstName + " " + u.LastName.String
+}
+
+func (q *Queries) UpdateUserProfilePhoto(ctx context.Context, userID int64, profilePhoto string) error {
+	return q.updateUserProfilePhoto(ctx, userID, UnixTime{time.Now()}, sql.NullString{
+		String: profilePhoto,
+		Valid:  profilePhoto != "",
+	})
+}
+
+func (q *Queries) UpdateUserTimeZone(ctx context.Context, user *User, zone int64) error {
+	if user == nil {
+		return errors.New("user is nil")
+	}
+	user.Timezone = zone
+	now := UnixTime{time.Now()}
+	return q.updateUserTimeZone(ctx, user.ID, now, zone)
 }
 
 func (c *ChatCfg) Save(q *Queries) error {

@@ -55,7 +55,7 @@ type User struct {
 	LastName        sql.NullString `json:"last_name"`
 	ProfileUpdateAt UnixTime       `json:"profile_update_at"`
 	ProfilePhoto    sql.NullString `json:"profile_photo"`
-	TimeZone        sql.NullInt64  `json:"time_zone"`
+	Timezone        int64          `json:"timezone"`
 }
 
 type YtDlResult struct {

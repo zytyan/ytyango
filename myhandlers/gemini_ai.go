@@ -3,7 +3,7 @@ package myhandlers
 import (
 	"context"
 	"fmt"
-	"main/globalcfg"
+	g "main/globalcfg"
 	"strings"
 	"sync"
 	"time"
@@ -65,5 +65,32 @@ func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 		return err
 	}
 	_, err = ctx.EffectiveMessage.Reply(bot, res.Text(), nil)
+	return err
+}
+
+func SetUserTimeZone(bot *gotgbot.Bot, ctx *ext.Context) error {
+	fields := strings.Fields(ctx.EffectiveMessage.Text)
+	const help = "用法: /settimezone +0800"
+	if len(fields) < 2 {
+		_, err := ctx.EffectiveMessage.Reply(bot, help, nil)
+		return err
+	}
+	t, err := time.Parse("-0700", fields[1])
+	if err != nil {
+		_, err := ctx.EffectiveMessage.Reply(bot, help, nil)
+		return err
+	}
+	_, zone := t.Zone()
+	user, err := g.Q.GetUserByTg(context.Background(), ctx.EffectiveUser)
+	if err != nil {
+		return err
+	}
+	err = g.Q.UpdateUserTimeZone(context.Background(), user, int64(zone))
+	if err != nil {
+		_, err = ctx.EffectiveMessage.Reply(bot, err.Error(), nil)
+		return err
+	}
+	user.Timezone = int64(zone)
+	_, err = ctx.EffectiveMessage.Reply(bot, fmt.Sprintf("设置成功 %d seconds", zone), nil)
 	return err
 }

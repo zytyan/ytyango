@@ -1,12 +1,8 @@
 package bothttp
 
 import (
-	"context"
-	"fmt"
 	"image"
 	_ "image/jpeg"
-	g "main/globalcfg"
-	"main/myhandlers"
 	"os"
 	"strconv"
 
@@ -41,26 +37,29 @@ func webpConvert(in, out string) error {
 	return nil
 }
 func getUserProfilePhotoWebp(userId int64) (string, error) {
-	user := g.Q.GetUserById(context.Background(), userId)
-	if user == nil {
-		return "", UserNotFound
-	}
-	if !user.ProfilePhoto.Valid {
-		return "", UserNoProfilePhoto
-	}
-	photoPath := fmt.Sprintf("data/profile_photo/p_%s.webp", user.ProfilePhoto.String)
-	if fileExists(photoPath) {
+	panic("TODO")
+	/*
+		user := g.Q.GetUserById(context.Background(), userId)
+		if user == nil {
+			return "", UserNotFound
+		}
+		if !user.ProfilePhoto.Valid {
+			return "", UserNoProfilePhoto
+		}
+		photoPath := fmt.Sprintf("data/profile_photo/p_%s.webp", user.ProfilePhoto.String)
+		if fileExists(photoPath) {
+			return photoPath, nil
+		}
+		path, err := user.DownloadProfilePhoto(myhandlers.GetMainBot())
+		if err != nil {
+			return "", err
+		}
+		err = webpConvert(path, photoPath)
+		if err != nil {
+			return "", err
+		}
 		return photoPath, nil
-	}
-	path, err := user.DownloadProfilePhoto(myhandlers.GetMainBot())
-	if err != nil {
-		return "", err
-	}
-	err = webpConvert(path, photoPath)
-	if err != nil {
-		return "", err
-	}
-	return photoPath, nil
+	*/
 }
 
 func getUserProfilePhoto(ctx *gin.Context) {

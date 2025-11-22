@@ -9,6 +9,7 @@ import (
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
+	lru "github.com/hashicorp/golang-lru/v2"
 )
 
 func fileSchema(filename string) gotgbot.InputFileOrString {
@@ -31,7 +32,6 @@ func SetMainBot(bot *gotgbot.Bot) {
 func GetMainBot() *gotgbot.Bot {
 	return mainBot
 }
-
 
 func GetMsgInfo(bot *gotgbot.Bot, ctx *ext.Context) error {
 	data := fmt.Sprintf("获取消息信息：%d", ctx.EffectiveMessage.Chat.Id)
@@ -139,4 +139,12 @@ func getChatName(chat *gotgbot.Chat) string {
 		return chat.FirstName
 	}
 	return chat.FirstName + " " + chat.LastName
+}
+
+func mustNewLru[K comparable, V any](count int) *lru.Cache[K, V] {
+	cache, err := lru.New[K, V](count)
+	if err != nil {
+		panic(err)
+	}
+	return cache
 }

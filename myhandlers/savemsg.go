@@ -44,12 +44,10 @@ func SaveMessage(bot *gotgbot.Bot, ctx *ext.Context) error {
 				log.Errorf("save message panic %s, update id %d", r, ctx.Update.UpdateId)
 			}
 		}()
-		//err := g.Q.GetUserByTg(bot, ctx)
-		var err error
-		if err != nil {
+		if err := SaveUser(bot, ctx); err != nil {
 			log.Errorf("save user error %s, update id %d", err, ctx.Update.UpdateId)
 		}
-		err = saveMessage(bot, ctx)
+		err := saveMessage(bot, ctx)
 		if err != nil {
 			log.Errorf("save message error %s, update id %d", err, ctx.Update.UpdateId)
 		}
@@ -80,6 +78,9 @@ func setImageText(bot *gotgbot.Bot, msg *gotgbot.Message, meili *MeiliMsg) error
 }
 
 func saveMessage(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
+	if ctx.Message == nil {
+		return nil
+	}
 	if !h.ChatSaveMessages(ctx.EffectiveChat.Id) {
 		return nil
 	}

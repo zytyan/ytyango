@@ -37,7 +37,7 @@ func defaultAtoi(s string, d int) int {
 }
 
 func IsDndDice(msg *gotgbot.Message) bool {
-	if !h.ChatEnableCoc(msg.Chat.Id) {
+	if msg.Chat.Type != "private" && !h.ChatEnableCoc(msg.Chat.Id) {
 		return false
 	}
 	text := width.Narrow.String(msg.Text)
@@ -45,7 +45,7 @@ func IsDndDice(msg *gotgbot.Message) bool {
 }
 
 func IsSetDndAttr(msg *gotgbot.Message) bool {
-	if !h.ChatEnableCoc(msg.Chat.Id) {
+	if msg.Chat.Type != "private" && !h.ChatEnableCoc(msg.Chat.Id) {
 		return false
 	}
 	text := width.Narrow.String(msg.Text)

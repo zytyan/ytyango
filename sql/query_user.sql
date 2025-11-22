@@ -6,12 +6,11 @@ FROM users
 WHERE user_id = ?;
 
 -- name: updateUserBase :one
-INSERT INTO users (updated_at, user_id, first_name, last_name, time_zone)
-VALUES (?, ?, ?, ?, ?)
+INSERT INTO users (updated_at, user_id, first_name, last_name)
+VALUES (?, ?, ?, ?)
 ON CONFLICT DO UPDATE SET updated_at=excluded.updated_at,
                           first_name=excluded.first_name,
-                          last_name =excluded.last_name,
-                          time_zone=excluded.time_zone
+                          last_name =excluded.last_name
 RETURNING id;
 
 -- name: updateUserProfilePhoto :exec
@@ -20,7 +19,12 @@ VALUES (?, ?, ?)
 ON CONFLICT DO UPDATE SET profile_update_at = excluded.profile_update_at,
                           profile_photo     = excluded.profile_photo;
 
-
+-- name: updateUserTimeZone :exec
+INSERT INTO users (user_id, updated_at, timezone)
+VALUES (?, ?, ?)
+ON CONFLICT DO UPDATE SET updated_at=excluded.updated_at,
+                          timezone=excluded.timezone
+RETURNING id;
 
 -- name: SetPrprCache :exec
 INSERT INTO prpr_caches (profile_photo_uid, prpr_file_id)

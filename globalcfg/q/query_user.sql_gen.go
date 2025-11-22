@@ -35,7 +35,7 @@ func (q *Queries) SetPrprCache(ctx context.Context, profilePhotoUid string, prpr
 
 const getUserById = `-- name: getUserById :one
 
-SELECT id, updated_at, user_id, first_name, last_name, profile_update_at, profile_photo, time_zone
+SELECT id, updated_at, user_id, first_name, last_name, profile_update_at, profile_photo, timezone
 FROM users
 WHERE user_id = ?
 `
@@ -52,36 +52,26 @@ func (q *Queries) getUserById(ctx context.Context, userID int64) (User, error) {
 		&i.LastName,
 		&i.ProfileUpdateAt,
 		&i.ProfilePhoto,
-		&i.TimeZone,
+		&i.Timezone,
 	)
 	return i, err
 }
 
 const updateUserBase = `-- name: updateUserBase :one
-INSERT INTO users (updated_at, user_id, first_name, last_name, time_zone)
-VALUES (?, ?, ?, ?, ?)
+INSERT INTO users (updated_at, user_id, first_name, last_name)
+VALUES (?, ?, ?, ?)
 ON CONFLICT DO UPDATE SET updated_at=excluded.updated_at,
                           first_name=excluded.first_name,
-                          last_name =excluded.last_name,
-                          time_zone=excluded.time_zone
+                          last_name =excluded.last_name
 RETURNING id
 `
 
-type updateUserBaseParams struct {
-	UpdatedAt UnixTime       `json:"updated_at"`
-	UserID    int64          `json:"user_id"`
-	FirstName string         `json:"first_name"`
-	LastName  sql.NullString `json:"last_name"`
-	TimeZone  sql.NullInt64  `json:"time_zone"`
-}
-
-func (q *Queries) updateUserBase(ctx context.Context, arg updateUserBaseParams) (int64, error) {
+func (q *Queries) updateUserBase(ctx context.Context, updatedAt UnixTime, userID int64, firstName string, lastName sql.NullString) (int64, error) {
 	row := q.db.QueryRowContext(ctx, updateUserBase,
-		arg.UpdatedAt,
-		arg.UserID,
-		arg.FirstName,
-		arg.LastName,
-		arg.TimeZone,
+		updatedAt,
+		userID,
+		firstName,
+		lastName,
 	)
 	var id int64
 	err := row.Scan(&id)
@@ -97,5 +87,18 @@ ON CONFLICT DO UPDATE SET profile_update_at = excluded.profile_update_at,
 
 func (q *Queries) updateUserProfilePhoto(ctx context.Context, userID int64, profileUpdateAt UnixTime, profilePhoto sql.NullString) error {
 	_, err := q.db.ExecContext(ctx, updateUserProfilePhoto, userID, profileUpdateAt, profilePhoto)
+	return err
+}
+
+const updateUserTimeZone = `-- name: updateUserTimeZone :exec
+INSERT INTO users (user_id, updated_at, timezone)
+VALUES (?, ?, ?)
+ON CONFLICT DO UPDATE SET updated_at=excluded.updated_at,
+                          timezone=excluded.timezone
+RETURNING id
+`
+
+func (q *Queries) updateUserTimeZone(ctx context.Context, userID int64, updatedAt UnixTime, timezone int64) error {
+	_, err := q.db.ExecContext(ctx, updateUserTimeZone, userID, updatedAt, timezone)
 	return err
 }

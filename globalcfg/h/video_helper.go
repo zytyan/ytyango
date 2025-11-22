@@ -41,11 +41,10 @@ func PrepareTgVideo(file string, replyMsgId int64, opts ...func(opts *gotgbot.Se
 	}
 	vs = probe.FirstVideoStream()
 	if vs != nil {
-		goto skip
+		opt.Duration = int64(vs.DurationTs)
+		opt.Width = int64(vs.Width)
+		opt.Height = int64(vs.Height)
 	}
-	opt.Duration = int64(vs.DurationTs)
-	opt.Width = int64(vs.Width)
-	opt.Height = int64(vs.Height)
 skip:
 	if replyMsgId > 0 {
 		opt.ReplyParameters = &gotgbot.ReplyParameters{

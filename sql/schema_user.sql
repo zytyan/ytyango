@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS users
     last_name         TEXT,
     profile_update_at INT_UNIX_SEC NOT NULL,
     profile_photo     TEXT,
-    time_zone         INTEGER DEFAULT 480 -- 8:00，+8小时
+    timezone          INTEGER NOT NULL DEFAULT 480 -- 8:00，+8小时
 );
 
 CREATE TABLE IF NOT EXISTS prpr_caches
