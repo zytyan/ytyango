@@ -15,6 +15,7 @@ import (
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers/filters/callbackquery"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers/filters/inlinequery"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers/filters/message"
+	"go.uber.org/zap"
 )
 
 var log = g.GetLogger("main")
@@ -32,12 +33,14 @@ func (g *GroupedDispatcher) AddHandler(handler ext.Handler) {
 	g.autoInc++
 	g.mutex.Unlock()
 }
+
 func (g *GroupedDispatcher) AddCommand(command string, handler handlers.Response) {
 	g.Dispatcher.AddHandlerToGroup(handlers.NewCommand(command, handler), g.autoInc)
 	g.mutex.Lock()
 	g.autoInc++
 	g.mutex.Unlock()
 }
+
 func newBot(token string) *gotgbot.Bot {
 	bot := &gotgbot.Bot{
 		Token: token,
@@ -58,6 +61,28 @@ func newBot(token string) *gotgbot.Bot {
 	return bot
 }
 
+func zapLogFields(b *gotgbot.Bot, ctx *ext.Context) []zap.Field {
+	fields := make([]zap.Field, 0, 8)
+	fields = append(fields,
+		zap.Int64("update_id", ctx.UpdateId),
+		zap.Int64("bot_id", b.Id),
+		zap.String("bot_username", b.Username),
+	)
+	if ctx.EffectiveChat != nil {
+		fields = append(fields, zap.Int64("effective_chat_id", ctx.EffectiveChat.Id))
+	}
+	if ctx.EffectiveUser != nil {
+		fields = append(fields, zap.Int64("effective_user_id", ctx.EffectiveUser.Id))
+	}
+	if ctx.EffectiveSender != nil {
+		fields = append(fields, zap.Int64("effective_sender_id", ctx.EffectiveSender.Id()))
+	}
+	if ctx.EffectiveMessage != nil {
+		fields = append(fields, zap.Int64("effective_msg_id", ctx.EffectiveMessage.MessageId))
+	}
+	return fields
+}
+
 func main() {
 	log.Infof("compile time: %s", compileTime)
 	token := g.GetConfig().BotToken
@@ -65,15 +90,23 @@ func main() {
 	myhandlers.SetMainBot(b)
 	go bothttp.Run()
 	go myhandlers.HttpListen4019()
+	dLog := log.Desugar()
 	dispatcher := GroupedDispatcher{Dispatcher: ext.NewDispatcher(&ext.DispatcherOpts{
-		// If an error is returned by a handler, log it and continue going.
 		Error: func(b *gotgbot.Bot, ctx *ext.Context, err error) ext.DispatcherAction {
-			log.Warnf("an error occurred while handling update: %s", err)
+			fields := zapLogFields(b, ctx)
+			fields = append(fields, zap.Error(err))
+			dLog.Warn("an error occurred while handling update", fields...)
 			return ext.DispatcherActionContinueGroups
 		},
 		Panic: func(b *gotgbot.Bot, ctx *ext.Context, r interface{}) {
+			fields := zapLogFields(b, ctx)
 			stackBytes := debug.Stack()
-			log.Errorf("a panic occurred while handling update: %s, stack trace: %s", r, stackBytes)
+			fields = append(fields,
+				zap.Any("panic", r),
+				zap.ByteString("stack", stackBytes),
+			)
+			dLog.Warn("an error occurred while handling update", fields...)
+			dLog.Error("recovered from panic, a panic occurred while handling update.", fields...)
 		},
 		MaxRoutines: ext.DefaultMaxRoutines,
 	}), autoInc: 0, mutex: sync.Mutex{}}
