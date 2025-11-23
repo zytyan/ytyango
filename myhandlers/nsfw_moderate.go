@@ -160,7 +160,7 @@ func CmdScore(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
 	if err == nil {
 		userRate = strconv.Itoa(int(savedPic.UserRate))
 	}
-	text := fmt.Sprintf("score: %d/6\n, userRate:%s/6", severity, userRate)
+	text := fmt.Sprintf("score: %d/6\nuserRate:%s/6", severity, userRate)
 	_, err = ctx.Message.Reply(bot, text, nil)
 	if err != nil {
 		log.Warnf("reply message failed, err: %s", err)

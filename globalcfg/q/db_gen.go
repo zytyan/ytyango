@@ -111,6 +111,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.updateChatCfgStmt, err = db.PrepareContext(ctx, updateChatCfg); err != nil {
 		return nil, fmt.Errorf("error preparing query updateChatCfg: %w", err)
 	}
+	if q.updatePicRateStmt, err = db.PrepareContext(ctx, updatePicRate); err != nil {
+		return nil, fmt.Errorf("error preparing query updatePicRate: %w", err)
+	}
 	if q.updateUserBaseStmt, err = db.PrepareContext(ctx, updateUserBase); err != nil {
 		return nil, fmt.Errorf("error preparing query updateUserBase: %w", err)
 	}
@@ -265,6 +268,11 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing updateChatCfgStmt: %w", cerr)
 		}
 	}
+	if q.updatePicRateStmt != nil {
+		if cerr := q.updatePicRateStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing updatePicRateStmt: %w", cerr)
+		}
+	}
 	if q.updateUserBaseStmt != nil {
 		if cerr := q.updateUserBaseStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing updateUserBaseStmt: %w", cerr)
@@ -350,6 +358,7 @@ type Queries struct {
 	insertPicStmt               *sql.Stmt
 	ratePicStmt                 *sql.Stmt
 	updateChatCfgStmt           *sql.Stmt
+	updatePicRateStmt           *sql.Stmt
 	updateUserBaseStmt          *sql.Stmt
 	updateUserProfilePhotoStmt  *sql.Stmt
 	updateUserTimeZoneStmt      *sql.Stmt
@@ -390,6 +399,7 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		insertPicStmt:               q.insertPicStmt,
 		ratePicStmt:                 q.ratePicStmt,
 		updateChatCfgStmt:           q.updateChatCfgStmt,
+		updatePicRateStmt:           q.updatePicRateStmt,
 		updateUserBaseStmt:          q.updateUserBaseStmt,
 		updateUserProfilePhotoStmt:  q.updateUserProfilePhotoStmt,
 		updateUserTimeZoneStmt:      q.updateUserTimeZoneStmt,

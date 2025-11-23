@@ -256,3 +256,27 @@ func (q *Queries) ratePic(ctx context.Context, fileUid string, userID int64, rat
 	q.logQuery(ratePic, logFields, err, start)
 	return err
 }
+
+const updatePicRate = `-- name: updatePicRate :exec
+UPDATE saved_pics_rating
+SET rating=?
+WHERE file_uid = ?
+  AND user_id = ?
+`
+
+func (q *Queries) updatePicRate(ctx context.Context, rating int64, fileUid string, userID int64) error {
+	var logFields []zap.Field
+	var start time.Time
+	if q.logger != nil {
+		logFields = make([]zap.Field, 0, 3+5)
+		start = time.Now()
+		logFields = append(logFields,
+			zap.Int64("rating", rating),
+			zap.String("file_uid", fileUid),
+			zap.Int64("user_id", userID),
+		)
+	}
+	_, err := q.exec(ctx, q.updatePicRateStmt, updatePicRate, rating, fileUid, userID)
+	q.logQuery(updatePicRate, logFields, err, start)
+	return err
+}

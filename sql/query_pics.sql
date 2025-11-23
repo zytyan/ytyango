@@ -38,6 +38,12 @@ ORDER BY rate;
 INSERT INTO saved_pics_rating (file_uid, user_id, rating)
 VALUES (?, ?, ?);
 
+-- name: updatePicRate :exec
+UPDATE saved_pics_rating
+SET rating=?
+WHERE file_uid = ?
+  AND user_id = ?;
+
 -- name: getPicRateByUserId :one
 SELECT rating
 FROM saved_pics_rating

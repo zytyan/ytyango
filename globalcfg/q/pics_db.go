@@ -218,5 +218,9 @@ func (q *Queries) RatePic(ctx context.Context, fileUid string, userID int64, new
 	} else if err != nil {
 		return false, 0, err
 	}
-	return true, rate, nil
+	if rate == newRate {
+		return true, rate, nil
+	}
+	err = q.updatePicRate(ctx, newRate, fileUid, userID)
+	return true, rate, err
 }
