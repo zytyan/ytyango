@@ -106,7 +106,6 @@ func main() {
 				zap.Any("panic", r),
 				zap.ByteString("stack", stackBytes),
 			)
-			dLog.Warn("an error occurred while handling update", fields...)
 			dLog.Error("recovered from panic, a panic occurred while handling update.", fields...)
 		},
 		MaxRoutines: ext.DefaultMaxRoutines,

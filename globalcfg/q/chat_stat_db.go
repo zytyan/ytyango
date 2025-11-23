@@ -257,7 +257,7 @@ func (q *Queries) chatStatAtWithTimezone(ctx context.Context, chatId, unixTime, 
 func (q *Queries) ChatStatAt(chatId, unixTime int64) *ChatStat {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
 	defer cancel()
-	cfg, err := q.chatCfgById(ctx, chatId)
+	cfg, err := q.ChatCfgById(ctx, chatId)
 	if err != nil {
 		return nil
 	}
@@ -272,7 +272,7 @@ func (q *Queries) ChatStatToday(chatId int64) (stat *ChatStat) {
 
 // ChatStatOfDay returns the stat of the day which contains the unixTime in the chat's timezone.
 func (q *Queries) ChatStatOfDay(ctx context.Context, chatId, unixTime int64) (ChatStatDaily, int64, error) {
-	cfg, err := q.chatCfgById(ctx, chatId)
+	cfg, err := q.ChatCfgById(ctx, chatId)
 	if err != nil {
 		return ChatStatDaily{}, 0, err
 	}
