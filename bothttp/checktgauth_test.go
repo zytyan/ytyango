@@ -3,6 +3,7 @@ package bothttp
 import (
 	"crypto/hmac"
 	"crypto/sha256"
+	g "main/globalcfg"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -12,7 +13,7 @@ func TestTelegramAuth(t *testing.T) {
 	as := require.New(t)
 	key := hmac.New(sha256.New, []byte("WebAppData"))
 	// 该token已经失效，可放心在测试代码中使用
-	key.Write([]byte("554277510:AAEKxRdcRfhEjtSIfxpaYtL19XFgdDcY23U"))
+	key.Write([]byte(g.GetConfig().BotToken))
 	keyS := key.Sum(nil)
 	data := "query_id=AAGhdeMLAAAAAKF14wu7BOmF&user=%7B%22" +
 		"id%22%3A199456161%2C%22first_name%22%3A%22z%22%2C" +
