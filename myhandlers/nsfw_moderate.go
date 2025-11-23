@@ -6,7 +6,7 @@ import (
 	g "main/globalcfg"
 	"main/globalcfg/h"
 	"main/helpers/azure"
-	"strconv"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -182,12 +182,12 @@ func CmdScore(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
 	severity := result.GetSeverityByCategory(azure.ModerateV2CatSexual)
 	go saveNsfw(photo.FileUniqueId, photo.FileId, severity)
 	savedPic, err := g.Q.GetNsfwPicByFileUid(context.Background(), photo.FileUniqueId)
-	userRate := "???"
+	userRate := severity
 	if err == nil {
-		userRate = strconv.Itoa(int(savedPic.UserRate))
+		userRate = int(savedPic.UserRate)
 	}
 	replyMarkup := BuildNsfwRateButton(photo.FileUniqueId, nsfwCallbackButtonCmdScore)
-	text := fmt.Sprintf("bot评分: %d/6\n用户评分:%s/6", severity, userRate)
+	text := fmt.Sprintf("bot评分: %d/6\n用户评分: %d/6", severity, userRate)
 	_, err = ctx.Message.Reply(bot, text, &gotgbot.SendMessageOpts{
 		ReplyMarkup: replyMarkup,
 	})
@@ -218,15 +218,34 @@ func CountNsfwPics(bot *gotgbot.Bot, ctx *ext.Context) error {
 	return err
 }
 
+var reUserRateInMsg = regexp.MustCompile(`用户评分.*(\d|\?\?\?)/6$`)
+
 func refreshMsgFromBtn(bot *gotgbot.Bot, ctx *ext.Context, fileUid, cmd string) {
 	msg := ctx.CallbackQuery.Message
-	fmt.Println(msg)
-	if cmd == nsfwCallbackButtonCmdScore {
-		// TODO: 修改评分
+	iMsg, ok := ctx.CallbackQuery.Message.(gotgbot.Message)
+
+	if cmd == nsfwCallbackButtonCmdScore && ok {
+		pic, err := g.Q.GetNsfwPicByFileUid(context.Background(), fileUid)
+		if err != nil {
+			log.Warnf("GetPicRateDetailsByFileUid failed, err: %s", err)
+			return
+		}
+		userRate := float64(pic.UserRate)
+		if pic.RateUserCount != 0 {
+			userRate = float64(pic.UserRatingSum) / float64(pic.RateUserCount)
+		}
+		_, _, err = msg.EditText(bot,
+			reUserRateInMsg.ReplaceAllString(iMsg.Text, fmt.Sprintf("用户评分: %.1f/6", userRate)),
+			&gotgbot.EditMessageTextOpts{ReplyMarkup: *BuildNsfwRateButton(fileUid, cmd)})
+		if err != nil {
+			log.Warnf("reply message failed, err: %s", err)
+		}
+		return
 	}
-	_, _, err := msg.EditReplyMarkup(bot, &gotgbot.EditMessageReplyMarkupOpts{
+	opts := &gotgbot.EditMessageReplyMarkupOpts{
 		ReplyMarkup: *BuildNsfwRateButton(fileUid, cmd),
-	})
+	}
+	_, _, err := msg.EditReplyMarkup(bot, opts)
 	if err != nil {
 		log.Warnf("edit message button failed, err: %s", err)
 	}
