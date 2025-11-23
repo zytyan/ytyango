@@ -28,6 +28,7 @@ type OcrConfig struct {
 type Config struct {
 	BotToken           string      `yaml:"bot-token"`
 	God                int64       `yaml:"god"`
+	MyChats            []int64     `yaml:"my-chats"`
 	MeiliConfig        MeiliConfig `yaml:"meili-config"`
 	ContentModerator   Azure       `yaml:"content-moderator"`
 	Ocr                OcrConfig   `yaml:"ocr"`

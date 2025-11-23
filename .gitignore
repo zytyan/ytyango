@@ -1,6 +1,7 @@
 /.idea
 /.vscode
 /main.exe
+/.cache
 /build
 /main
 __pycache__

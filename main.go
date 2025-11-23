@@ -63,6 +63,7 @@ func main() {
 	token := g.GetConfig().BotToken
 	b := newBot(token)
 	myhandlers.SetMainBot(b)
+	myhandlers.StartChatStatScheduler()
 	go bothttp.Run()
 	go myhandlers.HttpListen4019()
 	dispatcher := GroupedDispatcher{Dispatcher: ext.NewDispatcher(&ext.DispatcherOpts{

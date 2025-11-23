@@ -14,6 +14,11 @@ import (
 	"github.com/puzpuzpuz/xsync/v3"
 )
 
+const (
+	daySeconds int64 = 24 * 60 * 60
+	tenMinutes       = 10 * 60
+)
+
 type UserMsgStat struct {
 	MsgCount int64
 	MsgLen   int64
@@ -79,8 +84,6 @@ func (s *ChatStat) IncMessage(userId, txtLen, unixTime, messageId int64) {
 		stat = &UserMsgStat{}
 		s.UserMsgStat[userId] = stat
 	}
-	const daySeconds = 24 * 60 * 60
-	const tenMinutes = 10 * 60
 	timeSec := (unixTime + s.timezone) % daySeconds
 	if timeSec < 0 {
 		timeSec += daySeconds
@@ -228,7 +231,6 @@ func (q *Queries) getOrCreateChatStat(ctx context.Context, chatId int64, day int
 }
 
 func (q *Queries) chatStatAtWithTimezone(ctx context.Context, chatId, unixTime, timezone int64) (*ChatStat, error) {
-	const daySeconds = 24 * 60 * 60
 	day := (unixTime + timezone) / daySeconds
 	stat, _ := m.Compute(chatId, func(oldValue *ChatStat, loaded bool) (newValue *ChatStat, delete bool) {
 		if !loaded || oldValue == nil || oldValue.StatDate != day {
@@ -266,4 +268,15 @@ func (q *Queries) ChatStatAt(chatId, unixTime int64) *ChatStat {
 
 func (q *Queries) ChatStatToday(chatId int64) (stat *ChatStat) {
 	return q.ChatStatAt(chatId, time.Now().Unix())
+}
+
+// ChatStatOfDay returns the stat of the day which contains the unixTime in the chat's timezone.
+func (q *Queries) ChatStatOfDay(ctx context.Context, chatId, unixTime int64) (ChatStatDaily, int64, error) {
+	cfg, err := q.chatCfgById(ctx, chatId)
+	if err != nil {
+		return ChatStatDaily{}, 0, err
+	}
+	day := (unixTime + cfg.Timezone) / daySeconds
+	daily, err := q.getOrCreateChatStat(ctx, chatId, day)
+	return daily, cfg.Timezone, err
 }
