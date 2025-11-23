@@ -1,13 +1,11 @@
 package g
 
 import (
-	"context"
 	"database/sql"
 	"main/globalcfg/q"
 	"main/helpers/azure"
 	"os"
 	"sync"
-	"time"
 
 	_ "github.com/mattn/go-sqlite3"
 	"go.uber.org/zap"
@@ -140,11 +138,7 @@ func GetAllLoggers() map[string]LoggerWithLevel {
 var db *sql.DB
 var Q *q.Queries
 
-func initDatabase() *sql.DB {
-	dbPath := config.DatabasePath
-	if dbPath == "" {
-		dbPath = "ytyan_new.db"
-	}
+func initDatabase(dbPath string) *sql.DB {
 	d, err := sql.Open("sqlite3", dbPath)
 	if err != nil {
 		panic(err)
@@ -167,19 +161,4 @@ func NewTx() (*q.Queries, error) {
 		return nil, err
 	}
 	return Q.WithTx(tx), nil
-}
-
-func init() {
-	var err error
-	config = initConfig()
-	gWriteSyncer = initWriteSyncer()
-	db = initDatabase()
-	logger := GetLogger("database")
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	Q, err = q.PrepareWithLogger(ctx, db, logger.Desugar())
-	if err != nil {
-		panic(err)
-	}
-	logger.Infof("Database initialized")
 }
