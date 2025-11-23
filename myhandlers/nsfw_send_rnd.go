@@ -2,6 +2,7 @@ package myhandlers
 
 import (
 	"context"
+	"fmt"
 	g "main/globalcfg"
 	"main/globalcfg/h"
 	"regexp"
@@ -21,14 +22,22 @@ func SendRandRacy(bot *gotgbot.Bot, ctx *ext.Context) error {
 	}
 	photo, err := g.Q.GetPicByUserRateRange(context.Background(), start, end)
 	if err != nil {
+		_, _ = ctx.EffectiveMessage.Reply(bot, "没有涩图~", nil)
 		return err
 	}
-	if photo == "" {
-		_, err := ctx.EffectiveMessage.Reply(bot, "没有涩图~", nil)
-		return err
+	cb := func(s int) string {
+		return fmt.Sprintf("nsfw:%d:%s", s, photo.FileUid)
 	}
-	_, err = bot.SendPhoto(ctx.EffectiveChat.Id, gotgbot.InputFileByID(photo), &gotgbot.SendPhotoOpts{
+	replyMarkup := h.NewInlineKeyboardButtonBuilder().
+		Callback("不色！", cb(0)).
+		Callback("有点涩", cb(2)).
+		Row().
+		Callback("好色哦", cb(4)).
+		Callback("色爆了", cb(6)).
+		Build()
+	_, err = bot.SendPhoto(ctx.EffectiveChat.Id, gotgbot.InputFileByID(photo.FileID), &gotgbot.SendPhotoOpts{
 		ReplyParameters: MakeReplyToMsgID(ctx.EffectiveMessage.MessageId),
+		ReplyMarkup:     replyMarkup,
 	})
 	return err
 }

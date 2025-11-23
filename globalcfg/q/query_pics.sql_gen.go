@@ -12,9 +12,40 @@ import (
 	"go.uber.org/zap"
 )
 
+const getNsfwPicByFileUid = `-- name: GetNsfwPicByFileUid :one
+SELECT file_uid, file_id, bot_rate, rand_key, user_rate, user_rating_sum, rate_user_count
+FROM saved_pics
+WHERE file_uid = ?
+`
+
+func (q *Queries) GetNsfwPicByFileUid(ctx context.Context, fileUid string) (SavedPic, error) {
+	var logFields []zap.Field
+	var start time.Time
+	if q.logger != nil {
+		logFields = make([]zap.Field, 0, 1+5)
+		start = time.Now()
+		logFields = append(logFields,
+			zap.String("file_uid", fileUid),
+		)
+	}
+	row := q.queryRow(ctx, q.getNsfwPicByFileUidStmt, getNsfwPicByFileUid, fileUid)
+	var i SavedPic
+	err := row.Scan(
+		&i.FileUid,
+		&i.FileID,
+		&i.BotRate,
+		&i.RandKey,
+		&i.UserRate,
+		&i.UserRatingSum,
+		&i.RateUserCount,
+	)
+	q.logQuery(getNsfwPicByFileUid, logFields, err, start)
+	return i, err
+}
+
 const getPicByRateAndRandKey = `-- name: getPicByRateAndRandKey :one
 
-SELECT file_id
+SELECT file_uid, file_id, bot_rate, rand_key, user_rate, user_rating_sum, rate_user_count
 FROM saved_pics
 WHERE user_rate = ?
   AND rand_key > ?
@@ -22,7 +53,7 @@ LIMIT 1
 `
 
 // encoding: utf-8
-func (q *Queries) getPicByRateAndRandKey(ctx context.Context, userRate int64, randKey int64) (string, error) {
+func (q *Queries) getPicByRateAndRandKey(ctx context.Context, userRate int64, randKey int64) (SavedPic, error) {
 	var logFields []zap.Field
 	var start time.Time
 	if q.logger != nil {
@@ -34,21 +65,29 @@ func (q *Queries) getPicByRateAndRandKey(ctx context.Context, userRate int64, ra
 		)
 	}
 	row := q.queryRow(ctx, q.getPicByRateAndRandKeyStmt, getPicByRateAndRandKey, userRate, randKey)
-	var file_id string
-	err := row.Scan(&file_id)
+	var i SavedPic
+	err := row.Scan(
+		&i.FileUid,
+		&i.FileID,
+		&i.BotRate,
+		&i.RandKey,
+		&i.UserRate,
+		&i.UserRatingSum,
+		&i.RateUserCount,
+	)
 	q.logQuery(getPicByRateAndRandKey, logFields, err, start)
-	return file_id, err
+	return i, err
 }
 
 const getPicByRateFirst = `-- name: getPicByRateFirst :one
-SELECT file_id
+SELECT file_uid, file_id, bot_rate, rand_key, user_rate, user_rating_sum, rate_user_count
 FROM saved_pics
 WHERE user_rate = ?
 ORDER BY rand_key
 LIMIT 1
 `
 
-func (q *Queries) getPicByRateFirst(ctx context.Context, userRate int64) (string, error) {
+func (q *Queries) getPicByRateFirst(ctx context.Context, userRate int64) (SavedPic, error) {
 	var logFields []zap.Field
 	var start time.Time
 	if q.logger != nil {
@@ -59,10 +98,43 @@ func (q *Queries) getPicByRateFirst(ctx context.Context, userRate int64) (string
 		)
 	}
 	row := q.queryRow(ctx, q.getPicByRateFirstStmt, getPicByRateFirst, userRate)
-	var file_id string
-	err := row.Scan(&file_id)
+	var i SavedPic
+	err := row.Scan(
+		&i.FileUid,
+		&i.FileID,
+		&i.BotRate,
+		&i.RandKey,
+		&i.UserRate,
+		&i.UserRatingSum,
+		&i.RateUserCount,
+	)
 	q.logQuery(getPicByRateFirst, logFields, err, start)
-	return file_id, err
+	return i, err
+}
+
+const getPicRateByUserId = `-- name: getPicRateByUserId :one
+SELECT rating
+FROM saved_pics_rating
+WHERE file_uid = ?
+  AND user_id = ?
+`
+
+func (q *Queries) getPicRateByUserId(ctx context.Context, fileUid string, userID int64) (int64, error) {
+	var logFields []zap.Field
+	var start time.Time
+	if q.logger != nil {
+		logFields = make([]zap.Field, 0, 2+5)
+		start = time.Now()
+		logFields = append(logFields,
+			zap.String("file_uid", fileUid),
+			zap.Int64("user_id", userID),
+		)
+	}
+	row := q.queryRow(ctx, q.getPicRateByUserIdStmt, getPicRateByUserId, fileUid, userID)
+	var rating int64
+	err := row.Scan(&rating)
+	q.logQuery(getPicRateByUserId, logFields, err, start)
+	return rating, err
 }
 
 const getPicRateCounts = `-- name: getPicRateCounts :many
@@ -161,4 +233,26 @@ func (q *Queries) insertPic(ctx context.Context, arg insertPicParams) (SavedPic,
 	)
 	q.logQuery(insertPic, logFields, err, start)
 	return i, err
+}
+
+const ratePic = `-- name: ratePic :exec
+INSERT INTO saved_pics_rating (file_uid, user_id, rating)
+VALUES (?, ?, ?)
+`
+
+func (q *Queries) ratePic(ctx context.Context, fileUid string, userID int64, rating int64) error {
+	var logFields []zap.Field
+	var start time.Time
+	if q.logger != nil {
+		logFields = make([]zap.Field, 0, 3+5)
+		start = time.Now()
+		logFields = append(logFields,
+			zap.String("file_uid", fileUid),
+			zap.Int64("user_id", userID),
+			zap.Int64("rating", rating),
+		)
+	}
+	_, err := q.exec(ctx, q.ratePicStmt, ratePic, fileUid, userID, rating)
+	q.logQuery(ratePic, logFields, err, start)
+	return err
 }

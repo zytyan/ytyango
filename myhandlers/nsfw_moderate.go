@@ -6,6 +6,8 @@ import (
 	g "main/globalcfg"
 	"main/globalcfg/h"
 	"main/helpers/azure"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -61,8 +63,20 @@ func replyNsfw(bot *gotgbot.Bot, msg *gotgbot.Message, result *azure.ModeratorV2
 	if msg.HasMediaSpoiler {
 		spoiler = 1
 	}
+	cb := func(s int) string {
+		return fmt.Sprintf("nsfw:%d:%s", s, photo.FileUniqueId)
+	}
+	replyMarkup := h.NewInlineKeyboardButtonBuilder().
+		Callback("不色！", cb(0)).
+		Callback("有点涩", cb(2)).
+		Row().
+		Callback("好色哦", cb(4)).
+		Callback("色爆了", cb(6)).
+		Build()
 	replyText := nsfwReplyMsgList[spoiler][severity/2-1]
-	_, err := msg.Reply(bot, replyText, nil)
+	_, err := msg.Reply(bot, replyText, &gotgbot.SendMessageOpts{
+		ReplyMarkup: replyMarkup,
+	})
 	return true, err
 }
 
@@ -141,7 +155,12 @@ func CmdScore(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
 	}
 	severity := result.GetSeverityByCategory(azure.ModerateV2CatSexual)
 	go saveNsfw(photo.FileUniqueId, photo.FileId, severity)
-	text := fmt.Sprintf("score: %d", severity)
+	savedPic, err := g.Q.GetNsfwPicByFileUid(context.Background(), photo.FileUniqueId)
+	userRate := "???"
+	if err == nil {
+		userRate = strconv.Itoa(int(savedPic.UserRate))
+	}
+	text := fmt.Sprintf("score: %d/6\n, userRate:%s/6", severity, userRate)
 	_, err = ctx.Message.Reply(bot, text, nil)
 	if err != nil {
 		log.Warnf("reply message failed, err: %s", err)
@@ -168,4 +187,47 @@ func CountNsfwPics(bot *gotgbot.Bot, ctx *ext.Context) error {
 		racyPicCnt, adultPicCnt, manualNotNsfwCount)
 	_, err := ctx.EffectiveMessage.Reply(bot, text, nil)
 	return err
+}
+
+func RateNsfwPicByBtn(bot *gotgbot.Bot, ctx *ext.Context) error {
+	cb := ctx.CallbackQuery
+	split := strings.Split(cb.Data, ":")
+	if len(split) != 3 {
+		_, _ = cb.Answer(bot, &gotgbot.AnswerCallbackQueryOpts{
+			Text:      "Bot出现错误",
+			ShowAlert: false,
+		})
+		return fmt.Errorf("invalid format callback %s", cb.Data)
+	}
+	_, r, fid := split[0], split[1], split[2]
+	rate := defaultAtoi(r, 0)
+	rated, oldRate, err := g.Q.RatePic(context.Background(), fid, ctx.EffectiveSender.Id(), int64(rate))
+	if err != nil {
+		_, _ = cb.Answer(bot, &gotgbot.AnswerCallbackQueryOpts{
+			Text: "Bot出现错误，无法评分。",
+		})
+		return err
+	}
+	if !rated {
+		_, err = cb.Answer(bot, &gotgbot.AnswerCallbackQueryOpts{
+			Text: "评分成功",
+		})
+		return err
+	}
+	if int64(rate) == oldRate {
+		_, err = cb.Answer(bot, &gotgbot.AnswerCallbackQueryOpts{
+			Text:      "您不能重复评分",
+			ShowAlert: true,
+		})
+		return err
+	}
+	_, err = cb.Answer(bot, &gotgbot.AnswerCallbackQueryOpts{
+		Text:      fmt.Sprintf("您的评分已由%d修改为%d", oldRate, rate),
+		ShowAlert: true,
+	})
+	return err
+}
+
+func IsNsfwPicRateBtn(cb *gotgbot.CallbackQuery) bool {
+	return strings.HasPrefix(cb.Data, "nsfw:")
 }

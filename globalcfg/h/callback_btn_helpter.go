@@ -30,3 +30,11 @@ func (b *InlineKeyboardButtonBuilder) Callback(text, callback string) *InlineKey
 	})
 	return b
 }
+func (b *InlineKeyboardButtonBuilder) Build() *gotgbot.InlineKeyboardMarkup {
+	return &gotgbot.InlineKeyboardMarkup{
+		InlineKeyboard: b.inner,
+	}
+}
+func NewInlineKeyboardButtonBuilder() *InlineKeyboardButtonBuilder {
+	return &InlineKeyboardButtonBuilder{}
+}

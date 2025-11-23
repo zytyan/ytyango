@@ -165,6 +165,8 @@ func main() {
 	dispatcher.AddHandler(handlers.NewMessage(myhandlers.IsBattleCommand, myhandlers.ExecuteBattleCommand))
 	dispatcher.AddHandler(handlers.NewMessage(myhandlers.IsGeminiReq, myhandlers.GeminiReply))
 	dispatcher.AddHandler(handlers.NewCallback(myhandlers.IsBilibiliInlineBtn, myhandlers.DownloadInlinedBv))
+	dispatcher.AddHandler(handlers.NewCallback(myhandlers.IsNsfwPicRateBtn, myhandlers.RateNsfwPicByBtn))
+
 	dispatcher.AddHandler(handlers.NewCallback(callbackquery.Prefix(myhandlers.GroupConfigModifyPrefix), myhandlers.ModifyGroupConfigByButton))
 
 	err := updater.StartPolling(b, &ext.PollingOpts{

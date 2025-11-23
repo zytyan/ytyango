@@ -1,14 +1,14 @@
 -- encoding: utf-8
 
 -- name: getPicByRateAndRandKey :one
-SELECT file_id
+SELECT *
 FROM saved_pics
 WHERE user_rate = ?
   AND rand_key > ?
 LIMIT 1;
 
 -- name: getPicByRateFirst :one
-SELECT file_id
+SELECT *
 FROM saved_pics
 WHERE user_rate = ?
 ORDER BY rand_key
@@ -33,3 +33,18 @@ RETURNING *;
 SELECT *
 FROM pic_rate_counter
 ORDER BY rate;
+
+-- name: ratePic :exec
+INSERT INTO saved_pics_rating (file_uid, user_id, rating)
+VALUES (?, ?, ?);
+
+-- name: getPicRateByUserId :one
+SELECT rating
+FROM saved_pics_rating
+WHERE file_uid = ?
+  AND user_id = ?;
+
+-- name: GetNsfwPicByFileUid :one
+SELECT *
+FROM saved_pics
+WHERE file_uid = ?;

@@ -37,7 +37,6 @@ func (q *Queries) InitCountByRatePrefixSum() error {
 		minCountRate = 0
 		return nil
 	}
-
 	slices.SortFunc(counts, func(a, b PicRateCounter) int {
 		return cmp.Compare(a.Rate, b.Rate)
 	})
@@ -63,26 +62,23 @@ func (q *Queries) InitCountByRatePrefixSum() error {
 	return nil
 }
 
-func (q *Queries) GetPicByUserRate(ctx context.Context, rate int) (string, error) {
+func (q *Queries) GetPicByUserRate(ctx context.Context, rate int) (SavedPic, error) {
 	rnd := int64(rand.Uint64())
 	result, err := q.getPicByRateAndRandKey(ctx, int64(rate), rnd)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return "", err
+	if errors.Is(err, sql.ErrNoRows) {
+		return q.getPicByRateFirst(ctx, int64(rate))
 	}
-	if result != "" {
-		return result, nil
-	}
-	return q.getPicByRateFirst(ctx, int64(rate))
+	return result, err
 }
 
-func (q *Queries) GetPicByUserRateRange(ctx context.Context, start, end int) (string, error) {
+func (q *Queries) GetPicByUserRateRange(ctx context.Context, start, end int) (save SavedPic, err error) {
 	// lazy init prefix sum to support already-populated databases
 	psMu.RLock()
 	needInit := countByRatePrefixSum == nil
 	psMu.RUnlock()
 	if needInit {
-		if err := q.InitCountByRatePrefixSum(); err != nil {
-			return "", err
+		if err = q.InitCountByRatePrefixSum(); err != nil {
+			return
 		}
 	}
 
@@ -90,7 +86,8 @@ func (q *Queries) GetPicByUserRateRange(ctx context.Context, start, end int) (st
 	defer psMu.RUnlock()
 	// 无 prefixSum，或者 start/end 超界，或者 start > end
 	if len(countByRatePrefixSum) == 0 || start > end {
-		return "", sql.ErrNoRows
+		err = sql.ErrNoRows
+		return
 	}
 
 	// clamp 范围到 prefix 可表示区间
@@ -101,7 +98,8 @@ func (q *Queries) GetPicByUserRateRange(ctx context.Context, start, end int) (st
 	e := int64(end)
 
 	if e < actualMin || s > actualMax {
-		return "", sql.ErrNoRows // 完全没有交集
+		err = sql.ErrNoRows
+		return
 	}
 
 	if s < actualMin {
@@ -111,7 +109,8 @@ func (q *Queries) GetPicByUserRateRange(ctx context.Context, start, end int) (st
 		e = actualMax
 	}
 	if s > e {
-		return "", sql.ErrNoRows
+		err = sql.ErrNoRows
+		return
 	}
 
 	// prefixSum 下标区间
@@ -126,7 +125,8 @@ func (q *Queries) GetPicByUserRateRange(ctx context.Context, start, end int) (st
 		total = countByRatePrefixSum[endIdx] - countByRatePrefixSum[startIdx-1]
 	}
 	if total <= 0 {
-		return "", sql.ErrNoRows
+		err = sql.ErrNoRows
+		return
 	}
 
 	// 随机选择区间权重下的一个数
@@ -150,9 +150,10 @@ func (q *Queries) GetPicByUserRateRange(ctx context.Context, start, end int) (st
 	rndKey := int64(rand.Uint64())
 	result, err := q.getPicByRateAndRandKey(ctx, rate, rndKey)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return "", err
+		err = sql.ErrNoRows
+		return
 	}
-	if result != "" {
+	if result.FileID != "" {
 		return result, nil
 	}
 	return q.getPicByRateFirst(ctx, rate)
@@ -207,4 +208,15 @@ func (q *Queries) AddPic(ctx context.Context, fileUid, fileId string, botRate in
 		return nil
 	}
 	return fmt.Errorf("failed to insert picture due to persistent RandKey collision after 3 attempts: fileUid=%s", fileUid)
+}
+
+func (q *Queries) RatePic(ctx context.Context, fileUid string, userID int64, newRate int64) (bool, int64, error) {
+	rate, err := q.getPicRateByUserId(ctx, fileUid, userID)
+	if errors.Is(err, sql.ErrNoRows) {
+		err = q.ratePic(ctx, fileUid, userID, newRate)
+		return false, 0, err
+	} else if err != nil {
+		return false, 0, err
+	}
+	return true, rate, nil
 }

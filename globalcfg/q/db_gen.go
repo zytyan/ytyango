@@ -39,6 +39,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.getCocCharAttrStmt, err = db.PrepareContext(ctx, getCocCharAttr); err != nil {
 		return nil, fmt.Errorf("error preparing query GetCocCharAttr: %w", err)
 	}
+	if q.getNsfwPicByFileUidStmt, err = db.PrepareContext(ctx, getNsfwPicByFileUid); err != nil {
+		return nil, fmt.Errorf("error preparing query GetNsfwPicByFileUid: %w", err)
+	}
 	if q.getPrprCacheStmt, err = db.PrepareContext(ctx, getPrprCache); err != nil {
 		return nil, fmt.Errorf("error preparing query GetPrprCache: %w", err)
 	}
@@ -90,6 +93,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.getPicByRateFirstStmt, err = db.PrepareContext(ctx, getPicByRateFirst); err != nil {
 		return nil, fmt.Errorf("error preparing query getPicByRateFirst: %w", err)
 	}
+	if q.getPicRateByUserIdStmt, err = db.PrepareContext(ctx, getPicRateByUserId); err != nil {
+		return nil, fmt.Errorf("error preparing query getPicRateByUserId: %w", err)
+	}
 	if q.getPicRateCountsStmt, err = db.PrepareContext(ctx, getPicRateCounts); err != nil {
 		return nil, fmt.Errorf("error preparing query getPicRateCounts: %w", err)
 	}
@@ -98,6 +104,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	}
 	if q.insertPicStmt, err = db.PrepareContext(ctx, insertPic); err != nil {
 		return nil, fmt.Errorf("error preparing query insertPic: %w", err)
+	}
+	if q.ratePicStmt, err = db.PrepareContext(ctx, ratePic); err != nil {
+		return nil, fmt.Errorf("error preparing query ratePic: %w", err)
 	}
 	if q.updateChatCfgStmt, err = db.PrepareContext(ctx, updateChatCfg); err != nil {
 		return nil, fmt.Errorf("error preparing query updateChatCfg: %w", err)
@@ -134,6 +143,11 @@ func (q *Queries) Close() error {
 	if q.getCocCharAttrStmt != nil {
 		if cerr := q.getCocCharAttrStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing getCocCharAttrStmt: %w", cerr)
+		}
+	}
+	if q.getNsfwPicByFileUidStmt != nil {
+		if cerr := q.getNsfwPicByFileUidStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getNsfwPicByFileUidStmt: %w", cerr)
 		}
 	}
 	if q.getPrprCacheStmt != nil {
@@ -221,6 +235,11 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing getPicByRateFirstStmt: %w", cerr)
 		}
 	}
+	if q.getPicRateByUserIdStmt != nil {
+		if cerr := q.getPicRateByUserIdStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getPicRateByUserIdStmt: %w", cerr)
+		}
+	}
 	if q.getPicRateCountsStmt != nil {
 		if cerr := q.getPicRateCountsStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing getPicRateCountsStmt: %w", cerr)
@@ -234,6 +253,11 @@ func (q *Queries) Close() error {
 	if q.insertPicStmt != nil {
 		if cerr := q.insertPicStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing insertPicStmt: %w", cerr)
+		}
+	}
+	if q.ratePicStmt != nil {
+		if cerr := q.ratePicStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing ratePicStmt: %w", cerr)
 		}
 	}
 	if q.updateChatCfgStmt != nil {
@@ -302,6 +326,7 @@ type Queries struct {
 	getBiliInlineDataStmt       *sql.Stmt
 	getCocCharAllAttrStmt       *sql.Stmt
 	getCocCharAttrStmt          *sql.Stmt
+	getNsfwPicByFileUidStmt     *sql.Stmt
 	getPrprCacheStmt            *sql.Stmt
 	getYtDlpDbCacheStmt         *sql.Stmt
 	incYtDlUploadCountStmt      *sql.Stmt
@@ -319,9 +344,11 @@ type Queries struct {
 	getChatStatStmt             *sql.Stmt
 	getPicByRateAndRandKeyStmt  *sql.Stmt
 	getPicByRateFirstStmt       *sql.Stmt
+	getPicRateByUserIdStmt      *sql.Stmt
 	getPicRateCountsStmt        *sql.Stmt
 	getUserByIdStmt             *sql.Stmt
 	insertPicStmt               *sql.Stmt
+	ratePicStmt                 *sql.Stmt
 	updateChatCfgStmt           *sql.Stmt
 	updateUserBaseStmt          *sql.Stmt
 	updateUserProfilePhotoStmt  *sql.Stmt
@@ -339,6 +366,7 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		getBiliInlineDataStmt:       q.getBiliInlineDataStmt,
 		getCocCharAllAttrStmt:       q.getCocCharAllAttrStmt,
 		getCocCharAttrStmt:          q.getCocCharAttrStmt,
+		getNsfwPicByFileUidStmt:     q.getNsfwPicByFileUidStmt,
 		getPrprCacheStmt:            q.getPrprCacheStmt,
 		getYtDlpDbCacheStmt:         q.getYtDlpDbCacheStmt,
 		incYtDlUploadCountStmt:      q.incYtDlUploadCountStmt,
@@ -356,9 +384,11 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		getChatStatStmt:             q.getChatStatStmt,
 		getPicByRateAndRandKeyStmt:  q.getPicByRateAndRandKeyStmt,
 		getPicByRateFirstStmt:       q.getPicByRateFirstStmt,
+		getPicRateByUserIdStmt:      q.getPicRateByUserIdStmt,
 		getPicRateCountsStmt:        q.getPicRateCountsStmt,
 		getUserByIdStmt:             q.getUserByIdStmt,
 		insertPicStmt:               q.insertPicStmt,
+		ratePicStmt:                 q.ratePicStmt,
 		updateChatCfgStmt:           q.updateChatCfgStmt,
 		updateUserBaseStmt:          q.updateUserBaseStmt,
 		updateUserProfilePhotoStmt:  q.updateUserProfilePhotoStmt,
