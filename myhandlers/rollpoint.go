@@ -57,20 +57,14 @@ func Roll(bot *gotgbot.Bot, ctx *ext.Context) error {
 		log.Warnf("reply failed: %s", err)
 		return err
 	}
-	go func() {
-		time.Sleep(5 * time.Minute)
+	time.AfterFunc(5*time.Second, func() {
 		_, err := message.Delete(bot, nil)
 		if err != nil {
 			log.Warnf("delete bot message failed: %s", err)
 			return
 		}
-		_, err = ctx.Message.Delete(bot, nil)
-
-		if err != nil {
-			log.Infof("delete user message failed: %s", err)
-			return
-		}
-	}()
+		_, _ = ctx.Message.Delete(bot, nil)
+	})
 	return nil
 }
 

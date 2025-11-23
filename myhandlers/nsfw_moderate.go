@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	g "main/globalcfg"
+	"main/globalcfg/h"
 	"main/helpers/azure"
 	"sync"
 	"time"
@@ -108,15 +109,13 @@ func moderateDetectGrouped(bot *gotgbot.Bot, msg *gotgbot.Message) {
 
 }
 
-func seseDetect(bot *gotgbot.Bot, ctx *ext.Context) {
-	if !HasImage(ctx.Message) {
-		return
-	}
+func NsfwDetect(bot *gotgbot.Bot, ctx *ext.Context) error {
 	if ctx.Message.MediaGroupId != "" {
 		moderateDetectGrouped(bot, ctx.Message)
-		return
+		return nil
 	}
 	moderateDetectOne(bot, ctx.Message)
+	return nil
 }
 
 func CmdScore(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
@@ -150,27 +149,14 @@ func CmdScore(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
 	return
 }
 
-func SafeGo(f func()) {
-	go func() {
-		defer func() {
-			if r := recover(); r != nil {
-				log.Errorf("panic in SafeGo: %s", r)
-			}
-		}()
-		f()
-	}()
-}
-
-func SeseDetect(bot *gotgbot.Bot, ctx *ext.Context) error {
-	groupInfo, err := g.Q.ChatCfgById(context.Background(), ctx.EffectiveChat.Id)
-	if err != nil {
-		return err
+func DetectNsfwPhoto(msg *gotgbot.Message) bool {
+	if !HasImage(msg) {
+		return false
 	}
-	if !groupInfo.AutoCheckAdult {
-		return nil
+	if !h.ChatAutoCheckAdult(msg.Chat.Id) {
+		return false
 	}
-	SafeGo(func() { seseDetect(bot, ctx) })
-	return nil
+	return true
 }
 
 func CountNsfwPics(bot *gotgbot.Bot, ctx *ext.Context) error {
