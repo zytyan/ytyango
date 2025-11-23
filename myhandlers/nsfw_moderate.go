@@ -160,8 +160,20 @@ func CmdScore(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
 	if err == nil {
 		userRate = strconv.Itoa(int(savedPic.UserRate))
 	}
+	cb := func(s int) string {
+		return fmt.Sprintf("nsfw:%d:%s", s, photo.FileUniqueId)
+	}
+	replyMarkup := h.NewInlineKeyboardButtonBuilder().
+		Callback("不色！", cb(0)).
+		Callback("有点涩", cb(2)).
+		Row().
+		Callback("好色哦", cb(4)).
+		Callback("色爆了", cb(6)).
+		Build()
 	text := fmt.Sprintf("score: %d/6\nuserRate:%s/6", severity, userRate)
-	_, err = ctx.Message.Reply(bot, text, nil)
+	_, err = ctx.Message.Reply(bot, text, &gotgbot.SendMessageOpts{
+		ReplyMarkup: replyMarkup,
+	})
 	if err != nil {
 		log.Warnf("reply message failed, err: %s", err)
 	}
