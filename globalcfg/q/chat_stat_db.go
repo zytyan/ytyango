@@ -26,6 +26,10 @@ func (u *UserMsgStatMap) Scan(src any) error {
 	if !ok {
 		return fmt.Errorf("src must be []byte, but got %T", src)
 	}
+	if len(data) == 0 {
+		*u = make(UserMsgStatMap)
+		return nil
+	}
 	return gob.NewDecoder(bytes.NewReader(data)).Decode(u)
 
 }
@@ -42,6 +46,10 @@ func (t *TenMinuteStats) Scan(src any) error {
 	if !ok {
 		return fmt.Errorf("src must be []byte, but got %T", src)
 	}
+	if len(data) == 0 {
+		*t = TenMinuteStats{}
+		return nil
+	}
 	return gob.NewDecoder(bytes.NewReader(data)).Decode(t)
 }
 
@@ -52,22 +60,38 @@ func (t TenMinuteStats) Value() (driver.Value, error) {
 }
 
 type ChatStat struct {
-	mu sync.Mutex
+	mu       sync.Mutex
+	timezone int64
 	ChatStatDaily
 }
 
-func (s *ChatStat) IncMessage(userId, txtLen, time int64) {
+func (s *ChatStat) IncMessage(userId, txtLen, unixTime, messageId int64) {
 	if s == nil {
 		return
 	}
 	s.mu.Lock()
 	s.MessageCount++
-	s.MsgCountByTime[(time%86400)/(24*10)]++
 	if s.UserMsgStat == nil {
 		s.UserMsgStat = make(UserMsgStatMap, 4)
 	}
-	s.UserMsgStat[userId].MsgCount++
-	s.UserMsgStat[userId].MsgLen += txtLen
+	stat, ok := s.UserMsgStat[userId]
+	if !ok || stat == nil {
+		stat = &UserMsgStat{}
+		s.UserMsgStat[userId] = stat
+	}
+	const daySeconds = 24 * 60 * 60
+	const tenMinutes = 10 * 60
+	timeSec := (unixTime + s.timezone) % daySeconds
+	if timeSec < 0 {
+		timeSec += daySeconds
+	}
+	idx := int(timeSec / tenMinutes)
+	s.MsgCountByTime[idx]++
+	if s.MsgIDAtTimeStart[idx] == 0 {
+		s.MsgIDAtTimeStart[idx] = messageId
+	}
+	stat.MsgCount++
+	stat.MsgLen += txtLen
 	s.mu.Unlock()
 }
 
@@ -204,7 +228,8 @@ func (q *Queries) getOrCreateChatStat(ctx context.Context, chatId int64, day int
 }
 
 func (q *Queries) chatStatAtWithTimezone(ctx context.Context, chatId, unixTime, timezone int64) (*ChatStat, error) {
-	day := (unixTime + timezone) % (24 * 60 * 60)
+	const daySeconds = 24 * 60 * 60
+	day := (unixTime + timezone) / daySeconds
 	stat, _ := m.Compute(chatId, func(oldValue *ChatStat, loaded bool) (newValue *ChatStat, delete bool) {
 		if !loaded || oldValue == nil || oldValue.StatDate != day {
 			if oldValue != nil {
@@ -217,9 +242,11 @@ func (q *Queries) chatStatAtWithTimezone(ctx context.Context, chatId, unixTime, 
 			}
 			return &ChatStat{
 				mu:            sync.Mutex{},
+				timezone:      timezone,
 				ChatStatDaily: daily,
 			}, false
 		}
+		oldValue.timezone = timezone
 		return oldValue, false
 	})
 	return stat, nil

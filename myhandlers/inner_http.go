@@ -2,7 +2,7 @@ package myhandlers
 
 import (
 	"fmt"
-	"main/globalcfg"
+	g "main/globalcfg"
 	"strconv"
 	"strings"
 	"time"
@@ -25,6 +25,7 @@ func marsCounter(ctx *gin.Context) {
 		ctx.AbortWithStatus(400)
 		return
 	}
+	g.Q.ChatStatToday(marsInfo.GroupID).IncMarsCount(marsInfo.MarsCount)
 
 }
 
