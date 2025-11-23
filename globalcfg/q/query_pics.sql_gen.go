@@ -43,6 +43,55 @@ func (q *Queries) GetNsfwPicByFileUid(ctx context.Context, fileUid string) (Save
 	return i, err
 }
 
+const getPicRateDetailsByFileUid = `-- name: GetPicRateDetailsByFileUid :many
+SELECT rating, COUNT(*)
+FROM saved_pics_rating
+WHERE file_uid = ?
+GROUP BY rating
+`
+
+type GetPicRateDetailsByFileUidRow struct {
+	Rating int64 `json:"rating"`
+	Count  int64 `json:"count"`
+}
+
+func (q *Queries) GetPicRateDetailsByFileUid(ctx context.Context, fileUid string) ([]GetPicRateDetailsByFileUidRow, error) {
+	var logFields []zap.Field
+	var start time.Time
+	if q.logger != nil {
+		logFields = make([]zap.Field, 0, 1+5)
+		start = time.Now()
+		logFields = append(logFields,
+			zap.String("file_uid", fileUid),
+		)
+	}
+	rows, err := q.query(ctx, q.getPicRateDetailsByFileUidStmt, getPicRateDetailsByFileUid, fileUid)
+	if err != nil {
+		q.logQuery(getPicRateDetailsByFileUid, logFields, err, start)
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetPicRateDetailsByFileUidRow
+	for rows.Next() {
+		var i GetPicRateDetailsByFileUidRow
+		if err = rows.Scan(&i.Rating, &i.Count); err != nil {
+			q.logQuery(getPicRateDetailsByFileUid, logFields, err, start)
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err = rows.Close(); err != nil {
+		q.logQuery(getPicRateDetailsByFileUid, logFields, err, start)
+		return nil, err
+	}
+	if err = rows.Err(); err != nil {
+		q.logQuery(getPicRateDetailsByFileUid, logFields, err, start)
+		return nil, err
+	}
+	q.logQuery(getPicRateDetailsByFileUid, logFields, err, start)
+	return items, nil
+}
+
 const getPicByRateAndRandKey = `-- name: getPicByRateAndRandKey :one
 
 SELECT file_uid, file_id, bot_rate, rand_key, user_rate, user_rating_sum, rate_user_count

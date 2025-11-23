@@ -15,6 +15,40 @@ import (
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 )
 
+const (
+	nsfwCallbackButtonCmdScore = "s"
+)
+
+func BuildNsfwRateButton(fileUid, extraCmd string) *gotgbot.InlineKeyboardMarkup {
+	cb := func(s int) string {
+		return fmt.Sprintf("nsfw:%d:%s:%s", s, fileUid, extraCmd)
+	}
+	txt := func(s string, count int64) string {
+		if count == 0 {
+			return s
+		}
+		return fmt.Sprintf("%s (%d 用户评分)", s, count)
+	}
+	var rateTable [8]int64
+	rateList, err := g.Q.GetPicRateDetailsByFileUid(context.Background(), fileUid)
+	if err == nil {
+		for _, rate := range rateList {
+			if rate.Rating >= 8 || rate.Rating < 0 {
+				continue
+			}
+			rateTable[rate.Rating] = rate.Count
+		}
+	}
+	replyMarkup := h.NewInlineKeyboardButtonBuilder().
+		Callback(txt("不色！", rateTable[0]), cb(0)).
+		Callback(txt("有点涩", rateTable[2]), cb(2)).
+		Row().
+		Callback(txt("好色哦", rateTable[4]), cb(4)).
+		Callback(txt("色爆了", rateTable[6]), cb(6)).
+		Build()
+	return replyMarkup
+}
+
 type groupedMsgK struct {
 	ChatId  int64
 	GroupId string
@@ -63,16 +97,8 @@ func replyNsfw(bot *gotgbot.Bot, msg *gotgbot.Message, result *azure.ModeratorV2
 	if msg.HasMediaSpoiler {
 		spoiler = 1
 	}
-	cb := func(s int) string {
-		return fmt.Sprintf("nsfw:%d:%s", s, photo.FileUniqueId)
-	}
-	replyMarkup := h.NewInlineKeyboardButtonBuilder().
-		Callback("不色！", cb(0)).
-		Callback("有点涩", cb(2)).
-		Row().
-		Callback("好色哦", cb(4)).
-		Callback("色爆了", cb(6)).
-		Build()
+	replyMarkup := BuildNsfwRateButton(photo.FileUniqueId, "")
+
 	replyText := nsfwReplyMsgList[spoiler][severity/2-1]
 	_, err := msg.Reply(bot, replyText, &gotgbot.SendMessageOpts{
 		ReplyMarkup: replyMarkup,
@@ -160,17 +186,8 @@ func CmdScore(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
 	if err == nil {
 		userRate = strconv.Itoa(int(savedPic.UserRate))
 	}
-	cb := func(s int) string {
-		return fmt.Sprintf("nsfw:%d:%s", s, photo.FileUniqueId)
-	}
-	replyMarkup := h.NewInlineKeyboardButtonBuilder().
-		Callback("不色！", cb(0)).
-		Callback("有点涩", cb(2)).
-		Row().
-		Callback("好色哦", cb(4)).
-		Callback("色爆了", cb(6)).
-		Build()
-	text := fmt.Sprintf("score: %d/6\nuserRate:%s/6", severity, userRate)
+	replyMarkup := BuildNsfwRateButton(photo.FileUniqueId, nsfwCallbackButtonCmdScore)
+	text := fmt.Sprintf("bot评分: %d/6\n用户评分:%s/6", severity, userRate)
 	_, err = ctx.Message.Reply(bot, text, &gotgbot.SendMessageOpts{
 		ReplyMarkup: replyMarkup,
 	})
@@ -201,10 +218,25 @@ func CountNsfwPics(bot *gotgbot.Bot, ctx *ext.Context) error {
 	return err
 }
 
+func refreshMsgFromBtn(bot *gotgbot.Bot, ctx *ext.Context, fileUid, cmd string) {
+	msg := ctx.CallbackQuery.Message
+	fmt.Println(msg)
+	if cmd == nsfwCallbackButtonCmdScore {
+		// TODO: 修改评分
+	}
+	_, _, err := msg.EditReplyMarkup(bot, &gotgbot.EditMessageReplyMarkupOpts{
+		ReplyMarkup: *BuildNsfwRateButton(fileUid, cmd),
+	})
+	if err != nil {
+		log.Warnf("edit message button failed, err: %s", err)
+	}
+	return
+}
+
 func RateNsfwPicByBtn(bot *gotgbot.Bot, ctx *ext.Context) error {
 	cb := ctx.CallbackQuery
 	split := strings.Split(cb.Data, ":")
-	if len(split) != 3 {
+	if len(split) < 3 {
 		_, _ = cb.Answer(bot, &gotgbot.AnswerCallbackQueryOpts{
 			Text:      "Bot出现错误",
 			ShowAlert: false,
@@ -212,6 +244,11 @@ func RateNsfwPicByBtn(bot *gotgbot.Bot, ctx *ext.Context) error {
 		return fmt.Errorf("invalid format callback %s", cb.Data)
 	}
 	_, r, fid := split[0], split[1], split[2]
+	refresh := ""
+	if len(split) > 3 && split[3] != "" {
+		refresh = split[3]
+	}
+	defer refreshMsgFromBtn(bot, ctx, fid, refresh)
 	rate := defaultAtoi(r, 0)
 	rated, oldRate, err := g.Q.RatePic(context.Background(), fid, ctx.EffectiveSender.Id(), int64(rate))
 	if err != nil {

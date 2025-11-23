@@ -54,3 +54,9 @@ WHERE file_uid = ?
 SELECT *
 FROM saved_pics
 WHERE file_uid = ?;
+
+-- name: GetPicRateDetailsByFileUid :many
+SELECT rating, COUNT(*)
+FROM saved_pics_rating
+WHERE file_uid = ?
+GROUP BY rating;
