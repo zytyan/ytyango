@@ -78,6 +78,9 @@ func getRandomRangeByWeight(start, end int) (int, error) {
 	}
 	start, end = start-minCountRate, end-minCountRate
 	rndStart, rndEnd := countByRatePrefixSum[start], countByRatePrefixSum[end]
+	if rndStart >= rndEnd {
+		return 0, fmt.Errorf("invalid range: start %d end %d", start, end)
+	}
 	rnd := rand.Int64N(rndEnd-rndStart) + rndStart
 	idx := sort.Search(len(countByRatePrefixSum), func(i int) bool {
 		return countByRatePrefixSum[i] > rnd

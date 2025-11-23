@@ -10,14 +10,14 @@ import (
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 )
 
-var reRank = regexp.MustCompile(`(\d)(\b\d)?`)
+var reRank = regexp.MustCompile(`(\d)(.*\b(\d))`)
 
 func SendRandRacy(bot *gotgbot.Bot, ctx *ext.Context) error {
 	submatch := reRank.FindStringSubmatch(ctx.Message.Text)
 	start, end := 2, 4
 	if submatch != nil {
 		start = defaultAtoi(submatch[1], 2)
-		end = defaultAtoi(submatch[2], start)
+		end = defaultAtoi(submatch[3], start)
 	}
 	end = max(start, end)
 	start = min(start, end)
