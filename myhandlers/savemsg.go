@@ -95,7 +95,7 @@ func saveMessage(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
 		ImageText: "",
 		QrResult:  "",
 	}
-	if cfg, err := g.Q.GetChatById(context.Background(), ctx.EffectiveChat.Id); err == nil && cfg.AutoOcr {
+	if cfg, err := g.Q.ChatCfgById(context.Background(), ctx.EffectiveChat.Id); err == nil && cfg.AutoOcr {
 		err = setImageText(bot, ctx.Message, meiliMsg)
 		if err != nil {
 			log.Warnf("set image text error %s, update id %d", err, ctx.Update.UpdateId)

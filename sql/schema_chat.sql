@@ -9,7 +9,8 @@ CREATE TABLE IF NOT EXISTS chat_cfg
     auto_check_adult INT_BOOL            NOT NULL CHECK ( auto_check_adult in (0, 1)),
     save_messages    INT_BOOL            NOT NULL CHECK ( save_messages in (0, 1)),
     enable_coc       INT_BOOL            NOT NULL CHECK ( enable_coc in (0, 1)),
-    resp_nsfw_msg    INT_BOOL            NOT NULL CHECK ( resp_nsfw_msg in (0, 1))
+    resp_nsfw_msg    INT_BOOL            NOT NULL CHECK ( resp_nsfw_msg in (0, 1)),
+    timezone         INTEGER             NOT NULL CHECK ( timezone < 86400 AND timezone > -86400)
 );
 
 CREATE INDEX IF NOT EXISTS idx_chat_cfg

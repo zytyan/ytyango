@@ -20,6 +20,7 @@ type MarsInfo struct {
 func marsCounter(ctx *gin.Context) {
 	var marsInfo MarsInfo
 	err := ctx.Bind(&marsInfo)
+
 	if err != nil {
 		ctx.AbortWithStatus(400)
 		return
@@ -47,14 +48,13 @@ func dioBan(ctx *gin.Context) {
 		ctx.AbortWithStatus(400)
 		return
 	}
-	WithGroupLockToday(dioBanUser.GroupId, func(g *GroupStatDaily) {
-		switch dioBanUser.Action {
-		case DioBanActionAdd:
-			g.DioAddUserCount++
-		case DioBanActionBanByWrongButton, DioBanActionBanByNoButton, DioBanActionBanByNoMsg:
-			g.DioBanUserCount++
-		}
-	})
+	switch dioBanUser.Action {
+	case DioBanActionAdd:
+		g.Q.ChatStatToday(dioBanUser.GroupId).IncDioAddUserCount()
+	case DioBanActionBanByWrongButton, DioBanActionBanByNoButton, DioBanActionBanByNoMsg:
+		g.Q.ChatStatToday(dioBanUser.GroupId).IncDioBanUserCount()
+	}
+
 }
 func formatLoggers() string {
 	buf := strings.Builder{}

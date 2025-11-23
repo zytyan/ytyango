@@ -87,7 +87,7 @@ func main() {
 	hMsg.AllowChannel = true
 	hMsg.AllowEdited = true
 	dispatcher.AddHandler(hMsg)
-	dispatcher.AddHandler(handlers.NewMessage(message.All, myhandlers.AddNewMsg))
+	dispatcher.AddHandler(handlers.NewMessage(message.All, myhandlers.StatMessage))
 	dispatcher.AddHandler(handlers.NewInlineQuery(inlinequery.All, myhandlers.BiliMsgConverterInline))
 	dispatcher.AddHandler(handlers.NewMessage(myhandlers.BiliMsgFilter, myhandlers.BiliMsgConverter))
 
@@ -101,11 +101,11 @@ func main() {
 	dispatcher.AddCommand("calc", myhandlers.SolveMath)
 	dispatcher.AddCommand("downloadvideo", myhandlers.DownloadVideo)
 	dispatcher.AddCommand("downloadaudio", myhandlers.DownloadAudio)
-	dispatcher.AddCommand("getrank", myhandlers.GetRank)
-	dispatcher.AddCommand("diag_groupstat", myhandlers.GroupStatDiagnostic)
-	dispatcher.AddCommand("diag_sendstat", myhandlers.SendGroupStat)
-	dispatcher.AddCommand("diag_forcenewday", myhandlers.ForceNewDay)
-	dispatcher.AddCommand("diag_getcntbytime", myhandlers.GetCntByTime)
+	//dispatcher.AddCommand("getrank", myhandlers.GetRank)
+	//dispatcher.AddCommand("diag_groupstat", myhandlers.GroupStatDiagnostic)
+	//dispatcher.AddCommand("diag_sendstat", myhandlers.SendGroupStat)
+	//dispatcher.AddCommand("diag_forcenewday", myhandlers.ForceNewDay)
+	//dispatcher.AddCommand("diag_getcntbytime", myhandlers.GetCntByTime)
 	dispatcher.AddCommand("diag_msginfo", myhandlers.GetMsgInfo)
 	dispatcher.AddCommand("searchmsg", myhandlers.SearchMessage)
 	dispatcher.AddCommand("cochelp", myhandlers.CoCHelp)
@@ -117,7 +117,6 @@ func main() {
 
 	dispatcher.AddCommand("count_nsfw_pics", myhandlers.CountNsfwPics)
 	dispatcher.AddCommand("settimezone", myhandlers.SetUserTimeZone)
-
 	dispatcher.AddHandler(handlers.NewMessage(myhandlers.HasSinaGif, myhandlers.Gif2Mp4))
 	dispatcher.AddHandler(handlers.NewCallback(myhandlers.IsBilibiliBtn, myhandlers.DownloadVideoCallback))
 	dispatcher.AddHandler(handlers.NewMessage(myhandlers.HasImage, myhandlers.SeseDetect))

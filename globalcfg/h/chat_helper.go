@@ -6,7 +6,7 @@ import (
 )
 
 func ChatAutoCvtBili(chatId int64) bool {
-	cfg, err := g.Q.GetChatById(context.Background(), chatId)
+	cfg, err := g.Q.ChatCfgById(context.Background(), chatId)
 	if err != nil {
 		return false
 	}
@@ -14,7 +14,7 @@ func ChatAutoCvtBili(chatId int64) bool {
 }
 
 func ChatAutoOcr(chatId int64) bool {
-	cfg, err := g.Q.GetChatById(context.Background(), chatId)
+	cfg, err := g.Q.ChatCfgById(context.Background(), chatId)
 	if err != nil {
 		return false
 	}
@@ -22,7 +22,7 @@ func ChatAutoOcr(chatId int64) bool {
 }
 
 func ChatAutoCalculate(chatId int64) bool {
-	cfg, err := g.Q.GetChatById(context.Background(), chatId)
+	cfg, err := g.Q.ChatCfgById(context.Background(), chatId)
 	if err != nil {
 		return false
 	}
@@ -30,7 +30,7 @@ func ChatAutoCalculate(chatId int64) bool {
 }
 
 func ChatAutoExchange(chatId int64) bool {
-	cfg, err := g.Q.GetChatById(context.Background(), chatId)
+	cfg, err := g.Q.ChatCfgById(context.Background(), chatId)
 	if err != nil {
 		return false
 	}
@@ -38,7 +38,7 @@ func ChatAutoExchange(chatId int64) bool {
 }
 
 func ChatAutoCheckAdult(chatId int64) bool {
-	cfg, err := g.Q.GetChatById(context.Background(), chatId)
+	cfg, err := g.Q.ChatCfgById(context.Background(), chatId)
 	if err != nil {
 		return false
 	}
@@ -46,7 +46,7 @@ func ChatAutoCheckAdult(chatId int64) bool {
 }
 
 func ChatSaveMessages(chatId int64) bool {
-	cfg, err := g.Q.GetChatById(context.Background(), chatId)
+	cfg, err := g.Q.ChatCfgById(context.Background(), chatId)
 	if err != nil {
 		return false
 	}
@@ -54,7 +54,7 @@ func ChatSaveMessages(chatId int64) bool {
 }
 
 func ChatEnableCoc(chatId int64) bool {
-	cfg, err := g.Q.GetChatById(context.Background(), chatId)
+	cfg, err := g.Q.ChatCfgById(context.Background(), chatId)
 	if err != nil {
 		return false
 	}
@@ -62,7 +62,7 @@ func ChatEnableCoc(chatId int64) bool {
 }
 
 func ChatRespNsfwMsg(chatId int64) bool {
-	cfg, err := g.Q.GetChatById(context.Background(), chatId)
+	cfg, err := g.Q.ChatCfgById(context.Background(), chatId)
 	if err != nil {
 		return false
 	}

@@ -3,7 +3,6 @@ package bothttp
 import (
 	"context"
 	g "main/globalcfg"
-	"main/myhandlers"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -28,8 +27,8 @@ func groupStat(ctx *gin.Context) {
 		return
 	}
 
-	stat, ok := myhandlers.GetGroupStat(group.ID)
-	if !ok {
+	stat := g.Q.ChatStatToday(group.ID)
+	if stat == nil {
 		ctx.JSON(400, GroupNotFound.Msg("group not found"))
 		return
 	}

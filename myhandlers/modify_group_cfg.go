@@ -137,7 +137,7 @@ func ModifyGroupConfigByButton(bot *gotgbot.Bot, ctx *ext.Context) error {
 	if msg == nil {
 		return fmt.Errorf("ModifyGroupConfigByButton: message should not be nil")
 	}
-	cfg, err := g.Q.GetChatById(context.Background(), msg.Chat.Id)
+	cfg, err := g.Q.ChatCfgById(context.Background(), msg.Chat.Id)
 	if err != nil {
 		return err
 	}
@@ -175,7 +175,7 @@ func ShowChatCfg(bot *gotgbot.Bot, ctx *ext.Context) error {
 	if msg == nil {
 		return fmt.Errorf("ShowChatCfg: message should not be nil")
 	}
-	cfg, err := g.Q.GetChatById(context.Background(), msg.Chat.Id)
+	cfg, err := g.Q.ChatCfgById(context.Background(), msg.Chat.Id)
 	if err != nil {
 		return err
 	}

@@ -1,7 +1,7 @@
 /.idea
 /.vscode
 /main.exe
-/build/*
+/build
 /main
 __pycache__
 *.db

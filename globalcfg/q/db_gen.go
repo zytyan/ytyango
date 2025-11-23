@@ -27,9 +27,6 @@ func New(db DBTX) *Queries {
 func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	q := Queries{db: db}
 	var err error
-	if q.createNewChatDefaultCfgStmt, err = db.PrepareContext(ctx, createNewChatDefaultCfg); err != nil {
-		return nil, fmt.Errorf("error preparing query CreateNewChatDefaultCfg: %w", err)
-	}
 	if q.delCocCharAttrStmt, err = db.PrepareContext(ctx, delCocCharAttr); err != nil {
 		return nil, fmt.Errorf("error preparing query DelCocCharAttr: %w", err)
 	}
@@ -69,17 +66,20 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.updateYtDlpCacheStmt, err = db.PrepareContext(ctx, updateYtDlpCache); err != nil {
 		return nil, fmt.Errorf("error preparing query UpdateYtDlpCache: %w", err)
 	}
+	if q.chatCfgByIdStmt, err = db.PrepareContext(ctx, chatCfgById); err != nil {
+		return nil, fmt.Errorf("error preparing query chatCfgById: %w", err)
+	}
+	if q.chatIdByWebIdStmt, err = db.PrepareContext(ctx, chatIdByWebId); err != nil {
+		return nil, fmt.Errorf("error preparing query chatIdByWebId: %w", err)
+	}
 	if q.createChatStatDailyStmt, err = db.PrepareContext(ctx, createChatStatDaily); err != nil {
 		return nil, fmt.Errorf("error preparing query createChatStatDaily: %w", err)
 	}
+	if q.createNewChatCfgDefaultStmt, err = db.PrepareContext(ctx, createNewChatCfgDefault); err != nil {
+		return nil, fmt.Errorf("error preparing query createNewChatCfgDefault: %w", err)
+	}
 	if q.createNewUserStmt, err = db.PrepareContext(ctx, createNewUser); err != nil {
 		return nil, fmt.Errorf("error preparing query createNewUser: %w", err)
-	}
-	if q.getChatByIdStmt, err = db.PrepareContext(ctx, getChatById); err != nil {
-		return nil, fmt.Errorf("error preparing query getChatById: %w", err)
-	}
-	if q.getChatIdByWebIdStmt, err = db.PrepareContext(ctx, getChatIdByWebId); err != nil {
-		return nil, fmt.Errorf("error preparing query getChatIdByWebId: %w", err)
 	}
 	if q.getChatStatStmt, err = db.PrepareContext(ctx, getChatStat); err != nil {
 		return nil, fmt.Errorf("error preparing query getChatStat: %w", err)
@@ -96,8 +96,8 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.insertPicStmt, err = db.PrepareContext(ctx, insertPic); err != nil {
 		return nil, fmt.Errorf("error preparing query insertPic: %w", err)
 	}
-	if q.updateChatStmt, err = db.PrepareContext(ctx, updateChat); err != nil {
-		return nil, fmt.Errorf("error preparing query updateChat: %w", err)
+	if q.updateChatCfgStmt, err = db.PrepareContext(ctx, updateChatCfg); err != nil {
+		return nil, fmt.Errorf("error preparing query updateChatCfg: %w", err)
 	}
 	if q.updateUserBaseStmt, err = db.PrepareContext(ctx, updateUserBase); err != nil {
 		return nil, fmt.Errorf("error preparing query updateUserBase: %w", err)
@@ -113,11 +113,6 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 
 func (q *Queries) Close() error {
 	var err error
-	if q.createNewChatDefaultCfgStmt != nil {
-		if cerr := q.createNewChatDefaultCfgStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing createNewChatDefaultCfgStmt: %w", cerr)
-		}
-	}
 	if q.delCocCharAttrStmt != nil {
 		if cerr := q.delCocCharAttrStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing delCocCharAttrStmt: %w", cerr)
@@ -183,24 +178,29 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing updateYtDlpCacheStmt: %w", cerr)
 		}
 	}
+	if q.chatCfgByIdStmt != nil {
+		if cerr := q.chatCfgByIdStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing chatCfgByIdStmt: %w", cerr)
+		}
+	}
+	if q.chatIdByWebIdStmt != nil {
+		if cerr := q.chatIdByWebIdStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing chatIdByWebIdStmt: %w", cerr)
+		}
+	}
 	if q.createChatStatDailyStmt != nil {
 		if cerr := q.createChatStatDailyStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing createChatStatDailyStmt: %w", cerr)
 		}
 	}
+	if q.createNewChatCfgDefaultStmt != nil {
+		if cerr := q.createNewChatCfgDefaultStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing createNewChatCfgDefaultStmt: %w", cerr)
+		}
+	}
 	if q.createNewUserStmt != nil {
 		if cerr := q.createNewUserStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing createNewUserStmt: %w", cerr)
-		}
-	}
-	if q.getChatByIdStmt != nil {
-		if cerr := q.getChatByIdStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing getChatByIdStmt: %w", cerr)
-		}
-	}
-	if q.getChatIdByWebIdStmt != nil {
-		if cerr := q.getChatIdByWebIdStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing getChatIdByWebIdStmt: %w", cerr)
 		}
 	}
 	if q.getChatStatStmt != nil {
@@ -228,9 +228,9 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing insertPicStmt: %w", cerr)
 		}
 	}
-	if q.updateChatStmt != nil {
-		if cerr := q.updateChatStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing updateChatStmt: %w", cerr)
+	if q.updateChatCfgStmt != nil {
+		if cerr := q.updateChatCfgStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing updateChatCfgStmt: %w", cerr)
 		}
 	}
 	if q.updateUserBaseStmt != nil {
@@ -290,7 +290,6 @@ type Queries struct {
 	SlowQueryThreshold          time.Duration
 	txID                        string
 	tx                          *sql.Tx
-	createNewChatDefaultCfgStmt *sql.Stmt
 	delCocCharAttrStmt          *sql.Stmt
 	getBiliInlineDataStmt       *sql.Stmt
 	getCocCharAllAttrStmt       *sql.Stmt
@@ -304,16 +303,17 @@ type Queries struct {
 	updateBiliInlineMsgIdStmt   *sql.Stmt
 	updateChatStatDailyStmt     *sql.Stmt
 	updateYtDlpCacheStmt        *sql.Stmt
+	chatCfgByIdStmt             *sql.Stmt
+	chatIdByWebIdStmt           *sql.Stmt
 	createChatStatDailyStmt     *sql.Stmt
+	createNewChatCfgDefaultStmt *sql.Stmt
 	createNewUserStmt           *sql.Stmt
-	getChatByIdStmt             *sql.Stmt
-	getChatIdByWebIdStmt        *sql.Stmt
 	getChatStatStmt             *sql.Stmt
 	getPicByRateAndRandKeyStmt  *sql.Stmt
 	getPicByRateFirstStmt       *sql.Stmt
 	getUserByIdStmt             *sql.Stmt
 	insertPicStmt               *sql.Stmt
-	updateChatStmt              *sql.Stmt
+	updateChatCfgStmt           *sql.Stmt
 	updateUserBaseStmt          *sql.Stmt
 	updateUserProfilePhotoStmt  *sql.Stmt
 	updateUserTimeZoneStmt      *sql.Stmt
@@ -326,7 +326,6 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		SlowQueryThreshold:          q.SlowQueryThreshold,
 		txID:                        fmt.Sprintf("%p", tx),
 		tx:                          tx,
-		createNewChatDefaultCfgStmt: q.createNewChatDefaultCfgStmt,
 		delCocCharAttrStmt:          q.delCocCharAttrStmt,
 		getBiliInlineDataStmt:       q.getBiliInlineDataStmt,
 		getCocCharAllAttrStmt:       q.getCocCharAllAttrStmt,
@@ -340,16 +339,17 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		updateBiliInlineMsgIdStmt:   q.updateBiliInlineMsgIdStmt,
 		updateChatStatDailyStmt:     q.updateChatStatDailyStmt,
 		updateYtDlpCacheStmt:        q.updateYtDlpCacheStmt,
+		chatCfgByIdStmt:             q.chatCfgByIdStmt,
+		chatIdByWebIdStmt:           q.chatIdByWebIdStmt,
 		createChatStatDailyStmt:     q.createChatStatDailyStmt,
+		createNewChatCfgDefaultStmt: q.createNewChatCfgDefaultStmt,
 		createNewUserStmt:           q.createNewUserStmt,
-		getChatByIdStmt:             q.getChatByIdStmt,
-		getChatIdByWebIdStmt:        q.getChatIdByWebIdStmt,
 		getChatStatStmt:             q.getChatStatStmt,
 		getPicByRateAndRandKeyStmt:  q.getPicByRateAndRandKeyStmt,
 		getPicByRateFirstStmt:       q.getPicByRateFirstStmt,
 		getUserByIdStmt:             q.getUserByIdStmt,
 		insertPicStmt:               q.insertPicStmt,
-		updateChatStmt:              q.updateChatStmt,
+		updateChatCfgStmt:           q.updateChatCfgStmt,
 		updateUserBaseStmt:          q.updateUserBaseStmt,
 		updateUserProfilePhotoStmt:  q.updateUserProfilePhotoStmt,
 		updateUserTimeZoneStmt:      q.updateUserTimeZoneStmt,

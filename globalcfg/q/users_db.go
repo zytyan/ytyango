@@ -54,12 +54,12 @@ func (q *Queries) GetUserById(ctx context.Context, id int64) *User {
 // TODO: 将这里的xsync.MapOf替换为WeakMap(若可能）或LRU Map，避免内存泄漏的问题
 var chatCache = xsync.NewMapOf[int64, *ChatCfg]()
 
-func (q *Queries) GetChatById(ctx context.Context, id int64) (*ChatCfg, error) {
+func (q *Queries) ChatCfgById(ctx context.Context, id int64) (*ChatCfg, error) {
 	var err error
 	c, _ := chatCache.LoadOrCompute(id, func() *ChatCfg {
-		chat, erri := q.getChatById(ctx, id)
+		chat, erri := q.chatCfgById(ctx, id)
 		if errors.Is(erri, sql.ErrNoRows) {
-			chat, err = q.CreateNewChatDefaultCfg(ctx, id)
+			chat, err = q.createNewChatCfgDefault(ctx, id)
 			return fromInnerCfg(&chat)
 		} else if erri != nil {
 			err = erri
@@ -70,22 +70,11 @@ func (q *Queries) GetChatById(ctx context.Context, id int64) (*ChatCfg, error) {
 	return c, err
 }
 
-func (q *Queries) GetChatCfg(ctx context.Context, tgChat *gotgbot.Chat) (*ChatCfg, error) {
-	var err error
-	chatId := tgChat.Id
-	c, _ := chatCache.LoadOrCompute(chatId, func() *ChatCfg {
-		chat, erri := q.getChatById(ctx, chatId)
-		if errors.Is(erri, sql.ErrNoRows) {
-			chat, err = q.CreateNewChatDefaultCfg(ctx, chatId)
-			return fromInnerCfg(&chat)
-		} else if erri != nil {
-			err = erri
-			return nil
-		}
-		return fromInnerCfg(&chat)
-	})
-	return c, err
-
+func (q *Queries) ChatCfgByTg(ctx context.Context, tgChat *gotgbot.Chat) (*ChatCfg, error) {
+	if tgChat == nil {
+		return nil, errors.New("tgChat is nil")
+	}
+	return q.ChatCfgById(ctx, tgChat.Id)
 }
 
 func (q *Queries) GetChatByWebId(ctx context.Context, webId int64) (*ChatCfg, error) {
@@ -94,9 +83,9 @@ func (q *Queries) GetChatByWebId(ctx context.Context, webId int64) (*ChatCfg, er
 		Int64: webId,
 		Valid: true,
 	}
-	chatId, _ := q.getChatIdByWebId(ctx, webIdQ)
-	// 这里不能直接用数据库把查找合并为一个，因为需要单例
-	chat, err := q.GetChatById(ctx, chatId)
+	chatId, _ := q.chatIdByWebId(ctx, webIdQ)
+	// 这里不能直接用数据库把查找合并为一个，因为对每个群组都需要单例
+	chat, err := q.ChatCfgById(ctx, chatId)
 	return chat, err
 }
 
@@ -142,7 +131,7 @@ func (q *Queries) UpdateUserTimeZone(ctx context.Context, user *User, zone int64
 }
 
 func (c *ChatCfg) Save(q *Queries) error {
-	return q.updateChat(context.Background(), updateChatParams{
+	return q.updateChatCfg(context.Background(), updateChatCfgParams{
 		AutoCvtBili:    c.AutoCvtBili,
 		AutoOcr:        c.AutoOcr,
 		AutoCalculate:  c.AutoCalculate,

@@ -101,4 +101,5 @@ type chatCfg struct {
 	SaveMessages   bool          `json:"save_messages"`
 	EnableCoc      bool          `json:"enable_coc"`
 	RespNsfwMsg    bool          `json:"resp_nsfw_msg"`
+	Timezone       int64         `json:"timezone"`
 }

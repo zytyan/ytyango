@@ -9,50 +9,50 @@ import (
 )
 
 type UnixTime struct {
-    time.Time
+	time.Time
 }
 
 func (u *UnixTime) Scan(value any) error {
-    switch val := value.(type) {
-    case int64:
-        // SQLite INTEGER
-        u.Time = time.Unix(val, 0)
-        return nil
+	switch val := value.(type) {
+	case int64:
+		// SQLite INTEGER
+		u.Time = time.Unix(val, 0)
+		return nil
 
-    case float64:
-        // JSON float → SQLC sometimes gives float
-        u.Time = time.Unix(int64(val), 0)
-        return nil
+	case float64:
+		// JSON float → SQLC sometimes gives float
+		u.Time = time.Unix(int64(val), 0)
+		return nil
 
-    case time.Time:
-        // MySQL / Postgres
-        u.Time = val
-        return nil
+	case time.Time:
+		// MySQL / Postgres
+		u.Time = val
+		return nil
 
-    case []byte:
-        // SQLite sometimes returns []byte for INTEGER
-        i, err := strconv.ParseInt(string(val), 10, 64)
-        if err != nil {
-            return err
-        }
-        u.Time = time.Unix(i, 0)
-        return nil
+	case []byte:
+		// SQLite sometimes returns []byte for INTEGER
+		i, err := strconv.ParseInt(string(val), 10, 64)
+		if err != nil {
+			return err
+		}
+		u.Time = time.Unix(i, 0)
+		return nil
 
-    case string:
-        // If database stores as string timestamp
-        i, err := strconv.ParseInt(val, 10, 64)
-        if err != nil {
-            return err
-        }
-        u.Time = time.Unix(i, 0)
-        return nil
-    }
+	case string:
+		// If database stores as string timestamp
+		i, err := strconv.ParseInt(val, 10, 64)
+		if err != nil {
+			return err
+		}
+		u.Time = time.Unix(i, 0)
+		return nil
+	}
 
-    return fmt.Errorf("cannot convert %v (%T) to UnixTime", value, value)
+	return fmt.Errorf("cannot convert %v (%T) to UnixTime", value, value)
 }
 
 func (u UnixTime) Value() (driver.Value, error) {
-    return u.Unix(), nil
+	return u.Unix(), nil
 }
 
 type ChatCfg struct {
@@ -66,6 +66,7 @@ type ChatCfg struct {
 	SaveMessages   bool          `json:"save_messages"  btnTxt:"保存群组消息" pos:"3,1"`
 	EnableCoc      bool          `json:"enable_coc"     btnTxt:"启用CoC辅助" pos:"3,2"`
 	RespNsfwMsg    bool          `json:"resp_nsfw_msg"  btnTxt:"响应来张色图" pos:"4,1"`
+	Timezone       int64         `json:"timezone"`
 }
 
 func fromInnerCfg(cfg *chatCfg) *ChatCfg {
@@ -80,5 +81,6 @@ func fromInnerCfg(cfg *chatCfg) *ChatCfg {
 		SaveMessages:   cfg.SaveMessages,
 		EnableCoc:      cfg.EnableCoc,
 		RespNsfwMsg:    cfg.RespNsfwMsg,
+		Timezone:       cfg.Timezone,
 	}
 }

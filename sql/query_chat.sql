@@ -1,16 +1,16 @@
 -- encoding: utf-8
 
--- name: getChatById :one
+-- name: chatCfgById :one
 SELECT *
 FROM chat_cfg
 WHERE id = ?;
 
--- name: getChatIdByWebId :one
+-- name: chatIdByWebId :one
 SELECT id
 FROM chat_cfg
 WHERE web_id = ?;
 
--- name: CreateNewChatDefaultCfg :one
+-- name: createNewChatCfgDefault :one
 INSERT INTO chat_cfg (id, web_id, auto_cvt_bili, auto_ocr, auto_calculate, auto_exchange, auto_check_adult,
                       save_messages, enable_coc, resp_nsfw_msg)
 VALUES (?,
@@ -25,7 +25,7 @@ VALUES (?,
         FALSE)
 RETURNING *;
 
--- name: updateChat :exec
+-- name: updateChatCfg :exec
 UPDATE chat_cfg
 SET auto_cvt_bili=?,
     auto_ocr=?,
@@ -66,5 +66,5 @@ WHERE chat_id = ?
 -- name: getChatStat :one
 SELECT *
 FROM chat_stat_daily
-WHERE chat_id = ?
-  AND stat_date = ?;
+WHERE chat_stat_daily.chat_id = ?
+  AND chat_stat_daily.stat_date = ?;

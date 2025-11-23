@@ -52,9 +52,9 @@ func replyNsfw(bot *gotgbot.Bot, msg *gotgbot.Message, result *azure.ModeratorV2
 
 	go saveNsfw(photo.FileUniqueId, photo.FileId, severity)
 	if severity >= 6 {
-		g.Q.GetChatStatToday(msg.Chat.Id, 10).IncAdultCount()
+		g.Q.ChatStatToday(msg.Chat.Id).IncAdultCount()
 	} else {
-		g.Q.GetChatStatToday(msg.Chat.Id, 10).IncRacyCount()
+		g.Q.ChatStatToday(msg.Chat.Id).IncRacyCount()
 	}
 	var spoiler = 0
 	if msg.HasMediaSpoiler {
@@ -162,7 +162,7 @@ func SafeGo(f func()) {
 }
 
 func SeseDetect(bot *gotgbot.Bot, ctx *ext.Context) error {
-	groupInfo, err := g.Q.GetChatCfg(context.Background(), ctx.EffectiveChat)
+	groupInfo, err := g.Q.ChatCfgById(context.Background(), ctx.EffectiveChat.Id)
 	if err != nil {
 		return err
 	}

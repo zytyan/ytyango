@@ -3,8 +3,10 @@ package q
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"database/sql/driver"
 	"encoding/gob"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -61,6 +63,9 @@ func (s *ChatStat) IncMessage(userId, txtLen, time int64) {
 	s.mu.Lock()
 	s.MessageCount++
 	s.MsgCountByTime[(time%86400)/(24*10)]++
+	if s.UserMsgStat == nil {
+		s.UserMsgStat = make(UserMsgStatMap, 4)
+	}
 	s.UserMsgStat[userId].MsgCount++
 	s.UserMsgStat[userId].MsgLen += txtLen
 	s.mu.Unlock()
@@ -188,23 +193,25 @@ var m = xsync.NewMapOf[int64, *ChatStat]()
 
 func (q *Queries) getOrCreateChatStat(ctx context.Context, chatId int64, day int64) (ChatStatDaily, error) {
 	daily, err := q.getChatStat(ctx, chatId, day)
-	if err != nil {
-		return daily, err
+	if errors.Is(err, sql.ErrNoRows) {
+		return q.createChatStatDaily(ctx, chatId, day)
 	}
-	return q.createChatStatDaily(ctx, chatId, day)
+	if err != nil {
+		return ChatStatDaily{}, err
+	}
+	return daily, err
+
 }
 
-func (q *Queries) GetChatStatToday(chatId int64, day int64) (stat *ChatStat) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
-	defer cancel()
-	var err error
-	stat, _ = m.Compute(chatId, func(oldValue *ChatStat, loaded bool) (newValue *ChatStat, delete bool) {
+func (q *Queries) chatStatAtWithTimezone(ctx context.Context, chatId, unixTime, timezone int64) (*ChatStat, error) {
+	day := (unixTime + timezone) % (24 * 60 * 60)
+	stat, _ := m.Compute(chatId, func(oldValue *ChatStat, loaded bool) (newValue *ChatStat, delete bool) {
 		if !loaded || oldValue == nil || oldValue.StatDate != day {
-			if oldValue.StatDate != day {
-				_ = oldValue.Save(ctx, q) // 忽略错误，不忽略也不知道怎么办
+			if oldValue != nil {
+				// 这里除了忽略错误，还有什么办法呢？
+				_ = oldValue.Save(ctx, q)
 			}
-			var daily ChatStatDaily
-			daily, err = q.getOrCreateChatStat(ctx, chatId, day)
+			daily, err := q.getOrCreateChatStat(ctx, chatId, day)
 			if err != nil {
 				return nil, true
 			}
@@ -215,5 +222,21 @@ func (q *Queries) GetChatStatToday(chatId int64, day int64) (stat *ChatStat) {
 		}
 		return oldValue, false
 	})
-	return
+	return stat, nil
+}
+
+func (q *Queries) ChatStatAt(chatId, unixTime int64) *ChatStat {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
+	defer cancel()
+	cfg, err := q.chatCfgById(ctx, chatId)
+	if err != nil {
+		return nil
+	}
+	stat, _ := q.chatStatAtWithTimezone(ctx, chatId, unixTime, cfg.Timezone)
+	return stat
+
+}
+
+func (q *Queries) ChatStatToday(chatId int64) (stat *ChatStat) {
+	return q.ChatStatAt(chatId, time.Now().Unix())
 }

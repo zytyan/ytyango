@@ -13,50 +13,6 @@ import (
 	"go.uber.org/zap"
 )
 
-const createNewChatDefaultCfg = `-- name: CreateNewChatDefaultCfg :one
-INSERT INTO chat_cfg (id, web_id, auto_cvt_bili, auto_ocr, auto_calculate, auto_exchange, auto_check_adult,
-                      save_messages, enable_coc, resp_nsfw_msg)
-VALUES (?,
-        NULL,
-        FALSE,
-        FALSE,
-        FALSE,
-        FALSE,
-        FALSE,
-        TRUE,
-        FALSE,
-        FALSE)
-RETURNING id, web_id, auto_cvt_bili, auto_ocr, auto_calculate, auto_exchange, auto_check_adult, save_messages, enable_coc, resp_nsfw_msg
-`
-
-func (q *Queries) CreateNewChatDefaultCfg(ctx context.Context, id int64) (chatCfg, error) {
-	var logFields []zap.Field
-	var start time.Time
-	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 1+5)
-		start = time.Now()
-		logFields = append(logFields,
-			zap.Int64("id", id),
-		)
-	}
-	row := q.queryRow(ctx, q.createNewChatDefaultCfgStmt, createNewChatDefaultCfg, id)
-	var i chatCfg
-	err := row.Scan(
-		&i.ID,
-		&i.WebID,
-		&i.AutoCvtBili,
-		&i.AutoOcr,
-		&i.AutoCalculate,
-		&i.AutoExchange,
-		&i.AutoCheckAdult,
-		&i.SaveMessages,
-		&i.EnableCoc,
-		&i.RespNsfwMsg,
-	)
-	q.logQuery(createNewChatDefaultCfg, logFields, err, start)
-	return i, err
-}
-
 const updateChatStatDaily = `-- name: UpdateChatStatDaily :exec
 UPDATE chat_stat_daily
 SET message_count        = ?,
@@ -151,6 +107,66 @@ func (q *Queries) UpdateChatStatDaily(ctx context.Context, arg UpdateChatStatDai
 	return err
 }
 
+const chatCfgById = `-- name: chatCfgById :one
+
+SELECT id, web_id, auto_cvt_bili, auto_ocr, auto_calculate, auto_exchange, auto_check_adult, save_messages, enable_coc, resp_nsfw_msg, timezone
+FROM chat_cfg
+WHERE id = ?
+`
+
+// encoding: utf-8
+func (q *Queries) chatCfgById(ctx context.Context, id int64) (chatCfg, error) {
+	var logFields []zap.Field
+	var start time.Time
+	if q.logger != nil {
+		logFields = make([]zap.Field, 0, 1+5)
+		start = time.Now()
+		logFields = append(logFields,
+			zap.Int64("id", id),
+		)
+	}
+	row := q.queryRow(ctx, q.chatCfgByIdStmt, chatCfgById, id)
+	var i chatCfg
+	err := row.Scan(
+		&i.ID,
+		&i.WebID,
+		&i.AutoCvtBili,
+		&i.AutoOcr,
+		&i.AutoCalculate,
+		&i.AutoExchange,
+		&i.AutoCheckAdult,
+		&i.SaveMessages,
+		&i.EnableCoc,
+		&i.RespNsfwMsg,
+		&i.Timezone,
+	)
+	q.logQuery(chatCfgById, logFields, err, start)
+	return i, err
+}
+
+const chatIdByWebId = `-- name: chatIdByWebId :one
+SELECT id
+FROM chat_cfg
+WHERE web_id = ?
+`
+
+func (q *Queries) chatIdByWebId(ctx context.Context, webID sql.NullInt64) (int64, error) {
+	var logFields []zap.Field
+	var start time.Time
+	if q.logger != nil {
+		logFields = make([]zap.Field, 0, 1+5)
+		start = time.Now()
+		logFields = append(logFields,
+			zapNullInt64("web_id", webID),
+		)
+	}
+	row := q.queryRow(ctx, q.chatIdByWebIdStmt, chatIdByWebId, webID)
+	var id int64
+	err := row.Scan(&id)
+	q.logQuery(chatIdByWebId, logFields, err, start)
+	return id, err
+}
+
 const createChatStatDaily = `-- name: createChatStatDaily :one
 INSERT INTO chat_stat_daily (chat_id, stat_date)
 VALUES (?, ?)
@@ -194,15 +210,23 @@ func (q *Queries) createChatStatDaily(ctx context.Context, chatID int64, statDat
 	return i, err
 }
 
-const getChatById = `-- name: getChatById :one
-
-SELECT id, web_id, auto_cvt_bili, auto_ocr, auto_calculate, auto_exchange, auto_check_adult, save_messages, enable_coc, resp_nsfw_msg
-FROM chat_cfg
-WHERE id = ?
+const createNewChatCfgDefault = `-- name: createNewChatCfgDefault :one
+INSERT INTO chat_cfg (id, web_id, auto_cvt_bili, auto_ocr, auto_calculate, auto_exchange, auto_check_adult,
+                      save_messages, enable_coc, resp_nsfw_msg)
+VALUES (?,
+        NULL,
+        FALSE,
+        FALSE,
+        FALSE,
+        FALSE,
+        FALSE,
+        TRUE,
+        FALSE,
+        FALSE)
+RETURNING id, web_id, auto_cvt_bili, auto_ocr, auto_calculate, auto_exchange, auto_check_adult, save_messages, enable_coc, resp_nsfw_msg, timezone
 `
 
-// encoding: utf-8
-func (q *Queries) getChatById(ctx context.Context, id int64) (chatCfg, error) {
+func (q *Queries) createNewChatCfgDefault(ctx context.Context, id int64) (chatCfg, error) {
 	var logFields []zap.Field
 	var start time.Time
 	if q.logger != nil {
@@ -212,7 +236,7 @@ func (q *Queries) getChatById(ctx context.Context, id int64) (chatCfg, error) {
 			zap.Int64("id", id),
 		)
 	}
-	row := q.queryRow(ctx, q.getChatByIdStmt, getChatById, id)
+	row := q.queryRow(ctx, q.createNewChatCfgDefaultStmt, createNewChatCfgDefault, id)
 	var i chatCfg
 	err := row.Scan(
 		&i.ID,
@@ -225,39 +249,17 @@ func (q *Queries) getChatById(ctx context.Context, id int64) (chatCfg, error) {
 		&i.SaveMessages,
 		&i.EnableCoc,
 		&i.RespNsfwMsg,
+		&i.Timezone,
 	)
-	q.logQuery(getChatById, logFields, err, start)
+	q.logQuery(createNewChatCfgDefault, logFields, err, start)
 	return i, err
-}
-
-const getChatIdByWebId = `-- name: getChatIdByWebId :one
-SELECT id
-FROM chat_cfg
-WHERE web_id = ?
-`
-
-func (q *Queries) getChatIdByWebId(ctx context.Context, webID sql.NullInt64) (int64, error) {
-	var logFields []zap.Field
-	var start time.Time
-	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 1+5)
-		start = time.Now()
-		logFields = append(logFields,
-			zapNullInt64("web_id", webID),
-		)
-	}
-	row := q.queryRow(ctx, q.getChatIdByWebIdStmt, getChatIdByWebId, webID)
-	var id int64
-	err := row.Scan(&id)
-	q.logQuery(getChatIdByWebId, logFields, err, start)
-	return id, err
 }
 
 const getChatStat = `-- name: getChatStat :one
 SELECT chat_id, stat_date, message_count, photo_count, video_count, sticker_count, forward_count, mars_count, max_mars_count, racy_count, adult_count, download_video_count, download_audio_count, dio_add_user_count, dio_ban_user_count, user_msg_stat, msg_count_by_time, msg_id_at_time_start
 FROM chat_stat_daily
-WHERE chat_id = ?
-  AND stat_date = ?
+WHERE chat_stat_daily.chat_id = ?
+  AND chat_stat_daily.stat_date = ?
 `
 
 func (q *Queries) getChatStat(ctx context.Context, chatID int64, statDate int64) (ChatStatDaily, error) {
@@ -297,7 +299,7 @@ func (q *Queries) getChatStat(ctx context.Context, chatID int64, statDate int64)
 	return i, err
 }
 
-const updateChat = `-- name: updateChat :exec
+const updateChatCfg = `-- name: updateChatCfg :exec
 UPDATE chat_cfg
 SET auto_cvt_bili=?,
     auto_ocr=?,
@@ -310,7 +312,7 @@ SET auto_cvt_bili=?,
 WHERE id = ?
 `
 
-type updateChatParams struct {
+type updateChatCfgParams struct {
 	AutoCvtBili    bool  `json:"auto_cvt_bili"`
 	AutoOcr        bool  `json:"auto_ocr"`
 	AutoCalculate  bool  `json:"auto_calculate"`
@@ -322,7 +324,7 @@ type updateChatParams struct {
 	ID             int64 `json:"id"`
 }
 
-func (q *Queries) updateChat(ctx context.Context, arg updateChatParams) error {
+func (q *Queries) updateChatCfg(ctx context.Context, arg updateChatCfgParams) error {
 	var logFields []zap.Field
 	var start time.Time
 	if q.logger != nil {
@@ -340,7 +342,7 @@ func (q *Queries) updateChat(ctx context.Context, arg updateChatParams) error {
 			zap.Int64("id", arg.ID),
 		)
 	}
-	_, err := q.exec(ctx, q.updateChatStmt, updateChat,
+	_, err := q.exec(ctx, q.updateChatCfgStmt, updateChatCfg,
 		arg.AutoCvtBili,
 		arg.AutoOcr,
 		arg.AutoCalculate,
@@ -351,6 +353,6 @@ func (q *Queries) updateChat(ctx context.Context, arg updateChatParams) error {
 		arg.RespNsfwMsg,
 		arg.ID,
 	)
-	q.logQuery(updateChat, logFields, err, start)
+	q.logQuery(updateChatCfg, logFields, err, start)
 	return err
 }
