@@ -24,7 +24,7 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
-	err = Q.InitCountByRatePrefixSum()
+	err = Q.BuildCountByRatePrefixSum()
 	if err != nil {
 		panic(err)
 	}
