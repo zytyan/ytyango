@@ -13,50 +13,6 @@ import (
 	"go.uber.org/zap"
 )
 
-const getChatStat = `-- name: getChatStat :one
-SELECT chat_id, stat_date, message_count, photo_count, video_count, sticker_count, forward_count, mars_count, max_mars_count, racy_count, adult_count, download_video_count, download_audio_count, dio_add_user_count, dio_ban_user_count, user_msg_stat, msg_count_by_time, msg_id_at_time_start
-FROM chat_stat_daily
-WHERE chat_stat_daily.chat_id = ?
-  AND chat_stat_daily.stat_date = ?
-`
-
-func (q *Queries) getChatStat(ctx context.Context, chatID int64, statDate int64) (ChatStatDaily, error) {
-	var logFields []zap.Field
-	var start time.Time
-	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 2+5)
-		start = time.Now()
-		logFields = append(logFields,
-			zap.Int64("chat_id", chatID),
-			zap.Int64("stat_date", statDate),
-		)
-	}
-	row := q.queryRow(ctx, q.getChatStatStmt, getChatStat, chatID, statDate)
-	var i ChatStatDaily
-	err := row.Scan(
-		&i.ChatID,
-		&i.StatDate,
-		&i.MessageCount,
-		&i.PhotoCount,
-		&i.VideoCount,
-		&i.StickerCount,
-		&i.ForwardCount,
-		&i.MarsCount,
-		&i.MaxMarsCount,
-		&i.RacyCount,
-		&i.AdultCount,
-		&i.DownloadVideoCount,
-		&i.DownloadAudioCount,
-		&i.DioAddUserCount,
-		&i.DioBanUserCount,
-		&i.UserMsgStat,
-		&i.MsgCountByTime,
-		&i.MsgIDAtTimeStart,
-	)
-	q.logQuery(getChatStat, logFields, err, start)
-	return i, err
-}
-
 const updateChatStatDaily = `-- name: UpdateChatStatDaily :exec
 UPDATE chat_stat_daily
 SET message_count        = ?,
@@ -296,6 +252,50 @@ func (q *Queries) createNewChatCfgDefault(ctx context.Context, id int64) (chatCf
 		&i.Timezone,
 	)
 	q.logQuery(createNewChatCfgDefault, logFields, err, start)
+	return i, err
+}
+
+const getChatStat = `-- name: getChatStat :one
+SELECT chat_id, stat_date, message_count, photo_count, video_count, sticker_count, forward_count, mars_count, max_mars_count, racy_count, adult_count, download_video_count, download_audio_count, dio_add_user_count, dio_ban_user_count, user_msg_stat, msg_count_by_time, msg_id_at_time_start
+FROM chat_stat_daily
+WHERE chat_stat_daily.chat_id = ?
+  AND chat_stat_daily.stat_date = ?
+`
+
+func (q *Queries) getChatStat(ctx context.Context, chatID int64, statDate int64) (ChatStatDaily, error) {
+	var logFields []zap.Field
+	var start time.Time
+	if q.logger != nil {
+		logFields = make([]zap.Field, 0, 2+5)
+		start = time.Now()
+		logFields = append(logFields,
+			zap.Int64("chat_id", chatID),
+			zap.Int64("stat_date", statDate),
+		)
+	}
+	row := q.queryRow(ctx, q.getChatStatStmt, getChatStat, chatID, statDate)
+	var i ChatStatDaily
+	err := row.Scan(
+		&i.ChatID,
+		&i.StatDate,
+		&i.MessageCount,
+		&i.PhotoCount,
+		&i.VideoCount,
+		&i.StickerCount,
+		&i.ForwardCount,
+		&i.MarsCount,
+		&i.MaxMarsCount,
+		&i.RacyCount,
+		&i.AdultCount,
+		&i.DownloadVideoCount,
+		&i.DownloadAudioCount,
+		&i.DioAddUserCount,
+		&i.DioBanUserCount,
+		&i.UserMsgStat,
+		&i.MsgCountByTime,
+		&i.MsgIDAtTimeStart,
+	)
+	q.logQuery(getChatStat, logFields, err, start)
 	return i, err
 }
 

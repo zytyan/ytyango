@@ -27,9 +27,6 @@ func New(db DBTX) *Queries {
 func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	q := Queries{db: db}
 	var err error
-	if q.getChatStatStmt, err = db.PrepareContext(ctx, getChatStat); err != nil {
-		return nil, fmt.Errorf("error preparing query getChatStat: %w", err)
-	}
 	if q.delCocCharAttrStmt, err = db.PrepareContext(ctx, delCocCharAttr); err != nil {
 		return nil, fmt.Errorf("error preparing query DelCocCharAttr: %w", err)
 	}
@@ -84,11 +81,17 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.createNewUserStmt, err = db.PrepareContext(ctx, createNewUser); err != nil {
 		return nil, fmt.Errorf("error preparing query createNewUser: %w", err)
 	}
+	if q.getChatStatStmt, err = db.PrepareContext(ctx, getChatStat); err != nil {
+		return nil, fmt.Errorf("error preparing query getChatStat: %w", err)
+	}
 	if q.getPicByRateAndRandKeyStmt, err = db.PrepareContext(ctx, getPicByRateAndRandKey); err != nil {
 		return nil, fmt.Errorf("error preparing query getPicByRateAndRandKey: %w", err)
 	}
 	if q.getPicByRateFirstStmt, err = db.PrepareContext(ctx, getPicByRateFirst); err != nil {
 		return nil, fmt.Errorf("error preparing query getPicByRateFirst: %w", err)
+	}
+	if q.getPicRateCountsStmt, err = db.PrepareContext(ctx, getPicRateCounts); err != nil {
+		return nil, fmt.Errorf("error preparing query getPicRateCounts: %w", err)
 	}
 	if q.getUserByIdStmt, err = db.PrepareContext(ctx, getUserById); err != nil {
 		return nil, fmt.Errorf("error preparing query getUserById: %w", err)
@@ -113,11 +116,6 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 
 func (q *Queries) Close() error {
 	var err error
-	if q.getChatStatStmt != nil {
-		if cerr := q.getChatStatStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing getChatStatStmt: %w", cerr)
-		}
-	}
 	if q.delCocCharAttrStmt != nil {
 		if cerr := q.delCocCharAttrStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing delCocCharAttrStmt: %w", cerr)
@@ -208,6 +206,11 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing createNewUserStmt: %w", cerr)
 		}
 	}
+	if q.getChatStatStmt != nil {
+		if cerr := q.getChatStatStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getChatStatStmt: %w", cerr)
+		}
+	}
 	if q.getPicByRateAndRandKeyStmt != nil {
 		if cerr := q.getPicByRateAndRandKeyStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing getPicByRateAndRandKeyStmt: %w", cerr)
@@ -216,6 +219,11 @@ func (q *Queries) Close() error {
 	if q.getPicByRateFirstStmt != nil {
 		if cerr := q.getPicByRateFirstStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing getPicByRateFirstStmt: %w", cerr)
+		}
+	}
+	if q.getPicRateCountsStmt != nil {
+		if cerr := q.getPicRateCountsStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getPicRateCountsStmt: %w", cerr)
 		}
 	}
 	if q.getUserByIdStmt != nil {
@@ -290,7 +298,6 @@ type Queries struct {
 	SlowQueryThreshold          time.Duration
 	txID                        string
 	tx                          *sql.Tx
-	getChatStatStmt             *sql.Stmt
 	delCocCharAttrStmt          *sql.Stmt
 	getBiliInlineDataStmt       *sql.Stmt
 	getCocCharAllAttrStmt       *sql.Stmt
@@ -309,8 +316,10 @@ type Queries struct {
 	createChatStatDailyStmt     *sql.Stmt
 	createNewChatCfgDefaultStmt *sql.Stmt
 	createNewUserStmt           *sql.Stmt
+	getChatStatStmt             *sql.Stmt
 	getPicByRateAndRandKeyStmt  *sql.Stmt
 	getPicByRateFirstStmt       *sql.Stmt
+	getPicRateCountsStmt        *sql.Stmt
 	getUserByIdStmt             *sql.Stmt
 	insertPicStmt               *sql.Stmt
 	updateChatCfgStmt           *sql.Stmt
@@ -326,7 +335,6 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		SlowQueryThreshold:          q.SlowQueryThreshold,
 		txID:                        fmt.Sprintf("%p", tx),
 		tx:                          tx,
-		getChatStatStmt:             q.getChatStatStmt,
 		delCocCharAttrStmt:          q.delCocCharAttrStmt,
 		getBiliInlineDataStmt:       q.getBiliInlineDataStmt,
 		getCocCharAllAttrStmt:       q.getCocCharAllAttrStmt,
@@ -345,8 +353,10 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		createChatStatDailyStmt:     q.createChatStatDailyStmt,
 		createNewChatCfgDefaultStmt: q.createNewChatCfgDefaultStmt,
 		createNewUserStmt:           q.createNewUserStmt,
+		getChatStatStmt:             q.getChatStatStmt,
 		getPicByRateAndRandKeyStmt:  q.getPicByRateAndRandKeyStmt,
 		getPicByRateFirstStmt:       q.getPicByRateFirstStmt,
+		getPicRateCountsStmt:        q.getPicRateCountsStmt,
 		getUserByIdStmt:             q.getUserByIdStmt,
 		insertPicStmt:               q.insertPicStmt,
 		updateChatCfgStmt:           q.updateChatCfgStmt,

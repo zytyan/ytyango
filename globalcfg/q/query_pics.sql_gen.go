@@ -65,7 +65,47 @@ func (q *Queries) getPicByRateFirst(ctx context.Context, userRate int64) (string
 	return file_id, err
 }
 
-const insertPic = `-- name: insertPic :exec
+const getPicRateCounts = `-- name: getPicRateCounts :many
+SELECT rate, count
+FROM pic_rate_counter
+ORDER BY rate
+`
+
+func (q *Queries) getPicRateCounts(ctx context.Context) ([]PicRateCounter, error) {
+	var logFields []zap.Field
+	var start time.Time
+	if q.logger != nil {
+		logFields = make([]zap.Field, 0, 0+5)
+		start = time.Now()
+	}
+	rows, err := q.query(ctx, q.getPicRateCountsStmt, getPicRateCounts)
+	if err != nil {
+		q.logQuery(getPicRateCounts, logFields, err, start)
+		return nil, err
+	}
+	defer rows.Close()
+	var items []PicRateCounter
+	for rows.Next() {
+		var i PicRateCounter
+		if err = rows.Scan(&i.Rate, &i.Count); err != nil {
+			q.logQuery(getPicRateCounts, logFields, err, start)
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err = rows.Close(); err != nil {
+		q.logQuery(getPicRateCounts, logFields, err, start)
+		return nil, err
+	}
+	if err = rows.Err(); err != nil {
+		q.logQuery(getPicRateCounts, logFields, err, start)
+		return nil, err
+	}
+	q.logQuery(getPicRateCounts, logFields, err, start)
+	return items, nil
+}
+
+const insertPic = `-- name: insertPic :one
 INSERT INTO saved_pics (file_uid, file_id, bot_rate, rand_key, user_rate)
 VALUES (?, ?, ?, ?, ?)
 ON CONFLICT(file_uid) DO UPDATE SET file_id   = excluded.file_id,
@@ -77,6 +117,7 @@ ON CONFLICT(file_uid) DO UPDATE SET file_id   = excluded.file_id,
                                             ELSE
                                                 excluded.user_rate
                                             END
+RETURNING file_uid, file_id, bot_rate, rand_key, user_rate, user_rating_sum, rate_user_count
 `
 
 type insertPicParams struct {
@@ -87,7 +128,7 @@ type insertPicParams struct {
 	UserRate int64  `json:"user_rate"`
 }
 
-func (q *Queries) insertPic(ctx context.Context, arg insertPicParams) error {
+func (q *Queries) insertPic(ctx context.Context, arg insertPicParams) (SavedPic, error) {
 	var logFields []zap.Field
 	var start time.Time
 	if q.logger != nil {
@@ -101,13 +142,23 @@ func (q *Queries) insertPic(ctx context.Context, arg insertPicParams) error {
 			zap.Int64("user_rate", arg.UserRate),
 		)
 	}
-	_, err := q.exec(ctx, q.insertPicStmt, insertPic,
+	row := q.queryRow(ctx, q.insertPicStmt, insertPic,
 		arg.FileUid,
 		arg.FileID,
 		arg.BotRate,
 		arg.RandKey,
 		arg.UserRate,
 	)
+	var i SavedPic
+	err := row.Scan(
+		&i.FileUid,
+		&i.FileID,
+		&i.BotRate,
+		&i.RandKey,
+		&i.UserRate,
+		&i.UserRatingSum,
+		&i.RateUserCount,
+	)
 	q.logQuery(insertPic, logFields, err, start)
-	return err
+	return i, err
 }

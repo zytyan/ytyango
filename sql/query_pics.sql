@@ -14,7 +14,7 @@ WHERE user_rate = ?
 ORDER BY rand_key
 LIMIT 1;
 
--- name: insertPic :exec
+-- name: insertPic :one
 INSERT INTO saved_pics (file_uid, file_id, bot_rate, rand_key, user_rate)
 VALUES (?, ?, ?, ?, ?)
 ON CONFLICT(file_uid) DO UPDATE SET file_id   = excluded.file_id,
@@ -25,4 +25,11 @@ ON CONFLICT(file_uid) DO UPDATE SET file_id   = excluded.file_id,
                                                 THEN excluded.bot_rate
                                             ELSE
                                                 excluded.user_rate
-                                            END;
+                                            END
+RETURNING *;
+
+
+-- name: getPicRateCounts :many
+SELECT *
+FROM pic_rate_counter
+ORDER BY rate;
