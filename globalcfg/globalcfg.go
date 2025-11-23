@@ -140,19 +140,22 @@ var db *sql.DB
 var Q *q.Queries
 
 func initDatabase(dbPath string) *sql.DB {
+	check := func(_ sql.Result, e error) {
+		if e != nil {
+			panic(e)
+		}
+	}
 	d, err := sql.Open("sqlite3", dbPath)
 	if err != nil {
 		panic(err)
 	}
-	if _, err = d.Exec("PRAGMA journal_mode=WAL;"); err != nil {
-		panic(err)
-	}
-	if _, err = d.Exec("PRAGMA synchronous=OFF;"); err != nil {
-		panic(err)
-	}
-	if _, err = d.Exec("PRAGMA cache_size=-80000;"); err != nil {
-		panic(err)
-	}
+	check(d.Exec(`PRAGMA journal_mode=WAL;
+						PRAGMA wal_autocheckpoint=1000;
+						PRAGMA synchronous=NORMAL;
+						PRAGMA mmap_size=67108864; -- 64MB
+						PRAGMA cache_size = -32768; -- 32MB page cache
+						PRAGMA busy_timeout=5000;`,
+	))
 	return d
 }
 
