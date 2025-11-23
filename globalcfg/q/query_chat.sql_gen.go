@@ -57,6 +57,143 @@ func (q *Queries) CreateNewChatDefaultCfg(ctx context.Context, id int64) (chatCf
 	return i, err
 }
 
+const updateChatStatDaily = `-- name: UpdateChatStatDaily :exec
+UPDATE chat_stat_daily
+SET message_count        = ?,
+    photo_count          = ?,
+    video_count          = ?,
+    sticker_count        = ?,
+    forward_count        = ?,
+    mars_count           = ?,
+    max_mars_count       = ?,
+    racy_count           = ?,
+    adult_count          = ?,
+    download_video_count = ?,
+    download_audio_count = ?,
+    dio_add_user_count   = ?,
+    dio_ban_user_count   = ?,
+    user_msg_stat        = ?,
+    msg_count_by_time    = ?,
+    msg_id_at_time_start = ?
+WHERE chat_id = ?
+  AND stat_date = ?
+`
+
+type UpdateChatStatDailyParams struct {
+	MessageCount       int64          `json:"message_count"`
+	PhotoCount         int64          `json:"photo_count"`
+	VideoCount         int64          `json:"video_count"`
+	StickerCount       int64          `json:"sticker_count"`
+	ForwardCount       int64          `json:"forward_count"`
+	MarsCount          int64          `json:"mars_count"`
+	MaxMarsCount       int64          `json:"max_mars_count"`
+	RacyCount          int64          `json:"racy_count"`
+	AdultCount         int64          `json:"adult_count"`
+	DownloadVideoCount int64          `json:"download_video_count"`
+	DownloadAudioCount int64          `json:"download_audio_count"`
+	DioAddUserCount    int64          `json:"dio_add_user_count"`
+	DioBanUserCount    int64          `json:"dio_ban_user_count"`
+	UserMsgStat        UserMsgStatMap `json:"user_msg_stat"`
+	MsgCountByTime     TenMinuteStats `json:"msg_count_by_time"`
+	MsgIDAtTimeStart   TenMinuteStats `json:"msg_id_at_time_start"`
+	ChatID             int64          `json:"chat_id"`
+	StatDate           int64          `json:"stat_date"`
+}
+
+func (q *Queries) UpdateChatStatDaily(ctx context.Context, arg UpdateChatStatDailyParams) error {
+	var logFields []zap.Field
+	var start time.Time
+	if q.logger != nil {
+		logFields = make([]zap.Field, 0, 18+5)
+		start = time.Now()
+		logFields = append(logFields,
+			zap.Int64("message_count", arg.MessageCount),
+			zap.Int64("photo_count", arg.PhotoCount),
+			zap.Int64("video_count", arg.VideoCount),
+			zap.Int64("sticker_count", arg.StickerCount),
+			zap.Int64("forward_count", arg.ForwardCount),
+			zap.Int64("mars_count", arg.MarsCount),
+			zap.Int64("max_mars_count", arg.MaxMarsCount),
+			zap.Int64("racy_count", arg.RacyCount),
+			zap.Int64("adult_count", arg.AdultCount),
+			zap.Int64("download_video_count", arg.DownloadVideoCount),
+			zap.Int64("download_audio_count", arg.DownloadAudioCount),
+			zap.Int64("dio_add_user_count", arg.DioAddUserCount),
+			zap.Int64("dio_ban_user_count", arg.DioBanUserCount),
+			zap.Any("user_msg_stat", arg.UserMsgStat),
+			zap.Any("msg_count_by_time", arg.MsgCountByTime),
+			zap.Any("msg_id_at_time_start", arg.MsgIDAtTimeStart),
+			zap.Int64("chat_id", arg.ChatID),
+			zap.Int64("stat_date", arg.StatDate),
+		)
+	}
+	_, err := q.exec(ctx, q.updateChatStatDailyStmt, updateChatStatDaily,
+		arg.MessageCount,
+		arg.PhotoCount,
+		arg.VideoCount,
+		arg.StickerCount,
+		arg.ForwardCount,
+		arg.MarsCount,
+		arg.MaxMarsCount,
+		arg.RacyCount,
+		arg.AdultCount,
+		arg.DownloadVideoCount,
+		arg.DownloadAudioCount,
+		arg.DioAddUserCount,
+		arg.DioBanUserCount,
+		arg.UserMsgStat,
+		arg.MsgCountByTime,
+		arg.MsgIDAtTimeStart,
+		arg.ChatID,
+		arg.StatDate,
+	)
+	q.logQuery(updateChatStatDaily, logFields, err, start)
+	return err
+}
+
+const createChatStatDaily = `-- name: createChatStatDaily :one
+INSERT INTO chat_stat_daily (chat_id, stat_date)
+VALUES (?, ?)
+RETURNING chat_id, stat_date, message_count, photo_count, video_count, sticker_count, forward_count, mars_count, max_mars_count, racy_count, adult_count, download_video_count, download_audio_count, dio_add_user_count, dio_ban_user_count, user_msg_stat, msg_count_by_time, msg_id_at_time_start
+`
+
+func (q *Queries) createChatStatDaily(ctx context.Context, chatID int64, statDate int64) (ChatStatDaily, error) {
+	var logFields []zap.Field
+	var start time.Time
+	if q.logger != nil {
+		logFields = make([]zap.Field, 0, 2+5)
+		start = time.Now()
+		logFields = append(logFields,
+			zap.Int64("chat_id", chatID),
+			zap.Int64("stat_date", statDate),
+		)
+	}
+	row := q.queryRow(ctx, q.createChatStatDailyStmt, createChatStatDaily, chatID, statDate)
+	var i ChatStatDaily
+	err := row.Scan(
+		&i.ChatID,
+		&i.StatDate,
+		&i.MessageCount,
+		&i.PhotoCount,
+		&i.VideoCount,
+		&i.StickerCount,
+		&i.ForwardCount,
+		&i.MarsCount,
+		&i.MaxMarsCount,
+		&i.RacyCount,
+		&i.AdultCount,
+		&i.DownloadVideoCount,
+		&i.DownloadAudioCount,
+		&i.DioAddUserCount,
+		&i.DioBanUserCount,
+		&i.UserMsgStat,
+		&i.MsgCountByTime,
+		&i.MsgIDAtTimeStart,
+	)
+	q.logQuery(createChatStatDaily, logFields, err, start)
+	return i, err
+}
+
 const getChatById = `-- name: getChatById :one
 
 SELECT id, web_id, auto_cvt_bili, auto_ocr, auto_calculate, auto_exchange, auto_check_adult, save_messages, enable_coc, resp_nsfw_msg
@@ -114,6 +251,50 @@ func (q *Queries) getChatIdByWebId(ctx context.Context, webID sql.NullInt64) (in
 	err := row.Scan(&id)
 	q.logQuery(getChatIdByWebId, logFields, err, start)
 	return id, err
+}
+
+const getChatStat = `-- name: getChatStat :one
+SELECT chat_id, stat_date, message_count, photo_count, video_count, sticker_count, forward_count, mars_count, max_mars_count, racy_count, adult_count, download_video_count, download_audio_count, dio_add_user_count, dio_ban_user_count, user_msg_stat, msg_count_by_time, msg_id_at_time_start
+FROM chat_stat_daily
+WHERE chat_id = ?
+  AND stat_date = ?
+`
+
+func (q *Queries) getChatStat(ctx context.Context, chatID int64, statDate int64) (ChatStatDaily, error) {
+	var logFields []zap.Field
+	var start time.Time
+	if q.logger != nil {
+		logFields = make([]zap.Field, 0, 2+5)
+		start = time.Now()
+		logFields = append(logFields,
+			zap.Int64("chat_id", chatID),
+			zap.Int64("stat_date", statDate),
+		)
+	}
+	row := q.queryRow(ctx, q.getChatStatStmt, getChatStat, chatID, statDate)
+	var i ChatStatDaily
+	err := row.Scan(
+		&i.ChatID,
+		&i.StatDate,
+		&i.MessageCount,
+		&i.PhotoCount,
+		&i.VideoCount,
+		&i.StickerCount,
+		&i.ForwardCount,
+		&i.MarsCount,
+		&i.MaxMarsCount,
+		&i.RacyCount,
+		&i.AdultCount,
+		&i.DownloadVideoCount,
+		&i.DownloadAudioCount,
+		&i.DioAddUserCount,
+		&i.DioBanUserCount,
+		&i.UserMsgStat,
+		&i.MsgCountByTime,
+		&i.MsgIDAtTimeStart,
+	)
+	q.logQuery(getChatStat, logFields, err, start)
+	return i, err
 }
 
 const updateChat = `-- name: updateChat :exec

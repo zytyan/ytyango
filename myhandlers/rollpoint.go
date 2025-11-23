@@ -3,37 +3,15 @@ package myhandlers
 import (
 	"fmt"
 	"html"
+	"main/globalcfg/h"
 	"math/rand"
 	"net/url"
 	"strconv"
 	"time"
-	"unicode"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 )
-
-func splitCommand(command string) (string, string) {
-	i := 0
-	cmd, args := "", ""
-	for j, r := range command {
-		if unicode.IsSpace(r) {
-			if i == 0 {
-				cmd = command[:j]
-			}
-			i = j
-		} else {
-			if i != 0 {
-				args = command[j:]
-				break
-			}
-		}
-	}
-	if i == 0 {
-		return command, ""
-	}
-	return cmd, args
-}
 
 func getText(ctx *ext.Context) string {
 	return getTextMsg(ctx.EffectiveMessage)
@@ -98,7 +76,7 @@ func Roll(bot *gotgbot.Bot, ctx *ext.Context) error {
 
 func Google(bot *gotgbot.Bot, ctx *ext.Context) error {
 	text := getText(ctx)
-	_, query := splitCommand(text)
+	query := h.TrimCmd(text)
 	if query == "" {
 		_, err := ctx.Message.Reply(bot, "好消息，本群已和Google达成战略合作，以后有问题可以去Google搜索，不用来群里问啦！\n"+
 			"此外，您还可以使用 /google 关键字 来生成搜索链接。", nil)
@@ -111,7 +89,7 @@ func Google(bot *gotgbot.Bot, ctx *ext.Context) error {
 }
 func Wiki(bot *gotgbot.Bot, ctx *ext.Context) error {
 	text := getText(ctx)
-	_, query := splitCommand(text)
+	query := h.TrimCmd(text)
 	if query == "" {
 		_, err := ctx.Message.Reply(bot, `<a href="https://zh.wikipedia.org/wiki/">维基百科</a>`, &gotgbot.SendMessageOpts{ParseMode: "HTML"})
 		if err != nil {

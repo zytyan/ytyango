@@ -24,10 +24,7 @@ func marsCounter(ctx *gin.Context) {
 		ctx.AbortWithStatus(400)
 		return
 	}
-	WithGroupLockToday(marsInfo.GroupID, func(g *GroupStatDaily) {
-		g.MarsCount++
-		g.MaxMarsCount = max(g.MaxMarsCount, marsInfo.MarsCount)
-	})
+
 }
 
 const (

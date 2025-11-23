@@ -20,7 +20,7 @@ func SolveMath(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
 	force := false
 	text = mathReplacer.Replace(text)
 	if strings.HasPrefix(text, "/") {
-		_, text = splitCommand(text)
+		text = h.TrimCmd(text)
 		force = true
 	}
 	res, err := mathparser.Evaluate(text)
@@ -60,7 +60,7 @@ var mathReplacer = func() *strings.Replacer {
 }()
 
 func NeedSolve(msg *gotgbot.Message) bool {
-	if !h.ChatAutoCalculate(msg.Chat.Id){
+	if !h.ChatAutoCalculate(msg.Chat.Id) {
 		return false
 	}
 	text := msg.Text

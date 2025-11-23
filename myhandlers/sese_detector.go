@@ -51,13 +51,11 @@ func replyNsfw(bot *gotgbot.Bot, msg *gotgbot.Message, result *azure.ModeratorV2
 	photo := msg.Photo[len(msg.Photo)-1]
 
 	go saveNsfw(photo.FileUniqueId, photo.FileId, severity)
-	WithGroupLockToday(msg.Chat.Id, func(g *GroupStatDaily) {
-		if severity >= 6 {
-			g.AdultCount++
-		} else {
-			g.RacyCount++
-		}
-	})
+	if severity >= 6 {
+		g.Q.GetChatStatToday(msg.Chat.Id, 10).IncAdultCount()
+	} else {
+		g.Q.GetChatStatToday(msg.Chat.Id, 10).IncRacyCount()
+	}
 	var spoiler = 0
 	if msg.HasMediaSpoiler {
 		spoiler = 1

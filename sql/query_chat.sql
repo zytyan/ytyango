@@ -35,4 +35,36 @@ SET auto_cvt_bili=?,
     save_messages=?,
     enable_coc=?,
     resp_nsfw_msg=?
-WHERE id = ?
+WHERE id = ?;
+
+-- name: createChatStatDaily :one
+INSERT INTO chat_stat_daily (chat_id, stat_date)
+VALUES (?, ?)
+RETURNING *;
+
+-- name: UpdateChatStatDaily :exec
+UPDATE chat_stat_daily
+SET message_count        = ?,
+    photo_count          = ?,
+    video_count          = ?,
+    sticker_count        = ?,
+    forward_count        = ?,
+    mars_count           = ?,
+    max_mars_count       = ?,
+    racy_count           = ?,
+    adult_count          = ?,
+    download_video_count = ?,
+    download_audio_count = ?,
+    dio_add_user_count   = ?,
+    dio_ban_user_count   = ?,
+    user_msg_stat        = ?,
+    msg_count_by_time    = ?,
+    msg_id_at_time_start = ?
+WHERE chat_id = ?
+  AND stat_date = ?;
+
+-- name: getChatStat :one
+SELECT *
+FROM chat_stat_daily
+WHERE chat_id = ?
+  AND stat_date = ?;

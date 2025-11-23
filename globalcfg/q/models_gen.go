@@ -21,6 +21,27 @@ type CharacterAttr struct {
 	AttrValue string `json:"attr_value"`
 }
 
+type ChatStatDaily struct {
+	ChatID             int64          `json:"chat_id"`
+	StatDate           int64          `json:"stat_date"`
+	MessageCount       int64          `json:"message_count"`
+	PhotoCount         int64          `json:"photo_count"`
+	VideoCount         int64          `json:"video_count"`
+	StickerCount       int64          `json:"sticker_count"`
+	ForwardCount       int64          `json:"forward_count"`
+	MarsCount          int64          `json:"mars_count"`
+	MaxMarsCount       int64          `json:"max_mars_count"`
+	RacyCount          int64          `json:"racy_count"`
+	AdultCount         int64          `json:"adult_count"`
+	DownloadVideoCount int64          `json:"download_video_count"`
+	DownloadAudioCount int64          `json:"download_audio_count"`
+	DioAddUserCount    int64          `json:"dio_add_user_count"`
+	DioBanUserCount    int64          `json:"dio_ban_user_count"`
+	UserMsgStat        UserMsgStatMap `json:"user_msg_stat"`
+	MsgCountByTime     TenMinuteStats `json:"msg_count_by_time"`
+	MsgIDAtTimeStart   TenMinuteStats `json:"msg_id_at_time_start"`
+}
+
 type PicRateCounter struct {
 	Rate  int64 `json:"rate"`
 	Count int64 `json:"count"`

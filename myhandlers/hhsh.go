@@ -3,6 +3,7 @@ package myhandlers
 import (
 	"fmt"
 	"io"
+	"main/globalcfg/h"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -23,7 +24,7 @@ var hhshRe = regexp.MustCompile(`^[a-zA-Z0-9\s]+$`)
 
 func Hhsh(bot *gotgbot.Bot, ctx *ext.Context) error {
 	text := getText(ctx)
-	_, query := splitCommand(text)
+	query := h.TrimCmd(text)
 	if query == "" {
 		_, err := ctx.Message.Reply(bot, `<a href="https://lab.magiconch.com/nbnhhsh/">能不能好好说话</a>`, &gotgbot.SendMessageOpts{ParseMode: "HTML"})
 		return err

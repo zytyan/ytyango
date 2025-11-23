@@ -63,8 +63,14 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.updateBiliInlineMsgIdStmt, err = db.PrepareContext(ctx, updateBiliInlineMsgId); err != nil {
 		return nil, fmt.Errorf("error preparing query UpdateBiliInlineMsgId: %w", err)
 	}
+	if q.updateChatStatDailyStmt, err = db.PrepareContext(ctx, updateChatStatDaily); err != nil {
+		return nil, fmt.Errorf("error preparing query UpdateChatStatDaily: %w", err)
+	}
 	if q.updateYtDlpCacheStmt, err = db.PrepareContext(ctx, updateYtDlpCache); err != nil {
 		return nil, fmt.Errorf("error preparing query UpdateYtDlpCache: %w", err)
+	}
+	if q.createChatStatDailyStmt, err = db.PrepareContext(ctx, createChatStatDaily); err != nil {
+		return nil, fmt.Errorf("error preparing query createChatStatDaily: %w", err)
 	}
 	if q.createNewUserStmt, err = db.PrepareContext(ctx, createNewUser); err != nil {
 		return nil, fmt.Errorf("error preparing query createNewUser: %w", err)
@@ -74,6 +80,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	}
 	if q.getChatIdByWebIdStmt, err = db.PrepareContext(ctx, getChatIdByWebId); err != nil {
 		return nil, fmt.Errorf("error preparing query getChatIdByWebId: %w", err)
+	}
+	if q.getChatStatStmt, err = db.PrepareContext(ctx, getChatStat); err != nil {
+		return nil, fmt.Errorf("error preparing query getChatStat: %w", err)
 	}
 	if q.getPicByRateAndRandKeyStmt, err = db.PrepareContext(ctx, getPicByRateAndRandKey); err != nil {
 		return nil, fmt.Errorf("error preparing query getPicByRateAndRandKey: %w", err)
@@ -164,9 +173,19 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing updateBiliInlineMsgIdStmt: %w", cerr)
 		}
 	}
+	if q.updateChatStatDailyStmt != nil {
+		if cerr := q.updateChatStatDailyStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing updateChatStatDailyStmt: %w", cerr)
+		}
+	}
 	if q.updateYtDlpCacheStmt != nil {
 		if cerr := q.updateYtDlpCacheStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing updateYtDlpCacheStmt: %w", cerr)
+		}
+	}
+	if q.createChatStatDailyStmt != nil {
+		if cerr := q.createChatStatDailyStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing createChatStatDailyStmt: %w", cerr)
 		}
 	}
 	if q.createNewUserStmt != nil {
@@ -182,6 +201,11 @@ func (q *Queries) Close() error {
 	if q.getChatIdByWebIdStmt != nil {
 		if cerr := q.getChatIdByWebIdStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing getChatIdByWebIdStmt: %w", cerr)
+		}
+	}
+	if q.getChatStatStmt != nil {
+		if cerr := q.getChatStatStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getChatStatStmt: %w", cerr)
 		}
 	}
 	if q.getPicByRateAndRandKeyStmt != nil {
@@ -278,10 +302,13 @@ type Queries struct {
 	setCocCharAttrStmt          *sql.Stmt
 	setPrprCacheStmt            *sql.Stmt
 	updateBiliInlineMsgIdStmt   *sql.Stmt
+	updateChatStatDailyStmt     *sql.Stmt
 	updateYtDlpCacheStmt        *sql.Stmt
+	createChatStatDailyStmt     *sql.Stmt
 	createNewUserStmt           *sql.Stmt
 	getChatByIdStmt             *sql.Stmt
 	getChatIdByWebIdStmt        *sql.Stmt
+	getChatStatStmt             *sql.Stmt
 	getPicByRateAndRandKeyStmt  *sql.Stmt
 	getPicByRateFirstStmt       *sql.Stmt
 	getUserByIdStmt             *sql.Stmt
@@ -311,10 +338,13 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		setCocCharAttrStmt:          q.setCocCharAttrStmt,
 		setPrprCacheStmt:            q.setPrprCacheStmt,
 		updateBiliInlineMsgIdStmt:   q.updateBiliInlineMsgIdStmt,
+		updateChatStatDailyStmt:     q.updateChatStatDailyStmt,
 		updateYtDlpCacheStmt:        q.updateYtDlpCacheStmt,
+		createChatStatDailyStmt:     q.createChatStatDailyStmt,
 		createNewUserStmt:           q.createNewUserStmt,
 		getChatByIdStmt:             q.getChatByIdStmt,
 		getChatIdByWebIdStmt:        q.getChatIdByWebIdStmt,
+		getChatStatStmt:             q.getChatStatStmt,
 		getPicByRateAndRandKeyStmt:  q.getPicByRateAndRandKeyStmt,
 		getPicByRateFirstStmt:       q.getPicByRateFirstStmt,
 		getUserByIdStmt:             q.getUserByIdStmt,
