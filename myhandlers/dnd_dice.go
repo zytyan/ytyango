@@ -70,7 +70,7 @@ func getAttrTarget(ctx *ext.Context) (int64, string) {
 }
 func SetDndAttr(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
 	text := width.Narrow.String(ctx.EffectiveMessage.Text)
-	lines := strings.Split(text, "\n")
+	lines := strings.Fields(text)
 	buf := strings.Builder{}
 	userId, username := getAttrTarget(ctx)
 	buf.WriteString(fmt.Sprintf("用户：%s\n", username))

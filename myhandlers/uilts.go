@@ -26,14 +26,6 @@ func GetMsgInfo(bot *gotgbot.Bot, ctx *ext.Context) error {
 	return err
 }
 
-func cutString(s string, length int) string {
-	rl := []rune(s)
-	if len(rl) <= length {
-		return s
-	}
-	return string(rl[:length-3]) + "..."
-}
-
 func MakeReplyToMsgID(msgId int64) *gotgbot.ReplyParameters {
 	if msgId == 0 {
 		return nil

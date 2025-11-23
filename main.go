@@ -120,7 +120,7 @@ func main() {
 
 	dispatcher.AddHandler(handlers.NewMessage(myhandlers.HasSinaGif, myhandlers.Gif2Mp4))
 	dispatcher.AddHandler(handlers.NewCallback(myhandlers.IsBilibiliBtn, myhandlers.DownloadVideoCallback))
-	dispatcher.AddHandler(handlers.NewMessage(myhandlers.HasImage, myhandlers.SeseDetect))
+	dispatcher.AddHandler(handlers.NewMessage(myhandlers.DetectNsfwPhoto, myhandlers.NsfwDetect))
 	dispatcher.AddHandler(handlers.NewMessage(myhandlers.NeedSolve, myhandlers.SolveMath))
 	dispatcher.AddHandler(handlers.NewMessage(myhandlers.IsCalcExchangeRate, myhandlers.ExchangeRateCalc))
 	dispatcher.AddHandler(handlers.NewMessage(myhandlers.IsBilibiliInlineBtn2, myhandlers.SaveBiliMsgCallbackMsgId))
