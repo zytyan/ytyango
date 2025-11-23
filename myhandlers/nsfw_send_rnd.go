@@ -14,8 +14,11 @@ var reRank = regexp.MustCompile(`(\d)(\b\d)?`)
 
 func SendRandRacy(bot *gotgbot.Bot, ctx *ext.Context) error {
 	submatch := reRank.FindStringSubmatch(ctx.Message.Text)
-	start := defaultAtoi(submatch[0], 2)
-	end := defaultAtoi(submatch[1], start)
+	start, end := 2, 2
+	if submatch != nil {
+		start = defaultAtoi(submatch[1], 2)
+		end = defaultAtoi(submatch[2], start)
+	}
 	photo, err := g.Q.GetPicByUserRateRange(context.Background(), start, end)
 	if err != nil {
 		return err
