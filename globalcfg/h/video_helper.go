@@ -23,7 +23,7 @@ func PrepareTgVideo(file string, replyMsgId int64, opts ...func(opts *gotgbot.Se
 		CaptionEntities:       nil,
 		ShowCaptionAboveMedia: false,
 		HasSpoiler:            false,
-		SupportsStreaming:     false,
+		SupportsStreaming:     true,
 		DisableNotification:   false,
 		ProtectContent:        false,
 		AllowPaidBroadcast:    false,

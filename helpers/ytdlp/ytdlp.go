@@ -159,7 +159,7 @@ func parseBilibiliJsonData(body io.Reader) (Info, error) {
 	info.Title = defaultJsonString(data, `data.title`, "未知标题")
 	info.Uploader = defaultJsonString(data, `data.owner.name`, "未知上传者")
 	info.Desc = defaultJsonString(data, `data.desc`, "")
-	info.Desc = defaultJsonString(data, `data.desc_v2.*.raw_text`, "-")
+	info.Desc = defaultJsonString(data, `data.desc_v2.*.raw_text`, info.Desc)
 	return info, nil
 }
 
@@ -289,9 +289,9 @@ func (c *Req) runWithCtx(ctx context.Context) (resp *Resp, err error) {
 	if err != nil {
 		resp.InfoJsonErr = err
 	} else {
-		resp.Info.Title = defaultJsonString(infoJsonFile, ``, `未知标题`)
-		resp.Info.Uploader = defaultJsonString(infoJsonFile, ``, `未知上传者`)
-		resp.Info.Desc = defaultJsonString(infoJsonFile, ``, `-`)
+		resp.Info.Title = defaultJsonString(infoJsonFile, `title`, `未知标题`)
+		resp.Info.Uploader = defaultJsonString(infoJsonFile, `uploader`, `未知上传者`)
+		resp.Info.Desc = defaultJsonString(infoJsonFile, `description`, ``)
 	}
 
 	return resp, nil
