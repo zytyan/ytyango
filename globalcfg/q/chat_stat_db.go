@@ -277,6 +277,6 @@ func (q *Queries) ChatStatOfDay(ctx context.Context, chatId, unixTime int64) (Ch
 		return ChatStatDaily{}, 0, err
 	}
 	day := (unixTime + cfg.Timezone) / daySeconds
-	daily, err := q.getOrCreateChatStat(ctx, chatId, day)
+	daily, err := q.getChatStat(ctx, chatId, day)
 	return daily, cfg.Timezone, err
 }
