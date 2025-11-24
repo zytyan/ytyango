@@ -34,7 +34,7 @@ func SendRandRacy(bot *gotgbot.Bot, ctx *ext.Context) error {
 		_, _ = ctx.EffectiveMessage.Reply(bot, "没有涩图~", nil)
 		return err
 	}
-	replyMarkup := BuildNsfwRateButton(photo.FileUid, nsfwCallbackButtonCmdScore)
+	replyMarkup := BuildNsfwRateButton(photo.FileUid, "")
 	_, err = bot.SendPhoto(ctx.EffectiveChat.Id, gotgbot.InputFileByID(photo.FileID), &gotgbot.SendPhotoOpts{
 		ReplyParameters: MakeReplyToMsgID(ctx.EffectiveMessage.MessageId),
 		ReplyMarkup:     replyMarkup,
