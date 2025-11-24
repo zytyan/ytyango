@@ -7,7 +7,7 @@ servers:
   - url: http://127.0.0.1:4021
 
 paths:
-  /api/ping:
+  /ping:
     get:
       tags:
         - Health
@@ -20,7 +20,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PingResponse'
-  /api/v1/tg/username:
+  /tg/username:
     get:
       tags:
         - Telegram
@@ -47,7 +47,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
-  /api/v1/tg/profile_photo:
+  /tg/profile_photo:
     get:
       tags:
         - Telegram
@@ -75,7 +75,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
-  /api/v1/tg/group_stat:
+  /tg/group_stat:
     get:
       tags:
         - Telegram
@@ -110,7 +110,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
-  /api/v1/tg/search:
+  /tg/search:
     get:
       tags:
         - Search

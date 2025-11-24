@@ -11,310 +11,6 @@ import (
 	"github.com/ogen-go/ogen/validate"
 )
 
-// Encode encodes APIV1TgGroupStatGetBadRequest as json.
-func (s *APIV1TgGroupStatGetBadRequest) Encode(e *jx.Encoder) {
-	unwrapped := (*ErrorResponse)(s)
-
-	unwrapped.Encode(e)
-}
-
-// Decode decodes APIV1TgGroupStatGetBadRequest from json.
-func (s *APIV1TgGroupStatGetBadRequest) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode APIV1TgGroupStatGetBadRequest to nil")
-	}
-	var unwrapped ErrorResponse
-	if err := func() error {
-		if err := unwrapped.Decode(d); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return errors.Wrap(err, "alias")
-	}
-	*s = APIV1TgGroupStatGetBadRequest(unwrapped)
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *APIV1TgGroupStatGetBadRequest) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *APIV1TgGroupStatGetBadRequest) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes APIV1TgGroupStatGetUnauthorized as json.
-func (s *APIV1TgGroupStatGetUnauthorized) Encode(e *jx.Encoder) {
-	unwrapped := (*ErrorResponse)(s)
-
-	unwrapped.Encode(e)
-}
-
-// Decode decodes APIV1TgGroupStatGetUnauthorized from json.
-func (s *APIV1TgGroupStatGetUnauthorized) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode APIV1TgGroupStatGetUnauthorized to nil")
-	}
-	var unwrapped ErrorResponse
-	if err := func() error {
-		if err := unwrapped.Decode(d); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return errors.Wrap(err, "alias")
-	}
-	*s = APIV1TgGroupStatGetUnauthorized(unwrapped)
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *APIV1TgGroupStatGetUnauthorized) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *APIV1TgGroupStatGetUnauthorized) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes APIV1TgSearchGetBadRequest as json.
-func (s *APIV1TgSearchGetBadRequest) Encode(e *jx.Encoder) {
-	unwrapped := (*ErrorResponse)(s)
-
-	unwrapped.Encode(e)
-}
-
-// Decode decodes APIV1TgSearchGetBadRequest from json.
-func (s *APIV1TgSearchGetBadRequest) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode APIV1TgSearchGetBadRequest to nil")
-	}
-	var unwrapped ErrorResponse
-	if err := func() error {
-		if err := unwrapped.Decode(d); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return errors.Wrap(err, "alias")
-	}
-	*s = APIV1TgSearchGetBadRequest(unwrapped)
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *APIV1TgSearchGetBadRequest) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *APIV1TgSearchGetBadRequest) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes APIV1TgSearchGetUnauthorized as json.
-func (s *APIV1TgSearchGetUnauthorized) Encode(e *jx.Encoder) {
-	unwrapped := (*ErrorResponse)(s)
-
-	unwrapped.Encode(e)
-}
-
-// Decode decodes APIV1TgSearchGetUnauthorized from json.
-func (s *APIV1TgSearchGetUnauthorized) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode APIV1TgSearchGetUnauthorized to nil")
-	}
-	var unwrapped ErrorResponse
-	if err := func() error {
-		if err := unwrapped.Decode(d); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return errors.Wrap(err, "alias")
-	}
-	*s = APIV1TgSearchGetUnauthorized(unwrapped)
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *APIV1TgSearchGetUnauthorized) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *APIV1TgSearchGetUnauthorized) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes APIV1TgSearchPostApplicationJSON as json.
-func (s *APIV1TgSearchPostApplicationJSON) Encode(e *jx.Encoder) {
-	unwrapped := (*SearchQuery)(s)
-
-	unwrapped.Encode(e)
-}
-
-// Decode decodes APIV1TgSearchPostApplicationJSON from json.
-func (s *APIV1TgSearchPostApplicationJSON) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode APIV1TgSearchPostApplicationJSON to nil")
-	}
-	var unwrapped SearchQuery
-	if err := func() error {
-		if err := unwrapped.Decode(d); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return errors.Wrap(err, "alias")
-	}
-	*s = APIV1TgSearchPostApplicationJSON(unwrapped)
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *APIV1TgSearchPostApplicationJSON) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *APIV1TgSearchPostApplicationJSON) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes APIV1TgSearchPostApplicationXWwwFormUrlencoded as json.
-func (s *APIV1TgSearchPostApplicationXWwwFormUrlencoded) Encode(e *jx.Encoder) {
-	unwrapped := (*SearchQuery)(s)
-
-	unwrapped.Encode(e)
-}
-
-// Decode decodes APIV1TgSearchPostApplicationXWwwFormUrlencoded from json.
-func (s *APIV1TgSearchPostApplicationXWwwFormUrlencoded) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode APIV1TgSearchPostApplicationXWwwFormUrlencoded to nil")
-	}
-	var unwrapped SearchQuery
-	if err := func() error {
-		if err := unwrapped.Decode(d); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return errors.Wrap(err, "alias")
-	}
-	*s = APIV1TgSearchPostApplicationXWwwFormUrlencoded(unwrapped)
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *APIV1TgSearchPostApplicationXWwwFormUrlencoded) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *APIV1TgSearchPostApplicationXWwwFormUrlencoded) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes APIV1TgSearchPostBadRequest as json.
-func (s *APIV1TgSearchPostBadRequest) Encode(e *jx.Encoder) {
-	unwrapped := (*ErrorResponse)(s)
-
-	unwrapped.Encode(e)
-}
-
-// Decode decodes APIV1TgSearchPostBadRequest from json.
-func (s *APIV1TgSearchPostBadRequest) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode APIV1TgSearchPostBadRequest to nil")
-	}
-	var unwrapped ErrorResponse
-	if err := func() error {
-		if err := unwrapped.Decode(d); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return errors.Wrap(err, "alias")
-	}
-	*s = APIV1TgSearchPostBadRequest(unwrapped)
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *APIV1TgSearchPostBadRequest) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *APIV1TgSearchPostBadRequest) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes APIV1TgSearchPostUnauthorized as json.
-func (s *APIV1TgSearchPostUnauthorized) Encode(e *jx.Encoder) {
-	unwrapped := (*ErrorResponse)(s)
-
-	unwrapped.Encode(e)
-}
-
-// Decode decodes APIV1TgSearchPostUnauthorized from json.
-func (s *APIV1TgSearchPostUnauthorized) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode APIV1TgSearchPostUnauthorized to nil")
-	}
-	var unwrapped ErrorResponse
-	if err := func() error {
-		if err := unwrapped.Decode(d); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return errors.Wrap(err, "alias")
-	}
-	*s = APIV1TgSearchPostUnauthorized(unwrapped)
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *APIV1TgSearchPostUnauthorized) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *APIV1TgSearchPostUnauthorized) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
 // Encode implements json.Marshaler.
 func (s *ChatStat) Encode(e *jx.Encoder) {
 	e.ObjStart()
@@ -1631,6 +1327,310 @@ func (s TenMinuteStats) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *TenMinuteStats) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes TgGroupStatGetBadRequest as json.
+func (s *TgGroupStatGetBadRequest) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorResponse)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes TgGroupStatGetBadRequest from json.
+func (s *TgGroupStatGetBadRequest) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode TgGroupStatGetBadRequest to nil")
+	}
+	var unwrapped ErrorResponse
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = TgGroupStatGetBadRequest(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *TgGroupStatGetBadRequest) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *TgGroupStatGetBadRequest) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes TgGroupStatGetUnauthorized as json.
+func (s *TgGroupStatGetUnauthorized) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorResponse)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes TgGroupStatGetUnauthorized from json.
+func (s *TgGroupStatGetUnauthorized) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode TgGroupStatGetUnauthorized to nil")
+	}
+	var unwrapped ErrorResponse
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = TgGroupStatGetUnauthorized(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *TgGroupStatGetUnauthorized) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *TgGroupStatGetUnauthorized) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes TgSearchGetBadRequest as json.
+func (s *TgSearchGetBadRequest) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorResponse)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes TgSearchGetBadRequest from json.
+func (s *TgSearchGetBadRequest) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode TgSearchGetBadRequest to nil")
+	}
+	var unwrapped ErrorResponse
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = TgSearchGetBadRequest(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *TgSearchGetBadRequest) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *TgSearchGetBadRequest) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes TgSearchGetUnauthorized as json.
+func (s *TgSearchGetUnauthorized) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorResponse)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes TgSearchGetUnauthorized from json.
+func (s *TgSearchGetUnauthorized) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode TgSearchGetUnauthorized to nil")
+	}
+	var unwrapped ErrorResponse
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = TgSearchGetUnauthorized(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *TgSearchGetUnauthorized) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *TgSearchGetUnauthorized) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes TgSearchPostApplicationJSON as json.
+func (s *TgSearchPostApplicationJSON) Encode(e *jx.Encoder) {
+	unwrapped := (*SearchQuery)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes TgSearchPostApplicationJSON from json.
+func (s *TgSearchPostApplicationJSON) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode TgSearchPostApplicationJSON to nil")
+	}
+	var unwrapped SearchQuery
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = TgSearchPostApplicationJSON(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *TgSearchPostApplicationJSON) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *TgSearchPostApplicationJSON) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes TgSearchPostApplicationXWwwFormUrlencoded as json.
+func (s *TgSearchPostApplicationXWwwFormUrlencoded) Encode(e *jx.Encoder) {
+	unwrapped := (*SearchQuery)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes TgSearchPostApplicationXWwwFormUrlencoded from json.
+func (s *TgSearchPostApplicationXWwwFormUrlencoded) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode TgSearchPostApplicationXWwwFormUrlencoded to nil")
+	}
+	var unwrapped SearchQuery
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = TgSearchPostApplicationXWwwFormUrlencoded(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *TgSearchPostApplicationXWwwFormUrlencoded) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *TgSearchPostApplicationXWwwFormUrlencoded) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes TgSearchPostBadRequest as json.
+func (s *TgSearchPostBadRequest) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorResponse)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes TgSearchPostBadRequest from json.
+func (s *TgSearchPostBadRequest) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode TgSearchPostBadRequest to nil")
+	}
+	var unwrapped ErrorResponse
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = TgSearchPostBadRequest(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *TgSearchPostBadRequest) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *TgSearchPostBadRequest) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes TgSearchPostUnauthorized as json.
+func (s *TgSearchPostUnauthorized) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorResponse)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes TgSearchPostUnauthorized from json.
+func (s *TgSearchPostUnauthorized) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode TgSearchPostUnauthorized to nil")
+	}
+	var unwrapped ErrorResponse
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = TgSearchPostUnauthorized(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *TgSearchPostUnauthorized) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *TgSearchPostUnauthorized) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }

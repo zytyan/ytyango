@@ -24,12 +24,12 @@ func (c *codeRecorder) WriteHeader(status int) {
 
 func recordError(string, error) {}
 
-// handleAPIPingGetRequest handles GET /api/ping operation.
+// handlePingGetRequest handles GET /ping operation.
 //
 // Returns a simple JSON payload to verify the backend is running.
 //
-// GET /api/ping
-func (s *Server) handleAPIPingGetRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
+// GET /ping
+func (s *Server) handlePingGetRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
 	statusWriter := &codeRecorder{ResponseWriter: w}
 	w = statusWriter
 	ctx := r.Context()
@@ -44,7 +44,7 @@ func (s *Server) handleAPIPingGetRequest(args [0]string, argsEscaped bool, w htt
 	if m := s.cfg.Middleware; m != nil {
 		mreq := middleware.Request{
 			Context:          ctx,
-			OperationName:    APIPingGetOperation,
+			OperationName:    PingGetOperation,
 			OperationSummary: "Ping the service",
 			OperationID:      "",
 			Body:             nil,
@@ -67,12 +67,12 @@ func (s *Server) handleAPIPingGetRequest(args [0]string, argsEscaped bool, w htt
 			mreq,
 			nil,
 			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.APIPingGet(ctx)
+				response, err = s.h.PingGet(ctx)
 				return response, err
 			},
 		)
 	} else {
-		response, err = s.h.APIPingGet(ctx)
+		response, err = s.h.PingGet(ctx)
 	}
 	if err != nil {
 		defer recordError("Internal", err)
@@ -80,7 +80,7 @@ func (s *Server) handleAPIPingGetRequest(args [0]string, argsEscaped bool, w htt
 		return
 	}
 
-	if err := encodeAPIPingGetResponse(response, w); err != nil {
+	if err := encodePingGetResponse(response, w); err != nil {
 		defer recordError("EncodeResponse", err)
 		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
 			s.cfg.ErrorHandler(ctx, w, r, err)
@@ -89,12 +89,12 @@ func (s *Server) handleAPIPingGetRequest(args [0]string, argsEscaped bool, w htt
 	}
 }
 
-// handleAPIV1TgGroupStatGetRequest handles GET /api/v1/tg/group_stat operation.
+// handleTgGroupStatGetRequest handles GET /tg/group_stat operation.
 //
 // Get today's group statistics.
 //
-// GET /api/v1/tg/group_stat
-func (s *Server) handleAPIV1TgGroupStatGetRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
+// GET /tg/group_stat
+func (s *Server) handleTgGroupStatGetRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
 	statusWriter := &codeRecorder{ResponseWriter: w}
 	w = statusWriter
 	ctx := r.Context()
@@ -102,7 +102,7 @@ func (s *Server) handleAPIV1TgGroupStatGetRequest(args [0]string, argsEscaped bo
 	var (
 		err          error
 		opErrContext = ogenerrors.OperationContext{
-			Name: APIV1TgGroupStatGetOperation,
+			Name: TgGroupStatGetOperation,
 			ID:   "",
 		}
 	)
@@ -110,7 +110,7 @@ func (s *Server) handleAPIV1TgGroupStatGetRequest(args [0]string, argsEscaped bo
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			sctx, ok, err := s.securityTelegramAuth(ctx, APIV1TgGroupStatGetOperation, r)
+			sctx, ok, err := s.securityTelegramAuth(ctx, TgGroupStatGetOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
@@ -150,7 +150,7 @@ func (s *Server) handleAPIV1TgGroupStatGetRequest(args [0]string, argsEscaped bo
 			return
 		}
 	}
-	params, err := decodeAPIV1TgGroupStatGetParams(args, argsEscaped, r)
+	params, err := decodeTgGroupStatGetParams(args, argsEscaped, r)
 	if err != nil {
 		err = &ogenerrors.DecodeParamsError{
 			OperationContext: opErrContext,
@@ -163,11 +163,11 @@ func (s *Server) handleAPIV1TgGroupStatGetRequest(args [0]string, argsEscaped bo
 
 	var rawBody []byte
 
-	var response APIV1TgGroupStatGetRes
+	var response TgGroupStatGetRes
 	if m := s.cfg.Middleware; m != nil {
 		mreq := middleware.Request{
 			Context:          ctx,
-			OperationName:    APIV1TgGroupStatGetOperation,
+			OperationName:    TgGroupStatGetOperation,
 			OperationSummary: "Get today's group statistics",
 			OperationID:      "",
 			Body:             nil,
@@ -183,8 +183,8 @@ func (s *Server) handleAPIV1TgGroupStatGetRequest(args [0]string, argsEscaped bo
 
 		type (
 			Request  = struct{}
-			Params   = APIV1TgGroupStatGetParams
-			Response = APIV1TgGroupStatGetRes
+			Params   = TgGroupStatGetParams
+			Response = TgGroupStatGetRes
 		)
 		response, err = middleware.HookMiddleware[
 			Request,
@@ -193,14 +193,14 @@ func (s *Server) handleAPIV1TgGroupStatGetRequest(args [0]string, argsEscaped bo
 		](
 			m,
 			mreq,
-			unpackAPIV1TgGroupStatGetParams,
+			unpackTgGroupStatGetParams,
 			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.APIV1TgGroupStatGet(ctx, params)
+				response, err = s.h.TgGroupStatGet(ctx, params)
 				return response, err
 			},
 		)
 	} else {
-		response, err = s.h.APIV1TgGroupStatGet(ctx, params)
+		response, err = s.h.TgGroupStatGet(ctx, params)
 	}
 	if err != nil {
 		defer recordError("Internal", err)
@@ -208,7 +208,7 @@ func (s *Server) handleAPIV1TgGroupStatGetRequest(args [0]string, argsEscaped bo
 		return
 	}
 
-	if err := encodeAPIV1TgGroupStatGetResponse(response, w); err != nil {
+	if err := encodeTgGroupStatGetResponse(response, w); err != nil {
 		defer recordError("EncodeResponse", err)
 		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
 			s.cfg.ErrorHandler(ctx, w, r, err)
@@ -217,12 +217,12 @@ func (s *Server) handleAPIV1TgGroupStatGetRequest(args [0]string, argsEscaped bo
 	}
 }
 
-// handleAPIV1TgProfilePhotoGetRequest handles GET /api/v1/tg/profile_photo operation.
+// handleTgProfilePhotoGetRequest handles GET /tg/profile_photo operation.
 //
 // Get the user's profile photo in WEBP format.
 //
-// GET /api/v1/tg/profile_photo
-func (s *Server) handleAPIV1TgProfilePhotoGetRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
+// GET /tg/profile_photo
+func (s *Server) handleTgProfilePhotoGetRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
 	statusWriter := &codeRecorder{ResponseWriter: w}
 	w = statusWriter
 	ctx := r.Context()
@@ -230,11 +230,11 @@ func (s *Server) handleAPIV1TgProfilePhotoGetRequest(args [0]string, argsEscaped
 	var (
 		err          error
 		opErrContext = ogenerrors.OperationContext{
-			Name: APIV1TgProfilePhotoGetOperation,
+			Name: TgProfilePhotoGetOperation,
 			ID:   "",
 		}
 	)
-	params, err := decodeAPIV1TgProfilePhotoGetParams(args, argsEscaped, r)
+	params, err := decodeTgProfilePhotoGetParams(args, argsEscaped, r)
 	if err != nil {
 		err = &ogenerrors.DecodeParamsError{
 			OperationContext: opErrContext,
@@ -247,11 +247,11 @@ func (s *Server) handleAPIV1TgProfilePhotoGetRequest(args [0]string, argsEscaped
 
 	var rawBody []byte
 
-	var response APIV1TgProfilePhotoGetRes
+	var response TgProfilePhotoGetRes
 	if m := s.cfg.Middleware; m != nil {
 		mreq := middleware.Request{
 			Context:          ctx,
-			OperationName:    APIV1TgProfilePhotoGetOperation,
+			OperationName:    TgProfilePhotoGetOperation,
 			OperationSummary: "Get the user's profile photo in WEBP format",
 			OperationID:      "",
 			Body:             nil,
@@ -267,8 +267,8 @@ func (s *Server) handleAPIV1TgProfilePhotoGetRequest(args [0]string, argsEscaped
 
 		type (
 			Request  = struct{}
-			Params   = APIV1TgProfilePhotoGetParams
-			Response = APIV1TgProfilePhotoGetRes
+			Params   = TgProfilePhotoGetParams
+			Response = TgProfilePhotoGetRes
 		)
 		response, err = middleware.HookMiddleware[
 			Request,
@@ -277,14 +277,14 @@ func (s *Server) handleAPIV1TgProfilePhotoGetRequest(args [0]string, argsEscaped
 		](
 			m,
 			mreq,
-			unpackAPIV1TgProfilePhotoGetParams,
+			unpackTgProfilePhotoGetParams,
 			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.APIV1TgProfilePhotoGet(ctx, params)
+				response, err = s.h.TgProfilePhotoGet(ctx, params)
 				return response, err
 			},
 		)
 	} else {
-		response, err = s.h.APIV1TgProfilePhotoGet(ctx, params)
+		response, err = s.h.TgProfilePhotoGet(ctx, params)
 	}
 	if err != nil {
 		defer recordError("Internal", err)
@@ -292,7 +292,7 @@ func (s *Server) handleAPIV1TgProfilePhotoGetRequest(args [0]string, argsEscaped
 		return
 	}
 
-	if err := encodeAPIV1TgProfilePhotoGetResponse(response, w); err != nil {
+	if err := encodeTgProfilePhotoGetResponse(response, w); err != nil {
 		defer recordError("EncodeResponse", err)
 		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
 			s.cfg.ErrorHandler(ctx, w, r, err)
@@ -301,12 +301,12 @@ func (s *Server) handleAPIV1TgProfilePhotoGetRequest(args [0]string, argsEscaped
 	}
 }
 
-// handleAPIV1TgSearchGetRequest handles GET /api/v1/tg/search operation.
+// handleTgSearchGetRequest handles GET /tg/search operation.
 //
 // Search messages within a group.
 //
-// GET /api/v1/tg/search
-func (s *Server) handleAPIV1TgSearchGetRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
+// GET /tg/search
+func (s *Server) handleTgSearchGetRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
 	statusWriter := &codeRecorder{ResponseWriter: w}
 	w = statusWriter
 	ctx := r.Context()
@@ -314,7 +314,7 @@ func (s *Server) handleAPIV1TgSearchGetRequest(args [0]string, argsEscaped bool,
 	var (
 		err          error
 		opErrContext = ogenerrors.OperationContext{
-			Name: APIV1TgSearchGetOperation,
+			Name: TgSearchGetOperation,
 			ID:   "",
 		}
 	)
@@ -322,7 +322,7 @@ func (s *Server) handleAPIV1TgSearchGetRequest(args [0]string, argsEscaped bool,
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			sctx, ok, err := s.securityTelegramAuth(ctx, APIV1TgSearchGetOperation, r)
+			sctx, ok, err := s.securityTelegramAuth(ctx, TgSearchGetOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
@@ -362,7 +362,7 @@ func (s *Server) handleAPIV1TgSearchGetRequest(args [0]string, argsEscaped bool,
 			return
 		}
 	}
-	params, err := decodeAPIV1TgSearchGetParams(args, argsEscaped, r)
+	params, err := decodeTgSearchGetParams(args, argsEscaped, r)
 	if err != nil {
 		err = &ogenerrors.DecodeParamsError{
 			OperationContext: opErrContext,
@@ -375,11 +375,11 @@ func (s *Server) handleAPIV1TgSearchGetRequest(args [0]string, argsEscaped bool,
 
 	var rawBody []byte
 
-	var response APIV1TgSearchGetRes
+	var response TgSearchGetRes
 	if m := s.cfg.Middleware; m != nil {
 		mreq := middleware.Request{
 			Context:          ctx,
-			OperationName:    APIV1TgSearchGetOperation,
+			OperationName:    TgSearchGetOperation,
 			OperationSummary: "Search messages within a group",
 			OperationID:      "",
 			Body:             nil,
@@ -407,8 +407,8 @@ func (s *Server) handleAPIV1TgSearchGetRequest(args [0]string, argsEscaped bool,
 
 		type (
 			Request  = struct{}
-			Params   = APIV1TgSearchGetParams
-			Response = APIV1TgSearchGetRes
+			Params   = TgSearchGetParams
+			Response = TgSearchGetRes
 		)
 		response, err = middleware.HookMiddleware[
 			Request,
@@ -417,14 +417,14 @@ func (s *Server) handleAPIV1TgSearchGetRequest(args [0]string, argsEscaped bool,
 		](
 			m,
 			mreq,
-			unpackAPIV1TgSearchGetParams,
+			unpackTgSearchGetParams,
 			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.APIV1TgSearchGet(ctx, params)
+				response, err = s.h.TgSearchGet(ctx, params)
 				return response, err
 			},
 		)
 	} else {
-		response, err = s.h.APIV1TgSearchGet(ctx, params)
+		response, err = s.h.TgSearchGet(ctx, params)
 	}
 	if err != nil {
 		defer recordError("Internal", err)
@@ -432,7 +432,7 @@ func (s *Server) handleAPIV1TgSearchGetRequest(args [0]string, argsEscaped bool,
 		return
 	}
 
-	if err := encodeAPIV1TgSearchGetResponse(response, w); err != nil {
+	if err := encodeTgSearchGetResponse(response, w); err != nil {
 		defer recordError("EncodeResponse", err)
 		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
 			s.cfg.ErrorHandler(ctx, w, r, err)
@@ -441,12 +441,12 @@ func (s *Server) handleAPIV1TgSearchGetRequest(args [0]string, argsEscaped bool,
 	}
 }
 
-// handleAPIV1TgSearchPostRequest handles POST /api/v1/tg/search operation.
+// handleTgSearchPostRequest handles POST /tg/search operation.
 //
 // Search messages within a group.
 //
-// POST /api/v1/tg/search
-func (s *Server) handleAPIV1TgSearchPostRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
+// POST /tg/search
+func (s *Server) handleTgSearchPostRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
 	statusWriter := &codeRecorder{ResponseWriter: w}
 	w = statusWriter
 	ctx := r.Context()
@@ -454,7 +454,7 @@ func (s *Server) handleAPIV1TgSearchPostRequest(args [0]string, argsEscaped bool
 	var (
 		err          error
 		opErrContext = ogenerrors.OperationContext{
-			Name: APIV1TgSearchPostOperation,
+			Name: TgSearchPostOperation,
 			ID:   "",
 		}
 	)
@@ -462,7 +462,7 @@ func (s *Server) handleAPIV1TgSearchPostRequest(args [0]string, argsEscaped bool
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			sctx, ok, err := s.securityTelegramAuth(ctx, APIV1TgSearchPostOperation, r)
+			sctx, ok, err := s.securityTelegramAuth(ctx, TgSearchPostOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
@@ -504,7 +504,7 @@ func (s *Server) handleAPIV1TgSearchPostRequest(args [0]string, argsEscaped bool
 	}
 
 	var rawBody []byte
-	request, rawBody, close, err := s.decodeAPIV1TgSearchPostRequest(r)
+	request, rawBody, close, err := s.decodeTgSearchPostRequest(r)
 	if err != nil {
 		err = &ogenerrors.DecodeRequestError{
 			OperationContext: opErrContext,
@@ -520,11 +520,11 @@ func (s *Server) handleAPIV1TgSearchPostRequest(args [0]string, argsEscaped bool
 		}
 	}()
 
-	var response APIV1TgSearchPostRes
+	var response TgSearchPostRes
 	if m := s.cfg.Middleware; m != nil {
 		mreq := middleware.Request{
 			Context:          ctx,
-			OperationName:    APIV1TgSearchPostOperation,
+			OperationName:    TgSearchPostOperation,
 			OperationSummary: "Search messages within a group",
 			OperationID:      "",
 			Body:             request,
@@ -534,9 +534,9 @@ func (s *Server) handleAPIV1TgSearchPostRequest(args [0]string, argsEscaped bool
 		}
 
 		type (
-			Request  = APIV1TgSearchPostReq
+			Request  = TgSearchPostReq
 			Params   = struct{}
-			Response = APIV1TgSearchPostRes
+			Response = TgSearchPostRes
 		)
 		response, err = middleware.HookMiddleware[
 			Request,
@@ -547,12 +547,12 @@ func (s *Server) handleAPIV1TgSearchPostRequest(args [0]string, argsEscaped bool
 			mreq,
 			nil,
 			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.APIV1TgSearchPost(ctx, request)
+				response, err = s.h.TgSearchPost(ctx, request)
 				return response, err
 			},
 		)
 	} else {
-		response, err = s.h.APIV1TgSearchPost(ctx, request)
+		response, err = s.h.TgSearchPost(ctx, request)
 	}
 	if err != nil {
 		defer recordError("Internal", err)
@@ -560,7 +560,7 @@ func (s *Server) handleAPIV1TgSearchPostRequest(args [0]string, argsEscaped bool
 		return
 	}
 
-	if err := encodeAPIV1TgSearchPostResponse(response, w); err != nil {
+	if err := encodeTgSearchPostResponse(response, w); err != nil {
 		defer recordError("EncodeResponse", err)
 		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
 			s.cfg.ErrorHandler(ctx, w, r, err)
@@ -569,12 +569,12 @@ func (s *Server) handleAPIV1TgSearchPostRequest(args [0]string, argsEscaped bool
 	}
 }
 
-// handleAPIV1TgUsernameGetRequest handles GET /api/v1/tg/username operation.
+// handleTgUsernameGetRequest handles GET /tg/username operation.
 //
 // Get a user name by Telegram user id.
 //
-// GET /api/v1/tg/username
-func (s *Server) handleAPIV1TgUsernameGetRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
+// GET /tg/username
+func (s *Server) handleTgUsernameGetRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
 	statusWriter := &codeRecorder{ResponseWriter: w}
 	w = statusWriter
 	ctx := r.Context()
@@ -582,11 +582,11 @@ func (s *Server) handleAPIV1TgUsernameGetRequest(args [0]string, argsEscaped boo
 	var (
 		err          error
 		opErrContext = ogenerrors.OperationContext{
-			Name: APIV1TgUsernameGetOperation,
+			Name: TgUsernameGetOperation,
 			ID:   "",
 		}
 	)
-	params, err := decodeAPIV1TgUsernameGetParams(args, argsEscaped, r)
+	params, err := decodeTgUsernameGetParams(args, argsEscaped, r)
 	if err != nil {
 		err = &ogenerrors.DecodeParamsError{
 			OperationContext: opErrContext,
@@ -599,11 +599,11 @@ func (s *Server) handleAPIV1TgUsernameGetRequest(args [0]string, argsEscaped boo
 
 	var rawBody []byte
 
-	var response APIV1TgUsernameGetRes
+	var response TgUsernameGetRes
 	if m := s.cfg.Middleware; m != nil {
 		mreq := middleware.Request{
 			Context:          ctx,
-			OperationName:    APIV1TgUsernameGetOperation,
+			OperationName:    TgUsernameGetOperation,
 			OperationSummary: "Get a user name by Telegram user id",
 			OperationID:      "",
 			Body:             nil,
@@ -619,8 +619,8 @@ func (s *Server) handleAPIV1TgUsernameGetRequest(args [0]string, argsEscaped boo
 
 		type (
 			Request  = struct{}
-			Params   = APIV1TgUsernameGetParams
-			Response = APIV1TgUsernameGetRes
+			Params   = TgUsernameGetParams
+			Response = TgUsernameGetRes
 		)
 		response, err = middleware.HookMiddleware[
 			Request,
@@ -629,14 +629,14 @@ func (s *Server) handleAPIV1TgUsernameGetRequest(args [0]string, argsEscaped boo
 		](
 			m,
 			mreq,
-			unpackAPIV1TgUsernameGetParams,
+			unpackTgUsernameGetParams,
 			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.APIV1TgUsernameGet(ctx, params)
+				response, err = s.h.TgUsernameGet(ctx, params)
 				return response, err
 			},
 		)
 	} else {
-		response, err = s.h.APIV1TgUsernameGet(ctx, params)
+		response, err = s.h.TgUsernameGet(ctx, params)
 	}
 	if err != nil {
 		defer recordError("Internal", err)
@@ -644,7 +644,7 @@ func (s *Server) handleAPIV1TgUsernameGetRequest(args [0]string, argsEscaped boo
 		return
 	}
 
-	if err := encodeAPIV1TgUsernameGetResponse(response, w); err != nil {
+	if err := encodeTgUsernameGetResponse(response, w); err != nil {
 		defer recordError("EncodeResponse", err)
 		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
 			s.cfg.ErrorHandler(ctx, w, r, err)

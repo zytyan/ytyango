@@ -6,10 +6,10 @@ package botapi
 type OperationName = string
 
 const (
-	APIPingGetOperation             OperationName = "APIPingGet"
-	APIV1TgGroupStatGetOperation    OperationName = "APIV1TgGroupStatGet"
-	APIV1TgProfilePhotoGetOperation OperationName = "APIV1TgProfilePhotoGet"
-	APIV1TgSearchGetOperation       OperationName = "APIV1TgSearchGet"
-	APIV1TgSearchPostOperation      OperationName = "APIV1TgSearchPost"
-	APIV1TgUsernameGetOperation     OperationName = "APIV1TgUsernameGet"
+	PingGetOperation           OperationName = "PingGet"
+	TgGroupStatGetOperation    OperationName = "TgGroupStatGet"
+	TgProfilePhotoGetOperation OperationName = "TgProfilePhotoGet"
+	TgSearchGetOperation       OperationName = "TgSearchGet"
+	TgSearchPostOperation      OperationName = "TgSearchPost"
+	TgUsernameGetOperation     OperationName = "TgUsernameGet"
 )

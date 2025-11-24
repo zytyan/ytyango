@@ -8,42 +8,42 @@ import (
 
 // Handler handles operations described by OpenAPI v3 specification.
 type Handler interface {
-	// APIPingGet implements GET /api/ping operation.
+	// PingGet implements GET /ping operation.
 	//
 	// Returns a simple JSON payload to verify the backend is running.
 	//
-	// GET /api/ping
-	APIPingGet(ctx context.Context) (*PingResponse, error)
-	// APIV1TgGroupStatGet implements GET /api/v1/tg/group_stat operation.
+	// GET /ping
+	PingGet(ctx context.Context) (*PingResponse, error)
+	// TgGroupStatGet implements GET /tg/group_stat operation.
 	//
 	// Get today's group statistics.
 	//
-	// GET /api/v1/tg/group_stat
-	APIV1TgGroupStatGet(ctx context.Context, params APIV1TgGroupStatGetParams) (APIV1TgGroupStatGetRes, error)
-	// APIV1TgProfilePhotoGet implements GET /api/v1/tg/profile_photo operation.
+	// GET /tg/group_stat
+	TgGroupStatGet(ctx context.Context, params TgGroupStatGetParams) (TgGroupStatGetRes, error)
+	// TgProfilePhotoGet implements GET /tg/profile_photo operation.
 	//
 	// Get the user's profile photo in WEBP format.
 	//
-	// GET /api/v1/tg/profile_photo
-	APIV1TgProfilePhotoGet(ctx context.Context, params APIV1TgProfilePhotoGetParams) (APIV1TgProfilePhotoGetRes, error)
-	// APIV1TgSearchGet implements GET /api/v1/tg/search operation.
+	// GET /tg/profile_photo
+	TgProfilePhotoGet(ctx context.Context, params TgProfilePhotoGetParams) (TgProfilePhotoGetRes, error)
+	// TgSearchGet implements GET /tg/search operation.
 	//
 	// Search messages within a group.
 	//
-	// GET /api/v1/tg/search
-	APIV1TgSearchGet(ctx context.Context, params APIV1TgSearchGetParams) (APIV1TgSearchGetRes, error)
-	// APIV1TgSearchPost implements POST /api/v1/tg/search operation.
+	// GET /tg/search
+	TgSearchGet(ctx context.Context, params TgSearchGetParams) (TgSearchGetRes, error)
+	// TgSearchPost implements POST /tg/search operation.
 	//
 	// Search messages within a group.
 	//
-	// POST /api/v1/tg/search
-	APIV1TgSearchPost(ctx context.Context, req APIV1TgSearchPostReq) (APIV1TgSearchPostRes, error)
-	// APIV1TgUsernameGet implements GET /api/v1/tg/username operation.
+	// POST /tg/search
+	TgSearchPost(ctx context.Context, req TgSearchPostReq) (TgSearchPostRes, error)
+	// TgUsernameGet implements GET /tg/username operation.
 	//
 	// Get a user name by Telegram user id.
 	//
-	// GET /api/v1/tg/username
-	APIV1TgUsernameGet(ctx context.Context, params APIV1TgUsernameGetParams) (APIV1TgUsernameGetRes, error)
+	// GET /tg/username
+	TgUsernameGet(ctx context.Context, params TgUsernameGetParams) (TgUsernameGetRes, error)
 }
 
 // Server implements http server based on OpenAPI v3 specification and

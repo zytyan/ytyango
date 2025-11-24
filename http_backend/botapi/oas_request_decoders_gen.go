@@ -17,8 +17,8 @@ import (
 	"github.com/ogen-go/ogen/validate"
 )
 
-func (s *Server) decodeAPIV1TgSearchPostRequest(r *http.Request) (
-	req APIV1TgSearchPostReq,
+func (s *Server) decodeTgSearchPostRequest(r *http.Request) (
+	req TgSearchPostReq,
 	rawBody []byte,
 	close func() error,
 	rerr error,
@@ -65,7 +65,7 @@ func (s *Server) decodeAPIV1TgSearchPostRequest(r *http.Request) (
 		rawBody = append(rawBody, buf...)
 		d := jx.DecodeBytes(buf)
 
-		var request APIV1TgSearchPostApplicationJSON
+		var request TgSearchPostApplicationJSON
 		if err := func() error {
 			if err := request.Decode(d); err != nil {
 				return err
@@ -100,7 +100,7 @@ func (s *Server) decodeAPIV1TgSearchPostRequest(r *http.Request) (
 			return req, rawBody, close, errors.Wrap(err, "parse form")
 		}
 
-		var request APIV1TgSearchPostApplicationXWwwFormUrlencoded
+		var request TgSearchPostApplicationXWwwFormUrlencoded
 		{
 			var unwrapped SearchQuery
 			unwrapped.setDefaults()
@@ -275,7 +275,7 @@ func (s *Server) decodeAPIV1TgSearchPostRequest(r *http.Request) (
 					}
 				}
 			}
-			request = APIV1TgSearchPostApplicationXWwwFormUrlencoded(unwrapped)
+			request = TgSearchPostApplicationXWwwFormUrlencoded(unwrapped)
 		}
 		return &request, rawBody, close, nil
 	default:

@@ -35,9 +35,9 @@ func findAuthorization(h http.Header, prefix string) (string, bool) {
 }
 
 var operationRolesTelegramAuth = map[string][]string{
-	APIV1TgGroupStatGetOperation: []string{},
-	APIV1TgSearchGetOperation:    []string{},
-	APIV1TgSearchPostOperation:   []string{},
+	TgGroupStatGetOperation: []string{},
+	TgSearchGetOperation:    []string{},
+	TgSearchPostOperation:   []string{},
 }
 
 func (s *Server) securityTelegramAuth(ctx context.Context, operationName OperationName, req *http.Request) (context.Context, bool, error) {

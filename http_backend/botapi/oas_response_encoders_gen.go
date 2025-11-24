@@ -10,7 +10,7 @@ import (
 	"github.com/go-faster/jx"
 )
 
-func encodeAPIPingGetResponse(response *PingResponse, w http.ResponseWriter) error {
+func encodePingGetResponse(response *PingResponse, w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(200)
 
@@ -23,7 +23,7 @@ func encodeAPIPingGetResponse(response *PingResponse, w http.ResponseWriter) err
 	return nil
 }
 
-func encodeAPIV1TgGroupStatGetResponse(response APIV1TgGroupStatGetRes, w http.ResponseWriter) error {
+func encodeTgGroupStatGetResponse(response TgGroupStatGetRes, w http.ResponseWriter) error {
 	switch response := response.(type) {
 	case *ChatStat:
 		if err := func() error {
@@ -45,7 +45,7 @@ func encodeAPIV1TgGroupStatGetResponse(response APIV1TgGroupStatGetRes, w http.R
 
 		return nil
 
-	case *APIV1TgGroupStatGetBadRequest:
+	case *TgGroupStatGetBadRequest:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
 
@@ -57,7 +57,7 @@ func encodeAPIV1TgGroupStatGetResponse(response APIV1TgGroupStatGetRes, w http.R
 
 		return nil
 
-	case *APIV1TgGroupStatGetUnauthorized:
+	case *TgGroupStatGetUnauthorized:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
 
@@ -74,9 +74,9 @@ func encodeAPIV1TgGroupStatGetResponse(response APIV1TgGroupStatGetRes, w http.R
 	}
 }
 
-func encodeAPIV1TgProfilePhotoGetResponse(response APIV1TgProfilePhotoGetRes, w http.ResponseWriter) error {
+func encodeTgProfilePhotoGetResponse(response TgProfilePhotoGetRes, w http.ResponseWriter) error {
 	switch response := response.(type) {
-	case *APIV1TgProfilePhotoGetOK:
+	case *TgProfilePhotoGetOK:
 		w.Header().Set("Content-Type", "image/webp")
 		w.WriteHeader(200)
 
@@ -107,7 +107,7 @@ func encodeAPIV1TgProfilePhotoGetResponse(response APIV1TgProfilePhotoGetRes, w 
 	}
 }
 
-func encodeAPIV1TgSearchGetResponse(response APIV1TgSearchGetRes, w http.ResponseWriter) error {
+func encodeTgSearchGetResponse(response TgSearchGetRes, w http.ResponseWriter) error {
 	switch response := response.(type) {
 	case *SearchResult:
 		if err := func() error {
@@ -129,7 +129,7 @@ func encodeAPIV1TgSearchGetResponse(response APIV1TgSearchGetRes, w http.Respons
 
 		return nil
 
-	case *APIV1TgSearchGetBadRequest:
+	case *TgSearchGetBadRequest:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
 
@@ -141,7 +141,7 @@ func encodeAPIV1TgSearchGetResponse(response APIV1TgSearchGetRes, w http.Respons
 
 		return nil
 
-	case *APIV1TgSearchGetUnauthorized:
+	case *TgSearchGetUnauthorized:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
 
@@ -158,7 +158,7 @@ func encodeAPIV1TgSearchGetResponse(response APIV1TgSearchGetRes, w http.Respons
 	}
 }
 
-func encodeAPIV1TgSearchPostResponse(response APIV1TgSearchPostRes, w http.ResponseWriter) error {
+func encodeTgSearchPostResponse(response TgSearchPostRes, w http.ResponseWriter) error {
 	switch response := response.(type) {
 	case *SearchResult:
 		if err := func() error {
@@ -180,7 +180,7 @@ func encodeAPIV1TgSearchPostResponse(response APIV1TgSearchPostRes, w http.Respo
 
 		return nil
 
-	case *APIV1TgSearchPostBadRequest:
+	case *TgSearchPostBadRequest:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
 
@@ -192,7 +192,7 @@ func encodeAPIV1TgSearchPostResponse(response APIV1TgSearchPostRes, w http.Respo
 
 		return nil
 
-	case *APIV1TgSearchPostUnauthorized:
+	case *TgSearchPostUnauthorized:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
 
@@ -209,7 +209,7 @@ func encodeAPIV1TgSearchPostResponse(response APIV1TgSearchPostRes, w http.Respo
 	}
 }
 
-func encodeAPIV1TgUsernameGetResponse(response APIV1TgUsernameGetRes, w http.ResponseWriter) error {
+func encodeTgUsernameGetResponse(response TgUsernameGetRes, w http.ResponseWriter) error {
 	switch response := response.(type) {
 	case *User:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")

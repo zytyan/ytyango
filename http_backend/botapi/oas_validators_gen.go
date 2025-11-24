@@ -9,22 +9,6 @@ import (
 	"github.com/ogen-go/ogen/validate"
 )
 
-func (s *APIV1TgSearchPostApplicationJSON) Validate() error {
-	alias := (*SearchQuery)(s)
-	if err := alias.Validate(); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (s *APIV1TgSearchPostApplicationXWwwFormUrlencoded) Validate() error {
-	alias := (*SearchQuery)(s)
-	if err := alias.Validate(); err != nil {
-		return err
-	}
-	return nil
-}
-
 func (s *ChatStat) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
@@ -219,6 +203,22 @@ func (s TenMinuteStats) Validate() error {
 		MaxLengthSet: true,
 	}).ValidateLength(len(alias)); err != nil {
 		return errors.Wrap(err, "array")
+	}
+	return nil
+}
+
+func (s *TgSearchPostApplicationJSON) Validate() error {
+	alias := (*SearchQuery)(s)
+	if err := alias.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *TgSearchPostApplicationXWwwFormUrlencoded) Validate() error {
+	alias := (*SearchQuery)(s)
+	if err := alias.Validate(); err != nil {
+		return err
 	}
 	return nil
 }

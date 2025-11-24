@@ -13,13 +13,13 @@ import (
 	"github.com/ogen-go/ogen/validate"
 )
 
-// APIV1TgGroupStatGetParams is parameters of GET /api/v1/tg/group_stat operation.
-type APIV1TgGroupStatGetParams struct {
+// TgGroupStatGetParams is parameters of GET /tg/group_stat operation.
+type TgGroupStatGetParams struct {
 	// Web id of the group.
 	GroupWebID int64
 }
 
-func unpackAPIV1TgGroupStatGetParams(packed middleware.Parameters) (params APIV1TgGroupStatGetParams) {
+func unpackTgGroupStatGetParams(packed middleware.Parameters) (params TgGroupStatGetParams) {
 	{
 		key := middleware.ParameterKey{
 			Name: "group_web_id",
@@ -30,7 +30,7 @@ func unpackAPIV1TgGroupStatGetParams(packed middleware.Parameters) (params APIV1
 	return params
 }
 
-func decodeAPIV1TgGroupStatGetParams(args [0]string, argsEscaped bool, r *http.Request) (params APIV1TgGroupStatGetParams, _ error) {
+func decodeTgGroupStatGetParams(args [0]string, argsEscaped bool, r *http.Request) (params TgGroupStatGetParams, _ error) {
 	q := uri.NewQueryDecoder(r.URL.Query())
 	// Decode query: group_web_id.
 	if err := func() error {
@@ -71,13 +71,13 @@ func decodeAPIV1TgGroupStatGetParams(args [0]string, argsEscaped bool, r *http.R
 	return params, nil
 }
 
-// APIV1TgProfilePhotoGetParams is parameters of GET /api/v1/tg/profile_photo operation.
-type APIV1TgProfilePhotoGetParams struct {
+// TgProfilePhotoGetParams is parameters of GET /tg/profile_photo operation.
+type TgProfilePhotoGetParams struct {
 	// Telegram user id.
 	UserID int64
 }
 
-func unpackAPIV1TgProfilePhotoGetParams(packed middleware.Parameters) (params APIV1TgProfilePhotoGetParams) {
+func unpackTgProfilePhotoGetParams(packed middleware.Parameters) (params TgProfilePhotoGetParams) {
 	{
 		key := middleware.ParameterKey{
 			Name: "user_id",
@@ -88,7 +88,7 @@ func unpackAPIV1TgProfilePhotoGetParams(packed middleware.Parameters) (params AP
 	return params
 }
 
-func decodeAPIV1TgProfilePhotoGetParams(args [0]string, argsEscaped bool, r *http.Request) (params APIV1TgProfilePhotoGetParams, _ error) {
+func decodeTgProfilePhotoGetParams(args [0]string, argsEscaped bool, r *http.Request) (params TgProfilePhotoGetParams, _ error) {
 	q := uri.NewQueryDecoder(r.URL.Query())
 	// Decode query: user_id.
 	if err := func() error {
@@ -129,8 +129,8 @@ func decodeAPIV1TgProfilePhotoGetParams(args [0]string, argsEscaped bool, r *htt
 	return params, nil
 }
 
-// APIV1TgSearchGetParams is parameters of GET /api/v1/tg/search operation.
-type APIV1TgSearchGetParams struct {
+// TgSearchGetParams is parameters of GET /tg/search operation.
+type TgSearchGetParams struct {
 	// Search query string.
 	Q string
 	// Group web id (Meilisearch index id). Accepts digits as string or number.
@@ -141,7 +141,7 @@ type APIV1TgSearchGetParams struct {
 	Limit OptInt `json:",omitempty,omitzero"`
 }
 
-func unpackAPIV1TgSearchGetParams(packed middleware.Parameters) (params APIV1TgSearchGetParams) {
+func unpackTgSearchGetParams(packed middleware.Parameters) (params TgSearchGetParams) {
 	{
 		key := middleware.ParameterKey{
 			Name: "q",
@@ -175,7 +175,7 @@ func unpackAPIV1TgSearchGetParams(packed middleware.Parameters) (params APIV1TgS
 	return params
 }
 
-func decodeAPIV1TgSearchGetParams(args [0]string, argsEscaped bool, r *http.Request) (params APIV1TgSearchGetParams, _ error) {
+func decodeTgSearchGetParams(args [0]string, argsEscaped bool, r *http.Request) (params TgSearchGetParams, _ error) {
 	q := uri.NewQueryDecoder(r.URL.Query())
 	// Decode query: q.
 	if err := func() error {
@@ -391,13 +391,13 @@ func decodeAPIV1TgSearchGetParams(args [0]string, argsEscaped bool, r *http.Requ
 	return params, nil
 }
 
-// APIV1TgUsernameGetParams is parameters of GET /api/v1/tg/username operation.
-type APIV1TgUsernameGetParams struct {
+// TgUsernameGetParams is parameters of GET /tg/username operation.
+type TgUsernameGetParams struct {
 	// Telegram user id.
 	UserID int64
 }
 
-func unpackAPIV1TgUsernameGetParams(packed middleware.Parameters) (params APIV1TgUsernameGetParams) {
+func unpackTgUsernameGetParams(packed middleware.Parameters) (params TgUsernameGetParams) {
 	{
 		key := middleware.ParameterKey{
 			Name: "user_id",
@@ -408,7 +408,7 @@ func unpackAPIV1TgUsernameGetParams(packed middleware.Parameters) (params APIV1T
 	return params
 }
 
-func decodeAPIV1TgUsernameGetParams(args [0]string, argsEscaped bool, r *http.Request) (params APIV1TgUsernameGetParams, _ error) {
+func decodeTgUsernameGetParams(args [0]string, argsEscaped bool, r *http.Request) (params TgUsernameGetParams, _ error) {
 	q := uri.NewQueryDecoder(r.URL.Query())
 	// Decode query: user_id.
 	if err := func() error {

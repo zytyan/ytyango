@@ -6,54 +6,6 @@ import (
 	"io"
 )
 
-type APIV1TgGroupStatGetBadRequest ErrorResponse
-
-func (*APIV1TgGroupStatGetBadRequest) aPIV1TgGroupStatGetRes() {}
-
-type APIV1TgGroupStatGetUnauthorized ErrorResponse
-
-func (*APIV1TgGroupStatGetUnauthorized) aPIV1TgGroupStatGetRes() {}
-
-type APIV1TgProfilePhotoGetOK struct {
-	Data io.Reader
-}
-
-// Read reads data from the Data reader.
-//
-// Kept to satisfy the io.Reader interface.
-func (s APIV1TgProfilePhotoGetOK) Read(p []byte) (n int, err error) {
-	if s.Data == nil {
-		return 0, io.EOF
-	}
-	return s.Data.Read(p)
-}
-
-func (*APIV1TgProfilePhotoGetOK) aPIV1TgProfilePhotoGetRes() {}
-
-type APIV1TgSearchGetBadRequest ErrorResponse
-
-func (*APIV1TgSearchGetBadRequest) aPIV1TgSearchGetRes() {}
-
-type APIV1TgSearchGetUnauthorized ErrorResponse
-
-func (*APIV1TgSearchGetUnauthorized) aPIV1TgSearchGetRes() {}
-
-type APIV1TgSearchPostApplicationJSON SearchQuery
-
-func (*APIV1TgSearchPostApplicationJSON) aPIV1TgSearchPostReq() {}
-
-type APIV1TgSearchPostApplicationXWwwFormUrlencoded SearchQuery
-
-func (*APIV1TgSearchPostApplicationXWwwFormUrlencoded) aPIV1TgSearchPostReq() {}
-
-type APIV1TgSearchPostBadRequest ErrorResponse
-
-func (*APIV1TgSearchPostBadRequest) aPIV1TgSearchPostRes() {}
-
-type APIV1TgSearchPostUnauthorized ErrorResponse
-
-func (*APIV1TgSearchPostUnauthorized) aPIV1TgSearchPostRes() {}
-
 // Ref: #/components/schemas/ChatStat
 type ChatStat struct {
 	ChatID int64 `json:"chat_id"`
@@ -257,7 +209,7 @@ func (s *ChatStat) SetMsgIDAtTimeStart(val TenMinuteStats) {
 	s.MsgIDAtTimeStart = val
 }
 
-func (*ChatStat) aPIV1TgGroupStatGetRes() {}
+func (*ChatStat) tgGroupStatGetRes() {}
 
 // Ref: #/components/schemas/ErrorResponse
 type ErrorResponse struct {
@@ -296,8 +248,8 @@ func (s *ErrorResponse) SetError(val string) {
 	s.Error = val
 }
 
-func (*ErrorResponse) aPIV1TgProfilePhotoGetRes() {}
-func (*ErrorResponse) aPIV1TgUsernameGetRes()     {}
+func (*ErrorResponse) tgProfilePhotoGetRes() {}
+func (*ErrorResponse) tgUsernameGetRes()     {}
 
 // Ref: #/components/schemas/MeiliMsg
 type MeiliMsg struct {
@@ -710,8 +662,8 @@ func (s *SearchResult) SetEstimatedTotalHits(val int) {
 	s.EstimatedTotalHits = val
 }
 
-func (*SearchResult) aPIV1TgSearchGetRes()  {}
-func (*SearchResult) aPIV1TgSearchPostRes() {}
+func (*SearchResult) tgSearchGetRes()  {}
+func (*SearchResult) tgSearchPostRes() {}
 
 type TelegramAuth struct {
 	APIKey string
@@ -740,6 +692,54 @@ func (s *TelegramAuth) SetRoles(val []string) {
 
 type TenMinuteStats []int64
 
+type TgGroupStatGetBadRequest ErrorResponse
+
+func (*TgGroupStatGetBadRequest) tgGroupStatGetRes() {}
+
+type TgGroupStatGetUnauthorized ErrorResponse
+
+func (*TgGroupStatGetUnauthorized) tgGroupStatGetRes() {}
+
+type TgProfilePhotoGetOK struct {
+	Data io.Reader
+}
+
+// Read reads data from the Data reader.
+//
+// Kept to satisfy the io.Reader interface.
+func (s TgProfilePhotoGetOK) Read(p []byte) (n int, err error) {
+	if s.Data == nil {
+		return 0, io.EOF
+	}
+	return s.Data.Read(p)
+}
+
+func (*TgProfilePhotoGetOK) tgProfilePhotoGetRes() {}
+
+type TgSearchGetBadRequest ErrorResponse
+
+func (*TgSearchGetBadRequest) tgSearchGetRes() {}
+
+type TgSearchGetUnauthorized ErrorResponse
+
+func (*TgSearchGetUnauthorized) tgSearchGetRes() {}
+
+type TgSearchPostApplicationJSON SearchQuery
+
+func (*TgSearchPostApplicationJSON) tgSearchPostReq() {}
+
+type TgSearchPostApplicationXWwwFormUrlencoded SearchQuery
+
+func (*TgSearchPostApplicationXWwwFormUrlencoded) tgSearchPostReq() {}
+
+type TgSearchPostBadRequest ErrorResponse
+
+func (*TgSearchPostBadRequest) tgSearchPostRes() {}
+
+type TgSearchPostUnauthorized ErrorResponse
+
+func (*TgSearchPostUnauthorized) tgSearchPostRes() {}
+
 // Ref: #/components/schemas/User
 type User struct {
 	UserID int64  `json:"user_id"`
@@ -766,7 +766,7 @@ func (s *User) SetName(val string) {
 	s.Name = val
 }
 
-func (*User) aPIV1TgUsernameGetRes() {}
+func (*User) tgUsernameGetRes() {}
 
 // Ref: #/components/schemas/UserMsgStat
 type UserMsgStat struct {

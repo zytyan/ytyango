@@ -48,9 +48,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 		switch elem[0] {
-		case '/': // Prefix: "/api/"
+		case '/': // Prefix: "/"
 
-			if l := len("/api/"); len(elem) >= l && elem[0:l] == "/api/" {
+			if l := len("/"); len(elem) >= l && elem[0:l] == "/" {
 				elem = elem[l:]
 			} else {
 				break
@@ -72,7 +72,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					// Leaf node.
 					switch r.Method {
 					case "GET":
-						s.handleAPIPingGetRequest([0]string{}, elemIsEscaped, w, r)
+						s.handlePingGetRequest([0]string{}, elemIsEscaped, w, r)
 					default:
 						s.notAllowed(w, r, "GET")
 					}
@@ -80,9 +80,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					return
 				}
 
-			case 'v': // Prefix: "v1/tg/"
+			case 't': // Prefix: "tg/"
 
-				if l := len("v1/tg/"); len(elem) >= l && elem[0:l] == "v1/tg/" {
+				if l := len("tg/"); len(elem) >= l && elem[0:l] == "tg/" {
 					elem = elem[l:]
 				} else {
 					break
@@ -104,7 +104,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 						// Leaf node.
 						switch r.Method {
 						case "GET":
-							s.handleAPIV1TgGroupStatGetRequest([0]string{}, elemIsEscaped, w, r)
+							s.handleTgGroupStatGetRequest([0]string{}, elemIsEscaped, w, r)
 						default:
 							s.notAllowed(w, r, "GET")
 						}
@@ -124,7 +124,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 						// Leaf node.
 						switch r.Method {
 						case "GET":
-							s.handleAPIV1TgProfilePhotoGetRequest([0]string{}, elemIsEscaped, w, r)
+							s.handleTgProfilePhotoGetRequest([0]string{}, elemIsEscaped, w, r)
 						default:
 							s.notAllowed(w, r, "GET")
 						}
@@ -144,9 +144,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 						// Leaf node.
 						switch r.Method {
 						case "GET":
-							s.handleAPIV1TgSearchGetRequest([0]string{}, elemIsEscaped, w, r)
+							s.handleTgSearchGetRequest([0]string{}, elemIsEscaped, w, r)
 						case "POST":
-							s.handleAPIV1TgSearchPostRequest([0]string{}, elemIsEscaped, w, r)
+							s.handleTgSearchPostRequest([0]string{}, elemIsEscaped, w, r)
 						default:
 							s.notAllowed(w, r, "GET,POST")
 						}
@@ -166,7 +166,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 						// Leaf node.
 						switch r.Method {
 						case "GET":
-							s.handleAPIV1TgUsernameGetRequest([0]string{}, elemIsEscaped, w, r)
+							s.handleTgUsernameGetRequest([0]string{}, elemIsEscaped, w, r)
 						default:
 							s.notAllowed(w, r, "GET")
 						}
@@ -258,9 +258,9 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 			break
 		}
 		switch elem[0] {
-		case '/': // Prefix: "/api/"
+		case '/': // Prefix: "/"
 
-			if l := len("/api/"); len(elem) >= l && elem[0:l] == "/api/" {
+			if l := len("/"); len(elem) >= l && elem[0:l] == "/" {
 				elem = elem[l:]
 			} else {
 				break
@@ -282,10 +282,10 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 					// Leaf node.
 					switch method {
 					case "GET":
-						r.name = APIPingGetOperation
+						r.name = PingGetOperation
 						r.summary = "Ping the service"
 						r.operationID = ""
-						r.pathPattern = "/api/ping"
+						r.pathPattern = "/ping"
 						r.args = args
 						r.count = 0
 						return r, true
@@ -294,9 +294,9 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 					}
 				}
 
-			case 'v': // Prefix: "v1/tg/"
+			case 't': // Prefix: "tg/"
 
-				if l := len("v1/tg/"); len(elem) >= l && elem[0:l] == "v1/tg/" {
+				if l := len("tg/"); len(elem) >= l && elem[0:l] == "tg/" {
 					elem = elem[l:]
 				} else {
 					break
@@ -318,10 +318,10 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 						// Leaf node.
 						switch method {
 						case "GET":
-							r.name = APIV1TgGroupStatGetOperation
+							r.name = TgGroupStatGetOperation
 							r.summary = "Get today's group statistics"
 							r.operationID = ""
-							r.pathPattern = "/api/v1/tg/group_stat"
+							r.pathPattern = "/tg/group_stat"
 							r.args = args
 							r.count = 0
 							return r, true
@@ -342,10 +342,10 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 						// Leaf node.
 						switch method {
 						case "GET":
-							r.name = APIV1TgProfilePhotoGetOperation
+							r.name = TgProfilePhotoGetOperation
 							r.summary = "Get the user's profile photo in WEBP format"
 							r.operationID = ""
-							r.pathPattern = "/api/v1/tg/profile_photo"
+							r.pathPattern = "/tg/profile_photo"
 							r.args = args
 							r.count = 0
 							return r, true
@@ -366,18 +366,18 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 						// Leaf node.
 						switch method {
 						case "GET":
-							r.name = APIV1TgSearchGetOperation
+							r.name = TgSearchGetOperation
 							r.summary = "Search messages within a group"
 							r.operationID = ""
-							r.pathPattern = "/api/v1/tg/search"
+							r.pathPattern = "/tg/search"
 							r.args = args
 							r.count = 0
 							return r, true
 						case "POST":
-							r.name = APIV1TgSearchPostOperation
+							r.name = TgSearchPostOperation
 							r.summary = "Search messages within a group"
 							r.operationID = ""
-							r.pathPattern = "/api/v1/tg/search"
+							r.pathPattern = "/tg/search"
 							r.args = args
 							r.count = 0
 							return r, true
@@ -398,10 +398,10 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 						// Leaf node.
 						switch method {
 						case "GET":
-							r.name = APIV1TgUsernameGetOperation
+							r.name = TgUsernameGetOperation
 							r.summary = "Get a user name by Telegram user id"
 							r.operationID = ""
-							r.pathPattern = "/api/v1/tg/username"
+							r.pathPattern = "/tg/username"
 							r.args = args
 							r.count = 0
 							return r, true
