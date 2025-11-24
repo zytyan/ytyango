@@ -20,6 +20,7 @@ import (
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 	"github.com/puzpuzpuz/xsync/v3"
+	"go.uber.org/zap"
 )
 
 func initReDownload() *regexp.Regexp {
@@ -52,6 +53,7 @@ type dlKey struct {
 }
 type DlResult struct {
 	uploadFileOnce sync.Once
+	cleanup        func()
 
 	wg   sync.WaitGroup
 	file string
@@ -105,6 +107,12 @@ func (d *dlKey) downloadToFile() *DlResult {
 	result.Title = resp.Info.Title
 	result.Uploader = resp.Info.Uploader
 	result.Description = resp.Info.Desc
+	result.cleanup = func() {
+		err1 := req.Clean()
+		if err1 != nil {
+			log.Desugar().Warn("cleanup function error", zap.Error(err1))
+		}
+	}
 	return result
 }
 
@@ -251,6 +259,7 @@ func downloadMedia(bot *gotgbot.Bot, key *dlKey, user *gotgbot.User, msgId, chat
 		return err
 	}
 	result.uploadFileOnce.Do(func() {
+		defer result.cleanup()
 		var sent *gotgbot.Message
 		if key.AudioOnly {
 			sent, err = sendAudio(bot, result, user, msgId, chatId)

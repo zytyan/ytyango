@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -82,7 +83,7 @@ func (c *Req) prepare() error {
 	}
 	var err error
 	if c.tmpPath == "" {
-		c.tmpPath, err = os.MkdirTemp("", "ytdlp")
+		c.tmpPath, err = os.MkdirTemp("", "ytdlp-*")
 		if err != nil {
 			return err
 		}
@@ -125,14 +126,18 @@ func (c *Req) Clean() error {
 	}
 	return os.RemoveAll(c.tmpPath)
 }
+func isVideoFile(name string) bool {
+	videoSuffixes := []string{".mp4", ".mkv", ".flv"}
+	return slices.Contains(videoSuffixes, strings.ToLower(filepath.Ext(name)))
 
+}
 func getFirstFile(path string) (string, error) {
 	files, err := os.ReadDir(path)
 	if err != nil {
 		return "", fmt.Errorf("读取目录 %s 失败", path)
 	}
 	for _, file := range files {
-		if !file.IsDir() {
+		if !file.IsDir() && isVideoFile(file.Name()) {
 			firstFile := filepath.Join(path, file.Name())
 			return firstFile, nil
 		}
@@ -220,10 +225,7 @@ func (c *Req) runWithCtxBBDown(ctx context.Context) (resp *Resp, err error) {
 		resp.Info, resp.InfoJsonErr = getBilibiliVideoInfo(c.Url)
 	})
 
-	tmp, err := os.MkdirTemp("", "ytdlp-*")
-	if err != nil {
-		return nil, err
-	}
+	tmp := c.tmpPath
 	tmp, err = filepath.Abs(tmp)
 	if err != nil {
 		return nil, err
@@ -253,13 +255,13 @@ func (c *Req) runWithCtxBBDown(ctx context.Context) (resp *Resp, err error) {
 }
 
 func (c *Req) runWithCtx(ctx context.Context) (resp *Resp, err error) {
-	if strings.Contains(c.Url, "b23.tv") || strings.Contains(c.Url, "bilibili.com") {
-		return c.runWithCtxBBDown(ctx)
-	}
 	resp = &Resp{req: c}
 	err = c.prepare()
 	if err != nil {
 		return resp, err
+	}
+	if strings.Contains(c.Url, "b23.tv") || strings.Contains(c.Url, "bilibili.com") {
+		return c.runWithCtxBBDown(ctx)
 	}
 	args := c.args()
 	cmd := exec.CommandContext(ctx, Bin, args...)
