@@ -291,7 +291,7 @@ func RateNsfwPicByBtn(bot *gotgbot.Bot, ctx *ext.Context) error {
 	}
 	_, err = cb.Answer(bot, &gotgbot.AnswerCallbackQueryOpts{
 		Text:      fmt.Sprintf("您的评分已由%d修改为%d", oldRate, rate),
-		ShowAlert: true,
+		ShowAlert: false,
 	})
 	return err
 }
