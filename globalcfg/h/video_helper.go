@@ -3,7 +3,6 @@ package h
 import (
 	"context"
 	"net/url"
-	"strconv"
 	"time"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
@@ -42,9 +41,9 @@ func PrepareTgVideo(file string, replyMsgId int64, opts ...func(opts *gotgbot.Se
 	}
 	vs = probe.FirstVideoStream()
 	if vs != nil {
-		var duration float64
-		duration, err = strconv.ParseFloat(vs.Duration, 64)
-		opt.Duration = int64(duration)
+		if probe.Format != nil {
+			opt.Duration = int64(probe.Format.Duration().Seconds())
+		}
 		opt.Width = int64(vs.Width)
 		opt.Height = int64(vs.Height)
 	}

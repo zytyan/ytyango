@@ -15,6 +15,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
@@ -121,29 +122,54 @@ func (d *dlKey) findInDb() *DlResult {
 }
 
 func buildCaption(result *DlResult, user *gotgbot.User) string {
-	buf := strings.Builder{}
-	buf.Grow(1024)
-	buf.WriteString(`<b>`)
-	buf.WriteString(fmt.Sprintf(`<a href="%s">%s</a>`,
-		html.EscapeString(result.Url), html.EscapeString(result.Title),
-	))
-	buf.WriteString("</b>\n")
-	buf.WriteString("上传者: ")
-	buf.WriteString(html.EscapeString(result.Uploader))
-	buf.WriteString("\n")
-	buf.WriteString(h.MentionUserHtml(user))
-	buf.WriteString("\n")
-	if result.Description != "" {
-		buf.WriteString(`<blockquote expandable>`)
-		buf.WriteString(html.EscapeString(result.Description))
-		buf.WriteString(`</blockquote>`)
+	const maxLen = 1000
+	var buf strings.Builder
+	buf.Grow(2048)
+	write := func(s string) bool {
+		// 如果写入后超过长度，则停止写入
+		if buf.Len()+len(s) > maxLen {
+			return false
+		}
+		buf.WriteString(s)
+		return true
 	}
-	/*
-		TODO: 如果超过1024字节，tg就不让发Caption，所以这里将来要考虑一个截断到1024字节的东西
-		设想: buf:= LimitedBuf{}, buf.Remember() buf.Write() 若写出超限，则回到调用Remember()的时候
-	*/
-	s := buf.String()
-	return s
+	if !write(fmt.Sprintf(`<b><a href="%s">%s</a></b>`+"\n",
+		html.EscapeString(result.Url),
+		html.EscapeString(result.Title),
+	)) {
+		return buf.String()
+	}
+	if !write("上传者: " + html.EscapeString(result.Uploader) + "\n") {
+		return buf.String()
+	}
+	if !write(h.MentionUserHtml(user) + "\n") {
+		return buf.String()
+	}
+	if result.Description != "" {
+		desc := html.EscapeString(result.Description)
+		prefix := "<blockquote expandable>"
+		suffix := "</blockquote>"
+		if !write(prefix) {
+			return buf.String()
+		}
+		remain := maxLen - buf.Len() - len(suffix)
+		if remain > 0 {
+			desc = desc[:minUtf8Safe(desc, remain)]
+			write(desc)
+		}
+		write(suffix)
+	}
+	return buf.String()
+}
+
+func minUtf8Safe(s string, n int) int {
+	if len(s) <= n {
+		return len(s)
+	}
+	for n > 0 && !utf8.RuneStart(s[n]) {
+		n--
+	}
+	return n
 }
 
 func buildYtDlKey(text string, audioOnly bool) (*dlKey, error) {
