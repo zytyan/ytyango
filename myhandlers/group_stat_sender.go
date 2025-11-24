@@ -146,9 +146,6 @@ func sendMyChatsStat() {
 		if err := sendChatStat(bot, chatId, time.Now().Add(-24*time.Hour)); err != nil {
 			log.Warnf("send stat of yesterday to chat %d failed: %s", chatId, err)
 		}
-		if err := sendChatStat(bot, chatId, time.Now()); err != nil {
-			log.Warnf("send stat of today to chat %d failed: %s", chatId, err)
-		}
 	}
 }
 
