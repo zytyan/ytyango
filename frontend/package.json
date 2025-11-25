@@ -1,0 +1,23 @@
+{
+  "name": "ytyango-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite-ssg build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "vue": "^3.4.38",
+    "vue-router": "^4.4.3",
+    "vite-ssg": "^0.24.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.7.4",
+    "@vitejs/plugin-vue": "^5.1.4",
+    "typescript": "^5.6.2",
+    "vite": "^5.4.8",
+    "vue-tsc": "^2.1.6"
+  }
+}
