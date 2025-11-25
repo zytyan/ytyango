@@ -108,23 +108,9 @@ func (h *Backend) convertChatStat(stat *q.ChatStat) *botapi.ChatStat {
 
 func (h *Backend) parseLimit(opt botapi.OptInt) int {
 	if v, ok := opt.Get(); ok {
-		return clamp(v, 1, 50)
+		return v
 	}
 	return 20
-}
-
-func clamp(v, min, max int) int {
-	if v < min {
-		return min
-	}
-	if v > max {
-		return max
-	}
-	return v
-}
-
-func (h *Backend) decodeInsID(ins string) (int64, error) {
-	return strconv.ParseInt(ins, 10, 64)
 }
 
 // --- handler implementations ---
@@ -134,9 +120,6 @@ func (h *Backend) PingGet(_ context.Context) (*botapi.PingResponse, error) {
 }
 
 func (h *Backend) TgUsernameGet(ctx context.Context, params botapi.TgUsernameGetParams) (botapi.TgUsernameGetRes, error) {
-	if params.UserID == 0 {
-		return h.err(ErrArgInvalid, "user_id not found"), nil
-	}
 	user := g.Q.GetUserById(ctx, params.UserID)
 	if user == nil {
 		return h.err(UserNotFound, "user not found"), nil
@@ -150,10 +133,6 @@ func (h *Backend) TgUsernameGet(ctx context.Context, params botapi.TgUsernameGet
 func (h *Backend) TgGroupStatGet(ctx context.Context, params botapi.TgGroupStatGetParams) (botapi.TgGroupStatGetRes, error) {
 	if _, errResp := h.requireAuth(ctx); errResp != nil {
 		res := botapi.TgGroupStatGetUnauthorized(*errResp)
-		return &res, nil
-	}
-	if params.GroupWebID == 0 {
-		res := botapi.TgGroupStatGetBadRequest(*h.err(ErrArgInvalid, "group_web_id not found"))
 		return &res, nil
 	}
 	chat, err := g.Q.GetChatByWebId(ctx, params.GroupWebID)
@@ -170,9 +149,6 @@ func (h *Backend) TgGroupStatGet(ctx context.Context, params botapi.TgGroupStatG
 }
 
 func (h *Backend) TgProfilePhotoGet(ctx context.Context, params botapi.TgProfilePhotoGetParams) (botapi.TgProfilePhotoGetRes, error) {
-	if params.UserID <= 0 {
-		return h.err(ErrArgInvalid, "user_id is required"), nil
-	}
 	path, err := h.getUserProfilePhotoWebp(ctx, params.UserID)
 	if err != nil {
 		h.log.Warnf("get user profile photo error: %v", err)
@@ -214,9 +190,6 @@ func (h *Backend) TgSearchPost(ctx context.Context, req botapi.TgSearchPostReq) 
 		body = botapi.SearchQuery(*v)
 	case *botapi.TgSearchPostApplicationXWwwFormUrlencoded:
 		body = botapi.SearchQuery(*v)
-	default:
-		br := botapi.TgSearchPostBadRequest(*h.err(ErrArgInvalid, "invalid request body"))
-		return &br, nil
 	}
 	res, errResp := h.performSearch(ctx, body)
 	if errResp != nil {
@@ -237,17 +210,7 @@ type meiliQuery struct {
 }
 
 func (h *Backend) performSearch(ctx context.Context, qy botapi.SearchQuery) (*botapi.SearchResult, *botapi.ErrorResponse) {
-	insID, err := h.decodeInsID(qy.InsID)
-	if err != nil {
-		return nil, h.err(ErrArgInvalid, "ins_id is invalid")
-	}
-	if qy.Q == "" {
-		return nil, h.err(ErrArgInvalid, "q is required")
-	}
-	if qy.Page <= 0 {
-		return nil, h.err(ErrArgInvalid, "page must be >= 1")
-	}
-	chat, err := g.Q.GetChatByWebId(ctx, insID)
+	chat, err := g.Q.GetChatByWebId(ctx, qy.InsID)
 	if err != nil {
 		return nil, h.err(GroupNotFound, "group not found")
 	}

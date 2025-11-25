@@ -128,6 +128,22 @@ func (s *Server) decodeTgSearchPostRequest(r *http.Request) (
 					}); err != nil {
 						return req, rawBody, close, errors.Wrap(err, "decode \"q\"")
 					}
+					if err := func() error {
+						if err := (validate.String{
+							MinLength:    1,
+							MinLengthSet: true,
+							MaxLength:    0,
+							MaxLengthSet: false,
+							Email:        false,
+							Hostname:     false,
+							Regex:        nil,
+						}).Validate(string(unwrapped.Q)); err != nil {
+							return errors.Wrap(err, "string")
+						}
+						return nil
+					}(); err != nil {
+						return req, rawBody, close, errors.Wrap(err, "validate")
+					}
 				} else {
 					return req, rawBody, close, errors.Wrap(err, "query")
 				}
@@ -145,7 +161,7 @@ func (s *Server) decodeTgSearchPostRequest(r *http.Request) (
 							return err
 						}
 
-						c, err := conv.ToString(val)
+						c, err := conv.ToInt64(val)
 						if err != nil {
 							return err
 						}
@@ -154,22 +170,6 @@ func (s *Server) decodeTgSearchPostRequest(r *http.Request) (
 						return nil
 					}); err != nil {
 						return req, rawBody, close, errors.Wrap(err, "decode \"ins_id\"")
-					}
-					if err := func() error {
-						if err := (validate.String{
-							MinLength:    0,
-							MinLengthSet: false,
-							MaxLength:    0,
-							MaxLengthSet: false,
-							Email:        false,
-							Hostname:     false,
-							Regex:        regexMap["^[0-9]+$"],
-						}).Validate(string(unwrapped.InsID)); err != nil {
-							return errors.Wrap(err, "string")
-						}
-						return nil
-					}(); err != nil {
-						return req, rawBody, close, errors.Wrap(err, "validate")
 					}
 				} else {
 					return req, rawBody, close, errors.Wrap(err, "query")

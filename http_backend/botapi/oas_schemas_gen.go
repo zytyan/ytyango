@@ -547,7 +547,7 @@ type SearchQuery struct {
 	// Search query string.
 	Q string `json:"q"`
 	// Group web id (Meilisearch index id).
-	InsID string `json:"ins_id"`
+	InsID int64  `json:"ins_id"`
 	Page  int    `json:"page"`
 	Limit OptInt `json:"limit"`
 }
@@ -558,7 +558,7 @@ func (s *SearchQuery) GetQ() string {
 }
 
 // GetInsID returns the value of InsID.
-func (s *SearchQuery) GetInsID() string {
+func (s *SearchQuery) GetInsID() int64 {
 	return s.InsID
 }
 
@@ -578,7 +578,7 @@ func (s *SearchQuery) SetQ(val string) {
 }
 
 // SetInsID sets the value of InsID.
-func (s *SearchQuery) SetInsID(val string) {
+func (s *SearchQuery) SetInsID(val int64) {
 	s.InsID = val
 }
 

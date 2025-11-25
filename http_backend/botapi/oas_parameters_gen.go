@@ -15,7 +15,7 @@ import (
 
 // TgGroupStatGetParams is parameters of GET /tg/group_stat operation.
 type TgGroupStatGetParams struct {
-	// Web id of the group.
+	// Web id of the group, a random 64-bit integer.
 	GroupWebID int64
 }
 
@@ -115,6 +115,23 @@ func decodeTgProfilePhotoGetParams(args [0]string, argsEscaped bool, r *http.Req
 			}); err != nil {
 				return err
 			}
+			if err := func() error {
+				if err := (validate.Int{
+					MinSet:        true,
+					Min:           1,
+					MaxSet:        false,
+					Max:           0,
+					MinExclusive:  false,
+					MaxExclusive:  false,
+					MultipleOfSet: false,
+					MultipleOf:    0,
+				}).Validate(int64(params.UserID)); err != nil {
+					return errors.Wrap(err, "int")
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
 		} else {
 			return err
 		}
@@ -134,7 +151,7 @@ type TgSearchGetParams struct {
 	// Search query string.
 	Q string
 	// Group web id (Meilisearch index id). Accepts digits as string or number.
-	InsID string
+	InsID int64
 	// 1-based page number.
 	Page int
 	// Results per page. Defaults to 20, maximum 50.
@@ -154,7 +171,7 @@ func unpackTgSearchGetParams(packed middleware.Parameters) (params TgSearchGetPa
 			Name: "ins_id",
 			In:   "query",
 		}
-		params.InsID = packed[key].(string)
+		params.InsID = packed[key].(int64)
 	}
 	{
 		key := middleware.ParameterKey{
@@ -202,6 +219,22 @@ func decodeTgSearchGetParams(args [0]string, argsEscaped bool, r *http.Request) 
 			}); err != nil {
 				return err
 			}
+			if err := func() error {
+				if err := (validate.String{
+					MinLength:    1,
+					MinLengthSet: true,
+					MaxLength:    0,
+					MaxLengthSet: false,
+					Email:        false,
+					Hostname:     false,
+					Regex:        nil,
+				}).Validate(string(params.Q)); err != nil {
+					return errors.Wrap(err, "string")
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
 		} else {
 			return err
 		}
@@ -228,7 +261,7 @@ func decodeTgSearchGetParams(args [0]string, argsEscaped bool, r *http.Request) 
 					return err
 				}
 
-				c, err := conv.ToString(val)
+				c, err := conv.ToInt64(val)
 				if err != nil {
 					return err
 				}
@@ -239,16 +272,17 @@ func decodeTgSearchGetParams(args [0]string, argsEscaped bool, r *http.Request) 
 				return err
 			}
 			if err := func() error {
-				if err := (validate.String{
-					MinLength:    0,
-					MinLengthSet: false,
-					MaxLength:    0,
-					MaxLengthSet: false,
-					Email:        false,
-					Hostname:     false,
-					Regex:        regexMap["^[0-9]+$"],
-				}).Validate(string(params.InsID)); err != nil {
-					return errors.Wrap(err, "string")
+				if err := (validate.Int{
+					MinSet:        true,
+					Min:           1,
+					MaxSet:        false,
+					Max:           0,
+					MinExclusive:  false,
+					MaxExclusive:  false,
+					MultipleOfSet: false,
+					MultipleOf:    0,
+				}).Validate(int64(params.InsID)); err != nil {
+					return errors.Wrap(err, "int")
 				}
 				return nil
 			}(); err != nil {
@@ -433,6 +467,23 @@ func decodeTgUsernameGetParams(args [0]string, argsEscaped bool, r *http.Request
 				params.UserID = c
 				return nil
 			}); err != nil {
+				return err
+			}
+			if err := func() error {
+				if err := (validate.Int{
+					MinSet:        true,
+					Min:           1,
+					MaxSet:        false,
+					Max:           0,
+					MinExclusive:  false,
+					MaxExclusive:  false,
+					MultipleOfSet: false,
+					MultipleOf:    0,
+				}).Validate(int64(params.UserID)); err != nil {
+					return errors.Wrap(err, "int")
+				}
+				return nil
+			}(); err != nil {
 				return err
 			}
 		} else {

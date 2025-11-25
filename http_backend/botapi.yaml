@@ -33,6 +33,7 @@ paths:
           schema:
             type: integer
             format: int64
+            minimum: 1
       responses:
         200:
           description: User found.
@@ -60,6 +61,7 @@ paths:
           schema:
             type: integer
             format: int64
+            minimum: 1
       responses:
         200:
           description: Profile photo file.
@@ -86,7 +88,7 @@ paths:
         - name: group_web_id
           in: query
           required: true
-          description: Web id of the group.
+          description: Web id of the group, a random 64-bit integer.
           schema:
             type: integer
             format: int64
@@ -124,13 +126,15 @@ paths:
           description: Search query string.
           schema:
             type: string
+            minLength: 1
         - name: ins_id
           in: query
           required: true
           description: Group web id (Meilisearch index id). Accepts digits as string or number.
           schema:
-            type: string
-            pattern: '^[0-9]+$'
+            type: integer
+            format: int64
+            minimum: 1
         - name: page
           in: query
           required: true
@@ -357,10 +361,11 @@ components:
         q:
           type: string
           description: Search query string.
+          minLength: 1
         ins_id:
           description: Group web id (Meilisearch index id).
-          type: string
-          pattern: '^[0-9]+$'
+          type: integer
+          format: int64
         page:
           type: integer
           minimum: 1

@@ -81,20 +81,20 @@ func (s *SearchQuery) Validate() error {
 	var failures []validate.FieldError
 	if err := func() error {
 		if err := (validate.String{
-			MinLength:    0,
-			MinLengthSet: false,
+			MinLength:    1,
+			MinLengthSet: true,
 			MaxLength:    0,
 			MaxLengthSet: false,
 			Email:        false,
 			Hostname:     false,
-			Regex:        regexMap["^[0-9]+$"],
-		}).Validate(string(s.InsID)); err != nil {
+			Regex:        nil,
+		}).Validate(string(s.Q)); err != nil {
 			return errors.Wrap(err, "string")
 		}
 		return nil
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
-			Name:  "ins_id",
+			Name:  "q",
 			Error: err,
 		})
 	}

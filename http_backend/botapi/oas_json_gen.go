@@ -955,7 +955,7 @@ func (s *SearchQuery) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("ins_id")
-		e.Str(s.InsID)
+		e.Int64(s.InsID)
 	}
 	{
 		e.FieldStart("page")
@@ -1001,8 +1001,8 @@ func (s *SearchQuery) Decode(d *jx.Decoder) error {
 		case "ins_id":
 			requiredBitSet[0] |= 1 << 1
 			if err := func() error {
-				v, err := d.Str()
-				s.InsID = string(v)
+				v, err := d.Int64()
+				s.InsID = int64(v)
 				if err != nil {
 					return err
 				}
