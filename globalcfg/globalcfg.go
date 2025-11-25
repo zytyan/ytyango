@@ -30,6 +30,7 @@ type Config struct {
 	God                int64       `yaml:"god"`
 	MyChats            []int64     `yaml:"my-chats"`
 	MeiliConfig        MeiliConfig `yaml:"meili-config"`
+	TestMode           bool        `yaml:"test-mode"`
 	ContentModerator   Azure       `yaml:"content-moderator"`
 	Ocr                OcrConfig   `yaml:"ocr"`
 	QrScanUrl          string      `yaml:"qr-scan-url"`
