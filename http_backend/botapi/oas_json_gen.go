@@ -1407,82 +1407,6 @@ func (s *TgGroupStatGetUnauthorized) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
-// Encode encodes TgSearchGetBadRequest as json.
-func (s *TgSearchGetBadRequest) Encode(e *jx.Encoder) {
-	unwrapped := (*ErrorResponse)(s)
-
-	unwrapped.Encode(e)
-}
-
-// Decode decodes TgSearchGetBadRequest from json.
-func (s *TgSearchGetBadRequest) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode TgSearchGetBadRequest to nil")
-	}
-	var unwrapped ErrorResponse
-	if err := func() error {
-		if err := unwrapped.Decode(d); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return errors.Wrap(err, "alias")
-	}
-	*s = TgSearchGetBadRequest(unwrapped)
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *TgSearchGetBadRequest) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *TgSearchGetBadRequest) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes TgSearchGetUnauthorized as json.
-func (s *TgSearchGetUnauthorized) Encode(e *jx.Encoder) {
-	unwrapped := (*ErrorResponse)(s)
-
-	unwrapped.Encode(e)
-}
-
-// Decode decodes TgSearchGetUnauthorized from json.
-func (s *TgSearchGetUnauthorized) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode TgSearchGetUnauthorized to nil")
-	}
-	var unwrapped ErrorResponse
-	if err := func() error {
-		if err := unwrapped.Decode(d); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return errors.Wrap(err, "alias")
-	}
-	*s = TgSearchGetUnauthorized(unwrapped)
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *TgSearchGetUnauthorized) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *TgSearchGetUnauthorized) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
 // Encode encodes TgSearchPostApplicationJSON as json.
 func (s *TgSearchPostApplicationJSON) Encode(e *jx.Encoder) {
 	unwrapped := (*SearchQuery)(s)
@@ -1635,6 +1559,82 @@ func (s *TgSearchPostUnauthorized) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode encodes TgUserinfoPostBadRequest as json.
+func (s *TgUserinfoPostBadRequest) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorResponse)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes TgUserinfoPostBadRequest from json.
+func (s *TgUserinfoPostBadRequest) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode TgUserinfoPostBadRequest to nil")
+	}
+	var unwrapped ErrorResponse
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = TgUserinfoPostBadRequest(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *TgUserinfoPostBadRequest) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *TgUserinfoPostBadRequest) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes TgUserinfoPostUnauthorized as json.
+func (s *TgUserinfoPostUnauthorized) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorResponse)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes TgUserinfoPostUnauthorized from json.
+func (s *TgUserinfoPostUnauthorized) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode TgUserinfoPostUnauthorized to nil")
+	}
+	var unwrapped ErrorResponse
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = TgUserinfoPostUnauthorized(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *TgUserinfoPostUnauthorized) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *TgUserinfoPostUnauthorized) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode implements json.Marshaler.
 func (s *User) Encode(e *jx.Encoder) {
 	e.ObjStart()
@@ -1649,14 +1649,35 @@ func (s *User) encodeFields(e *jx.Encoder) {
 		e.Int64(s.UserID)
 	}
 	{
-		e.FieldStart("name")
-		e.Str(s.Name)
+		e.FieldStart("first_name")
+		e.Str(s.FirstName)
+	}
+	{
+		if s.LastName.Set {
+			e.FieldStart("last_name")
+			s.LastName.Encode(e)
+		}
+	}
+	{
+		if s.Username.Set {
+			e.FieldStart("username")
+			s.Username.Encode(e)
+		}
+	}
+	{
+		if s.ProfilePhoto.Set {
+			e.FieldStart("profile_photo")
+			s.ProfilePhoto.Encode(e)
+		}
 	}
 }
 
-var jsonFieldsNameOfUser = [2]string{
+var jsonFieldsNameOfUser = [5]string{
 	0: "user_id",
-	1: "name",
+	1: "first_name",
+	2: "last_name",
+	3: "username",
+	4: "profile_photo",
 }
 
 // Decode decodes User from json.
@@ -1680,17 +1701,47 @@ func (s *User) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"user_id\"")
 			}
-		case "name":
+		case "first_name":
 			requiredBitSet[0] |= 1 << 1
 			if err := func() error {
 				v, err := d.Str()
-				s.Name = string(v)
+				s.FirstName = string(v)
 				if err != nil {
 					return err
 				}
 				return nil
 			}(); err != nil {
-				return errors.Wrap(err, "decode field \"name\"")
+				return errors.Wrap(err, "decode field \"first_name\"")
+			}
+		case "last_name":
+			if err := func() error {
+				s.LastName.Reset()
+				if err := s.LastName.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"last_name\"")
+			}
+		case "username":
+			if err := func() error {
+				s.Username.Reset()
+				if err := s.Username.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"username\"")
+			}
+		case "profile_photo":
+			if err := func() error {
+				s.ProfilePhoto.Reset()
+				if err := s.ProfilePhoto.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"profile_photo\"")
 			}
 		default:
 			return d.Skip()
@@ -1911,6 +1962,58 @@ func (s UserMsgStatMap) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *UserMsgStatMap) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes UserQuery as json.
+func (s UserQuery) Encode(e *jx.Encoder) {
+	unwrapped := []int64(s)
+
+	e.ArrStart()
+	for _, elem := range unwrapped {
+		e.Int64(elem)
+	}
+	e.ArrEnd()
+}
+
+// Decode decodes UserQuery from json.
+func (s *UserQuery) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode UserQuery to nil")
+	}
+	var unwrapped []int64
+	if err := func() error {
+		unwrapped = make([]int64, 0)
+		if err := d.Arr(func(d *jx.Decoder) error {
+			var elem int64
+			v, err := d.Int64()
+			elem = int64(v)
+			if err != nil {
+				return err
+			}
+			unwrapped = append(unwrapped, elem)
+			return nil
+		}); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = UserQuery(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s UserQuery) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *UserQuery) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }

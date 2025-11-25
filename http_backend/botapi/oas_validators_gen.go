@@ -81,13 +81,17 @@ func (s *SearchQuery) Validate() error {
 	var failures []validate.FieldError
 	if err := func() error {
 		if err := (validate.String{
-			MinLength:    1,
-			MinLengthSet: true,
-			MaxLength:    0,
-			MaxLengthSet: false,
-			Email:        false,
-			Hostname:     false,
-			Regex:        nil,
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
 		}).Validate(string(s.Q)); err != nil {
 			return errors.Wrap(err, "string")
 		}
@@ -108,6 +112,7 @@ func (s *SearchQuery) Validate() error {
 			MaxExclusive:  false,
 			MultipleOfSet: false,
 			MultipleOf:    0,
+			Pattern:       nil,
 		}).Validate(int64(s.Page)); err != nil {
 			return errors.Wrap(err, "int")
 		}
@@ -130,6 +135,7 @@ func (s *SearchQuery) Validate() error {
 					MaxExclusive:  false,
 					MultipleOfSet: false,
 					MultipleOf:    0,
+					Pattern:       nil,
 				}).Validate(int64(value)); err != nil {
 					return errors.Wrap(err, "int")
 				}
@@ -219,6 +225,14 @@ func (s *TgSearchPostApplicationXWwwFormUrlencoded) Validate() error {
 	alias := (*SearchQuery)(s)
 	if err := alias.Validate(); err != nil {
 		return err
+	}
+	return nil
+}
+
+func (s UserQuery) Validate() error {
+	alias := ([]int64)(s)
+	if alias == nil {
+		return errors.New("nil is invalid value")
 	}
 	return nil
 }

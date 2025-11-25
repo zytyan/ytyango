@@ -6,10 +6,9 @@ package botapi
 type OperationName = string
 
 const (
-	PingGetOperation           OperationName = "PingGet"
-	TgGroupStatGetOperation    OperationName = "TgGroupStatGet"
-	TgProfilePhotoGetOperation OperationName = "TgProfilePhotoGet"
-	TgSearchGetOperation       OperationName = "TgSearchGet"
-	TgSearchPostOperation      OperationName = "TgSearchPost"
-	TgUsernameGetOperation     OperationName = "TgUsernameGet"
+	PingGetOperation                   OperationName = "PingGet"
+	TgGroupStatGetOperation            OperationName = "TgGroupStatGet"
+	TgProfilePhotoFilenameGetOperation OperationName = "TgProfilePhotoFilenameGet"
+	TgSearchPostOperation              OperationName = "TgSearchPost"
+	TgUserinfoPostOperation            OperationName = "TgUserinfoPost"
 )

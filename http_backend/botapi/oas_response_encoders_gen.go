@@ -74,9 +74,9 @@ func encodeTgGroupStatGetResponse(response TgGroupStatGetRes, w http.ResponseWri
 	}
 }
 
-func encodeTgProfilePhotoGetResponse(response TgProfilePhotoGetRes, w http.ResponseWriter) error {
+func encodeTgProfilePhotoFilenameGetResponse(response TgProfilePhotoFilenameGetRes, w http.ResponseWriter) error {
 	switch response := response.(type) {
-	case *TgProfilePhotoGetOK:
+	case *TgProfilePhotoFilenameGetOK:
 		w.Header().Set("Content-Type", "image/webp")
 		w.WriteHeader(200)
 
@@ -93,57 +93,6 @@ func encodeTgProfilePhotoGetResponse(response TgProfilePhotoGetRes, w http.Respo
 	case *ErrorResponse:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
-
-		e := new(jx.Encoder)
-		response.Encode(e)
-		if _, err := e.WriteTo(w); err != nil {
-			return errors.Wrap(err, "write")
-		}
-
-		return nil
-
-	default:
-		return errors.Errorf("unexpected response type: %T", response)
-	}
-}
-
-func encodeTgSearchGetResponse(response TgSearchGetRes, w http.ResponseWriter) error {
-	switch response := response.(type) {
-	case *SearchResult:
-		if err := func() error {
-			if err := response.Validate(); err != nil {
-				return err
-			}
-			return nil
-		}(); err != nil {
-			return errors.Wrap(err, "validate")
-		}
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		w.WriteHeader(200)
-
-		e := new(jx.Encoder)
-		response.Encode(e)
-		if _, err := e.WriteTo(w); err != nil {
-			return errors.Wrap(err, "write")
-		}
-
-		return nil
-
-	case *TgSearchGetBadRequest:
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		w.WriteHeader(400)
-
-		e := new(jx.Encoder)
-		response.Encode(e)
-		if _, err := e.WriteTo(w); err != nil {
-			return errors.Wrap(err, "write")
-		}
-
-		return nil
-
-	case *TgSearchGetUnauthorized:
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		w.WriteHeader(401)
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -209,7 +158,7 @@ func encodeTgSearchPostResponse(response TgSearchPostRes, w http.ResponseWriter)
 	}
 }
 
-func encodeTgUsernameGetResponse(response TgUsernameGetRes, w http.ResponseWriter) error {
+func encodeTgUserinfoPostResponse(response TgUserinfoPostRes, w http.ResponseWriter) error {
 	switch response := response.(type) {
 	case *User:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
@@ -223,9 +172,21 @@ func encodeTgUsernameGetResponse(response TgUsernameGetRes, w http.ResponseWrite
 
 		return nil
 
-	case *ErrorResponse:
+	case *TgUserinfoPostBadRequest:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
+
+		e := new(jx.Encoder)
+		response.Encode(e)
+		if _, err := e.WriteTo(w); err != nil {
+			return errors.Wrap(err, "write")
+		}
+
+		return nil
+
+	case *TgUserinfoPostUnauthorized:
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		w.WriteHeader(401)
 
 		e := new(jx.Encoder)
 		response.Encode(e)

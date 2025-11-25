@@ -72,7 +72,7 @@
         <p class="stat-value">{{ stat.sticker_count }}</p>
       </div>
       <div class="stat-card">
-        <p class="stat-label">火星文</p>
+        <p class="stat-label">火星车</p>
         <p class="stat-value">{{ stat.mars_count }} / {{ stat.max_mars_count }}</p>
       </div>
       <div class="stat-card">
@@ -110,7 +110,6 @@
 import { computed, onMounted, ref } from 'vue'
 import { fetchGroupStat, ping, searchMessages, type ChatStat, type SearchResult } from '../services/api'
 import { useTelegram } from '../services/telegram'
-
 const telegram = useTelegram()
 const groupWebId = ref<number | null>(null)
 const query = ref('')

@@ -20,48 +20,47 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PingResponse'
-  /tg/username:
-    get:
+  /tg/userinfo:
+    post:
       tags:
         - Telegram
-      summary: Get a user name by Telegram user id
-      parameters:
-        - name: user_id
-          in: query
-          required: true
-          description: Telegram user id.
-          schema:
-            type: integer
-            format: int64
-            minimum: 1
+      summary: 使用Json同时获取多个用户的用户信息
+      security:
+        - TelegramAuth: [ ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserQuery'
       responses:
         200:
-          description: User found.
+          description: 用户列表
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/User'
         400:
-          description: Invalid arguments or user not found.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
+          $ref: '#/components/responses/Error'
+        401:
+          $ref: '#/components/responses/Error'
 
-  /tg/profile_photo:
+  /tg/profile_photo/{filename}:
     get:
       tags:
         - Telegram
       summary: Get the user's profile photo in WEBP format
       parameters:
-        - name: user_id
+        - name: filename
+          in: path
+          required: true
+          description: bot返回的文件名，应为bot api中获取的 file id + .webp。
+          schema: { type: string }
+        - name: sha256
           in: query
           required: true
-          description: Telegram user id.
-          schema:
-            type: integer
-            format: int64
-            minimum: 1
+          description: bot给出的sha256签名，使用该签名验证用户有权访问该图片，验证方式为 hmac(secret, filename) == sha256
+          schema: { type: string }
       responses:
         200:
           description: Profile photo file.
@@ -100,77 +99,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/ChatStat'
         400:
-          description: Invalid arguments or group not found.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
+          $ref: '#/components/responses/Error'
         401:
-          description: Authorization is missing or invalid.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
+          $ref: '#/components/responses/Error'
 
   /tg/search:
-    get:
-      tags:
-        - Search
-      summary: Search messages within a group
-      security:
-        - TelegramAuth: [ ]
-      parameters:
-        - name: q
-          in: query
-          required: true
-          description: Search query string.
-          schema:
-            type: string
-            minLength: 1
-        - name: ins_id
-          in: query
-          required: true
-          description: Group web id (Meilisearch index id). Accepts digits as string or number.
-          schema:
-            type: integer
-            format: int64
-            minimum: 1
-        - name: page
-          in: query
-          required: true
-          description: 1-based page number.
-          schema:
-            type: integer
-            minimum: 1
-        - name: limit
-          in: query
-          required: false
-          description: Results per page. Defaults to 20, maximum 50.
-          schema:
-            type: integer
-            minimum: 1
-            maximum: 50
-            default: 20
-      responses:
-        200:
-          description: Search result list.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SearchResult'
-        400:
-          description: Invalid arguments or search error.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        401:
-          description: Authorization is missing or invalid.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-
     post:
       tags:
         - Search
@@ -194,19 +127,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/SearchResult'
         400:
-          description: Invalid arguments or search error.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
+          $ref: '#/components/responses/Error'
         401:
-          description: Authorization is missing or invalid.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
+          $ref: '#/components/responses/Error'
 
 components:
+  responses:
+    Error:
+      description: 通用错误，以错误码区分具体遇到的是何种错误
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
   securitySchemes:
     TelegramAuth:
       type: apiKey
@@ -240,6 +172,11 @@ components:
         - status
         - code
         - error
+    UserQuery:
+      type: array
+      items:
+        type: integer
+        format: int64
 
     User:
       type: object
@@ -247,11 +184,17 @@ components:
         user_id:
           type: integer
           format: int64
-        name:
+        first_name:
+          type: string
+        last_name:
+          type: string
+        username:
+          type: string
+        profile_photo:
           type: string
       required:
         - user_id
-        - name
+        - first_name
 
     UserMsgStat:
       type: object

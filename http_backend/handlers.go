@@ -3,11 +3,14 @@ package http_backend
 import (
 	"bytes"
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -117,21 +120,39 @@ func (h *Backend) parseLimit(opt botapi.OptInt) int {
 	return 20
 }
 
+func sanitizeProfilePhotoFilename(name string) (string, error) {
+	clean := filepath.Base(name)
+	switch {
+	case clean != name:
+		return "", errors.New("invalid filename")
+	case clean == "", !strings.HasSuffix(clean, ".webp"):
+		return "", errors.New("invalid filename")
+	default:
+		return clean, nil
+	}
+}
+
+func (h *Backend) profilePhotoSecret() []byte {
+	if v := os.Getenv("PROFILE_PHOTO_SECRET"); v != "" {
+		return []byte(v)
+	}
+	return []byte(g.GetConfig().BotToken)
+}
+
+func (h *Backend) verifyProfilePhotoSignature(filename, provided string) bool {
+	raw, err := hex.DecodeString(provided)
+	if err != nil {
+		return false
+	}
+	mac := hmac.New(sha256.New, h.profilePhotoSecret())
+	mac.Write([]byte(filename))
+	return hmac.Equal(raw, mac.Sum(nil))
+}
+
 // --- handler implementations ---
 
 func (h *Backend) PingGet(_ context.Context) (*botapi.PingResponse, error) {
 	return &botapi.PingResponse{Message: "pong"}, nil
-}
-
-func (h *Backend) TgUsernameGet(ctx context.Context, params botapi.TgUsernameGetParams) (botapi.TgUsernameGetRes, error) {
-	user := g.Q.GetUserById(ctx, params.UserID)
-	if user == nil {
-		return h.err(UserNotFound, "user not found"), nil
-	}
-	return &botapi.User{
-		UserID: params.UserID,
-		Name:   user.Name(),
-	}, nil
 }
 
 func (h *Backend) TgGroupStatGet(ctx context.Context, params botapi.TgGroupStatGetParams) (botapi.TgGroupStatGetRes, error) {
@@ -152,35 +173,21 @@ func (h *Backend) TgGroupStatGet(ctx context.Context, params botapi.TgGroupStatG
 	return h.convertChatStat(stat), nil
 }
 
-func (h *Backend) TgProfilePhotoGet(ctx context.Context, params botapi.TgProfilePhotoGetParams) (botapi.TgProfilePhotoGetRes, error) {
-	path, err := h.getUserProfilePhotoWebp(ctx, params.UserID)
+func (h *Backend) TgProfilePhotoFilenameGet(ctx context.Context, params botapi.TgProfilePhotoFilenameGetParams) (botapi.TgProfilePhotoFilenameGetRes, error) {
+	filename, err := sanitizeProfilePhotoFilename(params.Filename)
 	if err != nil {
-		h.log.Warnf("get user profile photo error: %v", err)
-		return h.err(ErrNoResource, "user profile photo not found"), nil
+		return h.err(ErrArgInvalid, "invalid filename"), nil
 	}
+	if !h.verifyProfilePhotoSignature(filename, params.SHA256) {
+		return h.err(ErrValidFailed, "invalid signature"), nil
+	}
+	path := filepath.Join("data/profile_photo", filename)
 	fp, err := os.Open(path)
 	if err != nil {
+		h.log.Warnf("open profile photo %s failed: %v", filename, err)
 		return h.err(ErrNoResource, "user profile photo not found"), nil
 	}
-	return &botapi.TgProfilePhotoGetOK{Data: fp}, nil
-}
-
-func (h *Backend) TgSearchGet(ctx context.Context, params botapi.TgSearchGetParams) (botapi.TgSearchGetRes, error) {
-	if _, errResp := h.requireAuth(ctx); errResp != nil {
-		res := botapi.TgSearchGetUnauthorized(*errResp)
-		return &res, nil
-	}
-	res, errResp := h.performSearch(ctx, botapi.SearchQuery{
-		Q:     params.Q,
-		InsID: params.InsID,
-		Page:  params.Page,
-		Limit: params.Limit,
-	})
-	if errResp != nil {
-		br := botapi.TgSearchGetBadRequest(*errResp)
-		return &br, nil
-	}
-	return res, nil
+	return &botapi.TgProfilePhotoFilenameGetOK{Data: fp}, nil
 }
 
 func (h *Backend) TgSearchPost(ctx context.Context, req botapi.TgSearchPostReq) (botapi.TgSearchPostRes, error) {
@@ -194,6 +201,9 @@ func (h *Backend) TgSearchPost(ctx context.Context, req botapi.TgSearchPostReq) 
 		body = botapi.SearchQuery(*v)
 	case *botapi.TgSearchPostApplicationXWwwFormUrlencoded:
 		body = botapi.SearchQuery(*v)
+	default:
+		br := botapi.TgSearchPostBadRequest(*h.err(ErrArgInvalid, "unsupported content type"))
+		return &br, nil
 	}
 	res, errResp := h.performSearch(ctx, body)
 	if errResp != nil {
@@ -201,6 +211,29 @@ func (h *Backend) TgSearchPost(ctx context.Context, req botapi.TgSearchPostReq) 
 		return &br, nil
 	}
 	return res, nil
+}
+
+func (h *Backend) TgUserinfoPost(ctx context.Context, ids botapi.UserQuery) (botapi.TgUserinfoPostRes, error) {
+	if _, errResp := h.requireAuth(ctx); errResp != nil {
+		res := botapi.TgUserinfoPostUnauthorized(*errResp)
+		return &res, nil
+	}
+	if len(ids) == 0 {
+		res := botapi.TgUserinfoPostBadRequest(*h.err(ErrArgInvalid, "user_id list required"))
+		return &res, nil
+	}
+	user := g.Q.GetUserById(ctx, ids[0])
+	if user == nil {
+		res := botapi.TgUserinfoPostBadRequest(*h.err(UserNotFound, "user not found"))
+		return &res, nil
+	}
+	return &botapi.User{
+		UserID:       user.UserID,
+		FirstName:    user.FirstName,
+		LastName:     botapi.OptString{Value: user.LastName.String, Set: user.LastName.Valid},
+		Username:     botapi.OptString{},
+		ProfilePhoto: botapi.OptString{Value: user.ProfilePhoto.String, Set: user.ProfilePhoto.Valid},
+	}, nil
 }
 
 // --- core logic ---
@@ -258,22 +291,6 @@ func (h *Backend) performSearch(ctx context.Context, qy botapi.SearchQuery) (*bo
 	res.Limit = limit
 	res.Offset = (qy.Page - 1) * limit
 	return &res, nil
-}
-
-// getUserProfilePhotoWebp mirrors the legacy logic but returns not-found when unavailable.
-func (h *Backend) getUserProfilePhotoWebp(ctx context.Context, userId int64) (string, error) {
-	user := g.Q.GetUserById(ctx, userId)
-	if user == nil {
-		return "", errors.New("user not found")
-	}
-	if !user.ProfilePhoto.Valid {
-		return "", errors.New("user has no profile photo")
-	}
-	photoPath := fmt.Sprintf("data/profile_photo/p_%s.webp", user.ProfilePhoto.String)
-	if fileExists(photoPath) {
-		return photoPath, nil
-	}
-	return "", errors.New("profile photo not cached")
 }
 
 // --- error handling ---

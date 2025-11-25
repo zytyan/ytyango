@@ -4,6 +4,7 @@ package botapi
 
 import (
 	"net/http"
+	"net/url"
 
 	"github.com/go-faster/errors"
 	"github.com/ogen-go/ogen/conv"
@@ -71,133 +72,84 @@ func decodeTgGroupStatGetParams(args [0]string, argsEscaped bool, r *http.Reques
 	return params, nil
 }
 
-// TgProfilePhotoGetParams is parameters of GET /tg/profile_photo operation.
-type TgProfilePhotoGetParams struct {
-	// Telegram user id.
-	UserID int64
+// TgProfilePhotoFilenameGetParams is parameters of GET /tg/profile_photo/{filename} operation.
+type TgProfilePhotoFilenameGetParams struct {
+	// Bot返回的文件名，应为bot api中获取的 file id + .webp。.
+	Filename string
+	// Bot给出的sha256签名，使用该签名验证用户有权访问该图片，验证方式为
+	// hmac(secret, filename) == sha256.
+	SHA256 string
 }
 
-func unpackTgProfilePhotoGetParams(packed middleware.Parameters) (params TgProfilePhotoGetParams) {
+func unpackTgProfilePhotoFilenameGetParams(packed middleware.Parameters) (params TgProfilePhotoFilenameGetParams) {
 	{
 		key := middleware.ParameterKey{
-			Name: "user_id",
+			Name: "filename",
+			In:   "path",
+		}
+		params.Filename = packed[key].(string)
+	}
+	{
+		key := middleware.ParameterKey{
+			Name: "sha256",
 			In:   "query",
 		}
-		params.UserID = packed[key].(int64)
+		params.SHA256 = packed[key].(string)
 	}
 	return params
 }
 
-func decodeTgProfilePhotoGetParams(args [0]string, argsEscaped bool, r *http.Request) (params TgProfilePhotoGetParams, _ error) {
+func decodeTgProfilePhotoFilenameGetParams(args [1]string, argsEscaped bool, r *http.Request) (params TgProfilePhotoFilenameGetParams, _ error) {
 	q := uri.NewQueryDecoder(r.URL.Query())
-	// Decode query: user_id.
+	// Decode path: filename.
 	if err := func() error {
-		cfg := uri.QueryParameterDecodingConfig{
-			Name:    "user_id",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
+		param := args[0]
+		if argsEscaped {
+			unescaped, err := url.PathUnescape(args[0])
+			if err != nil {
+				return errors.Wrap(err, "unescape path")
+			}
+			param = unescaped
 		}
+		if len(param) > 0 {
+			d := uri.NewPathDecoder(uri.PathDecoderConfig{
+				Param:   "filename",
+				Value:   param,
+				Style:   uri.PathStyleSimple,
+				Explode: false,
+			})
 
-		if err := q.HasParam(cfg); err == nil {
-			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+			if err := func() error {
 				val, err := d.DecodeValue()
 				if err != nil {
 					return err
 				}
 
-				c, err := conv.ToInt64(val)
+				c, err := conv.ToString(val)
 				if err != nil {
 					return err
 				}
 
-				params.UserID = c
-				return nil
-			}); err != nil {
-				return err
-			}
-			if err := func() error {
-				if err := (validate.Int{
-					MinSet:        true,
-					Min:           1,
-					MaxSet:        false,
-					Max:           0,
-					MinExclusive:  false,
-					MaxExclusive:  false,
-					MultipleOfSet: false,
-					MultipleOf:    0,
-				}).Validate(int64(params.UserID)); err != nil {
-					return errors.Wrap(err, "int")
-				}
+				params.Filename = c
 				return nil
 			}(); err != nil {
 				return err
 			}
 		} else {
-			return err
+			return validate.ErrFieldRequired
 		}
 		return nil
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
-			Name: "user_id",
-			In:   "query",
+			Name: "filename",
+			In:   "path",
 			Err:  err,
 		}
 	}
-	return params, nil
-}
-
-// TgSearchGetParams is parameters of GET /tg/search operation.
-type TgSearchGetParams struct {
-	// Search query string.
-	Q string
-	// Group web id (Meilisearch index id). Accepts digits as string or number.
-	InsID int64
-	// 1-based page number.
-	Page int
-	// Results per page. Defaults to 20, maximum 50.
-	Limit OptInt `json:",omitempty,omitzero"`
-}
-
-func unpackTgSearchGetParams(packed middleware.Parameters) (params TgSearchGetParams) {
-	{
-		key := middleware.ParameterKey{
-			Name: "q",
-			In:   "query",
-		}
-		params.Q = packed[key].(string)
-	}
-	{
-		key := middleware.ParameterKey{
-			Name: "ins_id",
-			In:   "query",
-		}
-		params.InsID = packed[key].(int64)
-	}
-	{
-		key := middleware.ParameterKey{
-			Name: "page",
-			In:   "query",
-		}
-		params.Page = packed[key].(int)
-	}
-	{
-		key := middleware.ParameterKey{
-			Name: "limit",
-			In:   "query",
-		}
-		if v, ok := packed[key]; ok {
-			params.Limit = v.(OptInt)
-		}
-	}
-	return params
-}
-
-func decodeTgSearchGetParams(args [0]string, argsEscaped bool, r *http.Request) (params TgSearchGetParams, _ error) {
-	q := uri.NewQueryDecoder(r.URL.Query())
-	// Decode query: q.
+	// Decode query: sha256.
 	if err := func() error {
 		cfg := uri.QueryParameterDecodingConfig{
-			Name:    "q",
+			Name:    "sha256",
 			Style:   uri.QueryStyleForm,
 			Explode: true,
 		}
@@ -214,25 +166,9 @@ func decodeTgSearchGetParams(args [0]string, argsEscaped bool, r *http.Request) 
 					return err
 				}
 
-				params.Q = c
+				params.SHA256 = c
 				return nil
 			}); err != nil {
-				return err
-			}
-			if err := func() error {
-				if err := (validate.String{
-					MinLength:    1,
-					MinLengthSet: true,
-					MaxLength:    0,
-					MaxLengthSet: false,
-					Email:        false,
-					Hostname:     false,
-					Regex:        nil,
-				}).Validate(string(params.Q)); err != nil {
-					return errors.Wrap(err, "string")
-				}
-				return nil
-			}(); err != nil {
 				return err
 			}
 		} else {
@@ -241,258 +177,7 @@ func decodeTgSearchGetParams(args [0]string, argsEscaped bool, r *http.Request) 
 		return nil
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
-			Name: "q",
-			In:   "query",
-			Err:  err,
-		}
-	}
-	// Decode query: ins_id.
-	if err := func() error {
-		cfg := uri.QueryParameterDecodingConfig{
-			Name:    "ins_id",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
-		}
-
-		if err := q.HasParam(cfg); err == nil {
-			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
-				val, err := d.DecodeValue()
-				if err != nil {
-					return err
-				}
-
-				c, err := conv.ToInt64(val)
-				if err != nil {
-					return err
-				}
-
-				params.InsID = c
-				return nil
-			}); err != nil {
-				return err
-			}
-			if err := func() error {
-				if err := (validate.Int{
-					MinSet:        true,
-					Min:           1,
-					MaxSet:        false,
-					Max:           0,
-					MinExclusive:  false,
-					MaxExclusive:  false,
-					MultipleOfSet: false,
-					MultipleOf:    0,
-				}).Validate(int64(params.InsID)); err != nil {
-					return errors.Wrap(err, "int")
-				}
-				return nil
-			}(); err != nil {
-				return err
-			}
-		} else {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return params, &ogenerrors.DecodeParamError{
-			Name: "ins_id",
-			In:   "query",
-			Err:  err,
-		}
-	}
-	// Decode query: page.
-	if err := func() error {
-		cfg := uri.QueryParameterDecodingConfig{
-			Name:    "page",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
-		}
-
-		if err := q.HasParam(cfg); err == nil {
-			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
-				val, err := d.DecodeValue()
-				if err != nil {
-					return err
-				}
-
-				c, err := conv.ToInt(val)
-				if err != nil {
-					return err
-				}
-
-				params.Page = c
-				return nil
-			}); err != nil {
-				return err
-			}
-			if err := func() error {
-				if err := (validate.Int{
-					MinSet:        true,
-					Min:           1,
-					MaxSet:        false,
-					Max:           0,
-					MinExclusive:  false,
-					MaxExclusive:  false,
-					MultipleOfSet: false,
-					MultipleOf:    0,
-				}).Validate(int64(params.Page)); err != nil {
-					return errors.Wrap(err, "int")
-				}
-				return nil
-			}(); err != nil {
-				return err
-			}
-		} else {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return params, &ogenerrors.DecodeParamError{
-			Name: "page",
-			In:   "query",
-			Err:  err,
-		}
-	}
-	// Set default value for query: limit.
-	{
-		val := int(20)
-		params.Limit.SetTo(val)
-	}
-	// Decode query: limit.
-	if err := func() error {
-		cfg := uri.QueryParameterDecodingConfig{
-			Name:    "limit",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
-		}
-
-		if err := q.HasParam(cfg); err == nil {
-			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
-				var paramsDotLimitVal int
-				if err := func() error {
-					val, err := d.DecodeValue()
-					if err != nil {
-						return err
-					}
-
-					c, err := conv.ToInt(val)
-					if err != nil {
-						return err
-					}
-
-					paramsDotLimitVal = c
-					return nil
-				}(); err != nil {
-					return err
-				}
-				params.Limit.SetTo(paramsDotLimitVal)
-				return nil
-			}); err != nil {
-				return err
-			}
-			if err := func() error {
-				if value, ok := params.Limit.Get(); ok {
-					if err := func() error {
-						if err := (validate.Int{
-							MinSet:        true,
-							Min:           1,
-							MaxSet:        true,
-							Max:           50,
-							MinExclusive:  false,
-							MaxExclusive:  false,
-							MultipleOfSet: false,
-							MultipleOf:    0,
-						}).Validate(int64(value)); err != nil {
-							return errors.Wrap(err, "int")
-						}
-						return nil
-					}(); err != nil {
-						return err
-					}
-				}
-				return nil
-			}(); err != nil {
-				return err
-			}
-		}
-		return nil
-	}(); err != nil {
-		return params, &ogenerrors.DecodeParamError{
-			Name: "limit",
-			In:   "query",
-			Err:  err,
-		}
-	}
-	return params, nil
-}
-
-// TgUsernameGetParams is parameters of GET /tg/username operation.
-type TgUsernameGetParams struct {
-	// Telegram user id.
-	UserID int64
-}
-
-func unpackTgUsernameGetParams(packed middleware.Parameters) (params TgUsernameGetParams) {
-	{
-		key := middleware.ParameterKey{
-			Name: "user_id",
-			In:   "query",
-		}
-		params.UserID = packed[key].(int64)
-	}
-	return params
-}
-
-func decodeTgUsernameGetParams(args [0]string, argsEscaped bool, r *http.Request) (params TgUsernameGetParams, _ error) {
-	q := uri.NewQueryDecoder(r.URL.Query())
-	// Decode query: user_id.
-	if err := func() error {
-		cfg := uri.QueryParameterDecodingConfig{
-			Name:    "user_id",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
-		}
-
-		if err := q.HasParam(cfg); err == nil {
-			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
-				val, err := d.DecodeValue()
-				if err != nil {
-					return err
-				}
-
-				c, err := conv.ToInt64(val)
-				if err != nil {
-					return err
-				}
-
-				params.UserID = c
-				return nil
-			}); err != nil {
-				return err
-			}
-			if err := func() error {
-				if err := (validate.Int{
-					MinSet:        true,
-					Min:           1,
-					MaxSet:        false,
-					Max:           0,
-					MinExclusive:  false,
-					MaxExclusive:  false,
-					MultipleOfSet: false,
-					MultipleOf:    0,
-				}).Validate(int64(params.UserID)); err != nil {
-					return errors.Wrap(err, "int")
-				}
-				return nil
-			}(); err != nil {
-				return err
-			}
-		} else {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return params, &ogenerrors.DecodeParamError{
-			Name: "user_id",
+			Name: "sha256",
 			In:   "query",
 			Err:  err,
 		}

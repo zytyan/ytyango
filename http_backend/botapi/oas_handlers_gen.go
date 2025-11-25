@@ -22,6 +22,10 @@ func (c *codeRecorder) WriteHeader(status int) {
 	c.ResponseWriter.WriteHeader(status)
 }
 
+func (c *codeRecorder) Unwrap() http.ResponseWriter {
+	return c.ResponseWriter
+}
+
 func recordError(string, error) {}
 
 // handlePingGetRequest handles GET /ping operation.
@@ -217,12 +221,12 @@ func (s *Server) handleTgGroupStatGetRequest(args [0]string, argsEscaped bool, w
 	}
 }
 
-// handleTgProfilePhotoGetRequest handles GET /tg/profile_photo operation.
+// handleTgProfilePhotoFilenameGetRequest handles GET /tg/profile_photo/{filename} operation.
 //
 // Get the user's profile photo in WEBP format.
 //
-// GET /tg/profile_photo
-func (s *Server) handleTgProfilePhotoGetRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
+// GET /tg/profile_photo/{filename}
+func (s *Server) handleTgProfilePhotoFilenameGetRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
 	statusWriter := &codeRecorder{ResponseWriter: w}
 	w = statusWriter
 	ctx := r.Context()
@@ -230,11 +234,11 @@ func (s *Server) handleTgProfilePhotoGetRequest(args [0]string, argsEscaped bool
 	var (
 		err          error
 		opErrContext = ogenerrors.OperationContext{
-			Name: TgProfilePhotoGetOperation,
+			Name: TgProfilePhotoFilenameGetOperation,
 			ID:   "",
 		}
 	)
-	params, err := decodeTgProfilePhotoGetParams(args, argsEscaped, r)
+	params, err := decodeTgProfilePhotoFilenameGetParams(args, argsEscaped, r)
 	if err != nil {
 		err = &ogenerrors.DecodeParamsError{
 			OperationContext: opErrContext,
@@ -247,28 +251,32 @@ func (s *Server) handleTgProfilePhotoGetRequest(args [0]string, argsEscaped bool
 
 	var rawBody []byte
 
-	var response TgProfilePhotoGetRes
+	var response TgProfilePhotoFilenameGetRes
 	if m := s.cfg.Middleware; m != nil {
 		mreq := middleware.Request{
 			Context:          ctx,
-			OperationName:    TgProfilePhotoGetOperation,
+			OperationName:    TgProfilePhotoFilenameGetOperation,
 			OperationSummary: "Get the user's profile photo in WEBP format",
 			OperationID:      "",
 			Body:             nil,
 			RawBody:          rawBody,
 			Params: middleware.Parameters{
 				{
-					Name: "user_id",
+					Name: "filename",
+					In:   "path",
+				}: params.Filename,
+				{
+					Name: "sha256",
 					In:   "query",
-				}: params.UserID,
+				}: params.SHA256,
 			},
 			Raw: r,
 		}
 
 		type (
 			Request  = struct{}
-			Params   = TgProfilePhotoGetParams
-			Response = TgProfilePhotoGetRes
+			Params   = TgProfilePhotoFilenameGetParams
+			Response = TgProfilePhotoFilenameGetRes
 		)
 		response, err = middleware.HookMiddleware[
 			Request,
@@ -277,14 +285,14 @@ func (s *Server) handleTgProfilePhotoGetRequest(args [0]string, argsEscaped bool
 		](
 			m,
 			mreq,
-			unpackTgProfilePhotoGetParams,
+			unpackTgProfilePhotoFilenameGetParams,
 			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.TgProfilePhotoGet(ctx, params)
+				response, err = s.h.TgProfilePhotoFilenameGet(ctx, params)
 				return response, err
 			},
 		)
 	} else {
-		response, err = s.h.TgProfilePhotoGet(ctx, params)
+		response, err = s.h.TgProfilePhotoFilenameGet(ctx, params)
 	}
 	if err != nil {
 		defer recordError("Internal", err)
@@ -292,147 +300,7 @@ func (s *Server) handleTgProfilePhotoGetRequest(args [0]string, argsEscaped bool
 		return
 	}
 
-	if err := encodeTgProfilePhotoGetResponse(response, w); err != nil {
-		defer recordError("EncodeResponse", err)
-		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
-			s.cfg.ErrorHandler(ctx, w, r, err)
-		}
-		return
-	}
-}
-
-// handleTgSearchGetRequest handles GET /tg/search operation.
-//
-// Search messages within a group.
-//
-// GET /tg/search
-func (s *Server) handleTgSearchGetRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
-	statusWriter := &codeRecorder{ResponseWriter: w}
-	w = statusWriter
-	ctx := r.Context()
-
-	var (
-		err          error
-		opErrContext = ogenerrors.OperationContext{
-			Name: TgSearchGetOperation,
-			ID:   "",
-		}
-	)
-	{
-		type bitset = [1]uint8
-		var satisfied bitset
-		{
-			sctx, ok, err := s.securityTelegramAuth(ctx, TgSearchGetOperation, r)
-			if err != nil {
-				err = &ogenerrors.SecurityError{
-					OperationContext: opErrContext,
-					Security:         "TelegramAuth",
-					Err:              err,
-				}
-				defer recordError("Security:TelegramAuth", err)
-				s.cfg.ErrorHandler(ctx, w, r, err)
-				return
-			}
-			if ok {
-				satisfied[0] |= 1 << 0
-				ctx = sctx
-			}
-		}
-
-		if ok := func() bool {
-		nextRequirement:
-			for _, requirement := range []bitset{
-				{0b00000001},
-			} {
-				for i, mask := range requirement {
-					if satisfied[i]&mask != mask {
-						continue nextRequirement
-					}
-				}
-				return true
-			}
-			return false
-		}(); !ok {
-			err = &ogenerrors.SecurityError{
-				OperationContext: opErrContext,
-				Err:              ogenerrors.ErrSecurityRequirementIsNotSatisfied,
-			}
-			defer recordError("Security", err)
-			s.cfg.ErrorHandler(ctx, w, r, err)
-			return
-		}
-	}
-	params, err := decodeTgSearchGetParams(args, argsEscaped, r)
-	if err != nil {
-		err = &ogenerrors.DecodeParamsError{
-			OperationContext: opErrContext,
-			Err:              err,
-		}
-		defer recordError("DecodeParams", err)
-		s.cfg.ErrorHandler(ctx, w, r, err)
-		return
-	}
-
-	var rawBody []byte
-
-	var response TgSearchGetRes
-	if m := s.cfg.Middleware; m != nil {
-		mreq := middleware.Request{
-			Context:          ctx,
-			OperationName:    TgSearchGetOperation,
-			OperationSummary: "Search messages within a group",
-			OperationID:      "",
-			Body:             nil,
-			RawBody:          rawBody,
-			Params: middleware.Parameters{
-				{
-					Name: "q",
-					In:   "query",
-				}: params.Q,
-				{
-					Name: "ins_id",
-					In:   "query",
-				}: params.InsID,
-				{
-					Name: "page",
-					In:   "query",
-				}: params.Page,
-				{
-					Name: "limit",
-					In:   "query",
-				}: params.Limit,
-			},
-			Raw: r,
-		}
-
-		type (
-			Request  = struct{}
-			Params   = TgSearchGetParams
-			Response = TgSearchGetRes
-		)
-		response, err = middleware.HookMiddleware[
-			Request,
-			Params,
-			Response,
-		](
-			m,
-			mreq,
-			unpackTgSearchGetParams,
-			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.TgSearchGet(ctx, params)
-				return response, err
-			},
-		)
-	} else {
-		response, err = s.h.TgSearchGet(ctx, params)
-	}
-	if err != nil {
-		defer recordError("Internal", err)
-		s.cfg.ErrorHandler(ctx, w, r, err)
-		return
-	}
-
-	if err := encodeTgSearchGetResponse(response, w); err != nil {
+	if err := encodeTgProfilePhotoFilenameGetResponse(response, w); err != nil {
 		defer recordError("EncodeResponse", err)
 		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
 			s.cfg.ErrorHandler(ctx, w, r, err)
@@ -569,12 +437,12 @@ func (s *Server) handleTgSearchPostRequest(args [0]string, argsEscaped bool, w h
 	}
 }
 
-// handleTgUsernameGetRequest handles GET /tg/username operation.
+// handleTgUserinfoPostRequest handles POST /tg/userinfo operation.
 //
-// Get a user name by Telegram user id.
+// 使用Json同时获取多个用户的用户信息.
 //
-// GET /tg/username
-func (s *Server) handleTgUsernameGetRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
+// POST /tg/userinfo
+func (s *Server) handleTgUserinfoPostRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
 	statusWriter := &codeRecorder{ResponseWriter: w}
 	w = statusWriter
 	ctx := r.Context()
@@ -582,45 +450,89 @@ func (s *Server) handleTgUsernameGetRequest(args [0]string, argsEscaped bool, w 
 	var (
 		err          error
 		opErrContext = ogenerrors.OperationContext{
-			Name: TgUsernameGetOperation,
+			Name: TgUserinfoPostOperation,
 			ID:   "",
 		}
 	)
-	params, err := decodeTgUsernameGetParams(args, argsEscaped, r)
-	if err != nil {
-		err = &ogenerrors.DecodeParamsError{
-			OperationContext: opErrContext,
-			Err:              err,
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			sctx, ok, err := s.securityTelegramAuth(ctx, TgUserinfoPostOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "TelegramAuth",
+					Err:              err,
+				}
+				defer recordError("Security:TelegramAuth", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
 		}
-		defer recordError("DecodeParams", err)
-		s.cfg.ErrorHandler(ctx, w, r, err)
-		return
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			err = &ogenerrors.SecurityError{
+				OperationContext: opErrContext,
+				Err:              ogenerrors.ErrSecurityRequirementIsNotSatisfied,
+			}
+			defer recordError("Security", err)
+			s.cfg.ErrorHandler(ctx, w, r, err)
+			return
+		}
 	}
 
 	var rawBody []byte
+	request, rawBody, close, err := s.decodeTgUserinfoPostRequest(r)
+	if err != nil {
+		err = &ogenerrors.DecodeRequestError{
+			OperationContext: opErrContext,
+			Err:              err,
+		}
+		defer recordError("DecodeRequest", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+	defer func() {
+		if err := close(); err != nil {
+			recordError("CloseRequest", err)
+		}
+	}()
 
-	var response TgUsernameGetRes
+	var response TgUserinfoPostRes
 	if m := s.cfg.Middleware; m != nil {
 		mreq := middleware.Request{
 			Context:          ctx,
-			OperationName:    TgUsernameGetOperation,
-			OperationSummary: "Get a user name by Telegram user id",
+			OperationName:    TgUserinfoPostOperation,
+			OperationSummary: "使用Json同时获取多个用户的用户信息",
 			OperationID:      "",
-			Body:             nil,
+			Body:             request,
 			RawBody:          rawBody,
-			Params: middleware.Parameters{
-				{
-					Name: "user_id",
-					In:   "query",
-				}: params.UserID,
-			},
-			Raw: r,
+			Params:           middleware.Parameters{},
+			Raw:              r,
 		}
 
 		type (
-			Request  = struct{}
-			Params   = TgUsernameGetParams
-			Response = TgUsernameGetRes
+			Request  = UserQuery
+			Params   = struct{}
+			Response = TgUserinfoPostRes
 		)
 		response, err = middleware.HookMiddleware[
 			Request,
@@ -629,14 +541,14 @@ func (s *Server) handleTgUsernameGetRequest(args [0]string, argsEscaped bool, w 
 		](
 			m,
 			mreq,
-			unpackTgUsernameGetParams,
+			nil,
 			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.TgUsernameGet(ctx, params)
+				response, err = s.h.TgUserinfoPost(ctx, request)
 				return response, err
 			},
 		)
 	} else {
-		response, err = s.h.TgUsernameGet(ctx, params)
+		response, err = s.h.TgUserinfoPost(ctx, request)
 	}
 	if err != nil {
 		defer recordError("Internal", err)
@@ -644,7 +556,7 @@ func (s *Server) handleTgUsernameGetRequest(args [0]string, argsEscaped bool, w 
 		return
 	}
 
-	if err := encodeTgUsernameGetResponse(response, w); err != nil {
+	if err := encodeTgUserinfoPostResponse(response, w); err != nil {
 		defer recordError("EncodeResponse", err)
 		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
 			s.cfg.ErrorHandler(ctx, w, r, err)

@@ -40,6 +40,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.notFound(w, r)
 		return
 	}
+	args := [1]string{}
 
 	// Static code generated router with unwrapped path search.
 	switch {
@@ -112,19 +113,30 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 						return
 					}
 
-				case 'p': // Prefix: "profile_photo"
+				case 'p': // Prefix: "profile_photo/"
 
-					if l := len("profile_photo"); len(elem) >= l && elem[0:l] == "profile_photo" {
+					if l := len("profile_photo/"); len(elem) >= l && elem[0:l] == "profile_photo/" {
 						elem = elem[l:]
 					} else {
 						break
 					}
 
+					// Param: "filename"
+					// Leaf parameter, slashes are prohibited
+					idx := strings.IndexByte(elem, '/')
+					if idx >= 0 {
+						break
+					}
+					args[0] = elem
+					elem = ""
+
 					if len(elem) == 0 {
 						// Leaf node.
 						switch r.Method {
 						case "GET":
-							s.handleTgProfilePhotoGetRequest([0]string{}, elemIsEscaped, w, r)
+							s.handleTgProfilePhotoFilenameGetRequest([1]string{
+								args[0],
+							}, elemIsEscaped, w, r)
 						default:
 							s.notAllowed(w, r, "GET")
 						}
@@ -143,20 +155,18 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					if len(elem) == 0 {
 						// Leaf node.
 						switch r.Method {
-						case "GET":
-							s.handleTgSearchGetRequest([0]string{}, elemIsEscaped, w, r)
 						case "POST":
 							s.handleTgSearchPostRequest([0]string{}, elemIsEscaped, w, r)
 						default:
-							s.notAllowed(w, r, "GET,POST")
+							s.notAllowed(w, r, "POST")
 						}
 
 						return
 					}
 
-				case 'u': // Prefix: "username"
+				case 'u': // Prefix: "userinfo"
 
-					if l := len("username"); len(elem) >= l && elem[0:l] == "username" {
+					if l := len("userinfo"); len(elem) >= l && elem[0:l] == "userinfo" {
 						elem = elem[l:]
 					} else {
 						break
@@ -165,10 +175,10 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					if len(elem) == 0 {
 						// Leaf node.
 						switch r.Method {
-						case "GET":
-							s.handleTgUsernameGetRequest([0]string{}, elemIsEscaped, w, r)
+						case "POST":
+							s.handleTgUserinfoPostRequest([0]string{}, elemIsEscaped, w, r)
 						default:
-							s.notAllowed(w, r, "GET")
+							s.notAllowed(w, r, "POST")
 						}
 
 						return
@@ -185,12 +195,13 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // Route is route object.
 type Route struct {
-	name        string
-	summary     string
-	operationID string
-	pathPattern string
-	count       int
-	args        [0]string
+	name           string
+	summary        string
+	operationID    string
+	operationGroup string
+	pathPattern    string
+	count          int
+	args           [1]string
 }
 
 // Name returns ogen operation name.
@@ -208,6 +219,11 @@ func (r Route) Summary() string {
 // OperationID returns OpenAPI operationId.
 func (r Route) OperationID() string {
 	return r.operationID
+}
+
+// OperationGroup returns the x-ogen-operation-group value.
+func (r Route) OperationGroup() string {
+	return r.operationGroup
 }
 
 // PathPattern returns OpenAPI path.
@@ -285,6 +301,7 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 						r.name = PingGetOperation
 						r.summary = "Ping the service"
 						r.operationID = ""
+						r.operationGroup = ""
 						r.pathPattern = "/ping"
 						r.args = args
 						r.count = 0
@@ -321,6 +338,7 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 							r.name = TgGroupStatGetOperation
 							r.summary = "Get today's group statistics"
 							r.operationID = ""
+							r.operationGroup = ""
 							r.pathPattern = "/tg/group_stat"
 							r.args = args
 							r.count = 0
@@ -330,24 +348,34 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 						}
 					}
 
-				case 'p': // Prefix: "profile_photo"
+				case 'p': // Prefix: "profile_photo/"
 
-					if l := len("profile_photo"); len(elem) >= l && elem[0:l] == "profile_photo" {
+					if l := len("profile_photo/"); len(elem) >= l && elem[0:l] == "profile_photo/" {
 						elem = elem[l:]
 					} else {
 						break
 					}
 
+					// Param: "filename"
+					// Leaf parameter, slashes are prohibited
+					idx := strings.IndexByte(elem, '/')
+					if idx >= 0 {
+						break
+					}
+					args[0] = elem
+					elem = ""
+
 					if len(elem) == 0 {
 						// Leaf node.
 						switch method {
 						case "GET":
-							r.name = TgProfilePhotoGetOperation
+							r.name = TgProfilePhotoFilenameGetOperation
 							r.summary = "Get the user's profile photo in WEBP format"
 							r.operationID = ""
-							r.pathPattern = "/tg/profile_photo"
+							r.operationGroup = ""
+							r.pathPattern = "/tg/profile_photo/{filename}"
 							r.args = args
-							r.count = 0
+							r.count = 1
 							return r, true
 						default:
 							return
@@ -365,18 +393,11 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 					if len(elem) == 0 {
 						// Leaf node.
 						switch method {
-						case "GET":
-							r.name = TgSearchGetOperation
-							r.summary = "Search messages within a group"
-							r.operationID = ""
-							r.pathPattern = "/tg/search"
-							r.args = args
-							r.count = 0
-							return r, true
 						case "POST":
 							r.name = TgSearchPostOperation
 							r.summary = "Search messages within a group"
 							r.operationID = ""
+							r.operationGroup = ""
 							r.pathPattern = "/tg/search"
 							r.args = args
 							r.count = 0
@@ -386,9 +407,9 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 						}
 					}
 
-				case 'u': // Prefix: "username"
+				case 'u': // Prefix: "userinfo"
 
-					if l := len("username"); len(elem) >= l && elem[0:l] == "username" {
+					if l := len("userinfo"); len(elem) >= l && elem[0:l] == "userinfo" {
 						elem = elem[l:]
 					} else {
 						break
@@ -397,11 +418,12 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 					if len(elem) == 0 {
 						// Leaf node.
 						switch method {
-						case "GET":
-							r.name = TgUsernameGetOperation
-							r.summary = "Get a user name by Telegram user id"
+						case "POST":
+							r.name = TgUserinfoPostOperation
+							r.summary = "使用Json同时获取多个用户的用户信息"
 							r.operationID = ""
-							r.pathPattern = "/tg/username"
+							r.operationGroup = ""
+							r.pathPattern = "/tg/userinfo"
 							r.args = args
 							r.count = 0
 							return r, true

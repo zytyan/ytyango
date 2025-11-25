@@ -248,8 +248,7 @@ func (s *ErrorResponse) SetError(val string) {
 	s.Error = val
 }
 
-func (*ErrorResponse) tgProfilePhotoGetRes() {}
-func (*ErrorResponse) tgUsernameGetRes()     {}
+func (*ErrorResponse) tgProfilePhotoFilenameGetRes() {}
 
 // Ref: #/components/schemas/MeiliMsg
 type MeiliMsg struct {
@@ -662,7 +661,6 @@ func (s *SearchResult) SetEstimatedTotalHits(val int) {
 	s.EstimatedTotalHits = val
 }
 
-func (*SearchResult) tgSearchGetRes()  {}
 func (*SearchResult) tgSearchPostRes() {}
 
 type TelegramAuth struct {
@@ -700,29 +698,21 @@ type TgGroupStatGetUnauthorized ErrorResponse
 
 func (*TgGroupStatGetUnauthorized) tgGroupStatGetRes() {}
 
-type TgProfilePhotoGetOK struct {
+type TgProfilePhotoFilenameGetOK struct {
 	Data io.Reader
 }
 
 // Read reads data from the Data reader.
 //
 // Kept to satisfy the io.Reader interface.
-func (s TgProfilePhotoGetOK) Read(p []byte) (n int, err error) {
+func (s TgProfilePhotoFilenameGetOK) Read(p []byte) (n int, err error) {
 	if s.Data == nil {
 		return 0, io.EOF
 	}
 	return s.Data.Read(p)
 }
 
-func (*TgProfilePhotoGetOK) tgProfilePhotoGetRes() {}
-
-type TgSearchGetBadRequest ErrorResponse
-
-func (*TgSearchGetBadRequest) tgSearchGetRes() {}
-
-type TgSearchGetUnauthorized ErrorResponse
-
-func (*TgSearchGetUnauthorized) tgSearchGetRes() {}
+func (*TgProfilePhotoFilenameGetOK) tgProfilePhotoFilenameGetRes() {}
 
 type TgSearchPostApplicationJSON SearchQuery
 
@@ -740,10 +730,21 @@ type TgSearchPostUnauthorized ErrorResponse
 
 func (*TgSearchPostUnauthorized) tgSearchPostRes() {}
 
+type TgUserinfoPostBadRequest ErrorResponse
+
+func (*TgUserinfoPostBadRequest) tgUserinfoPostRes() {}
+
+type TgUserinfoPostUnauthorized ErrorResponse
+
+func (*TgUserinfoPostUnauthorized) tgUserinfoPostRes() {}
+
 // Ref: #/components/schemas/User
 type User struct {
-	UserID int64  `json:"user_id"`
-	Name   string `json:"name"`
+	UserID       int64     `json:"user_id"`
+	FirstName    string    `json:"first_name"`
+	LastName     OptString `json:"last_name"`
+	Username     OptString `json:"username"`
+	ProfilePhoto OptString `json:"profile_photo"`
 }
 
 // GetUserID returns the value of UserID.
@@ -751,9 +752,24 @@ func (s *User) GetUserID() int64 {
 	return s.UserID
 }
 
-// GetName returns the value of Name.
-func (s *User) GetName() string {
-	return s.Name
+// GetFirstName returns the value of FirstName.
+func (s *User) GetFirstName() string {
+	return s.FirstName
+}
+
+// GetLastName returns the value of LastName.
+func (s *User) GetLastName() OptString {
+	return s.LastName
+}
+
+// GetUsername returns the value of Username.
+func (s *User) GetUsername() OptString {
+	return s.Username
+}
+
+// GetProfilePhoto returns the value of ProfilePhoto.
+func (s *User) GetProfilePhoto() OptString {
+	return s.ProfilePhoto
 }
 
 // SetUserID sets the value of UserID.
@@ -761,12 +777,27 @@ func (s *User) SetUserID(val int64) {
 	s.UserID = val
 }
 
-// SetName sets the value of Name.
-func (s *User) SetName(val string) {
-	s.Name = val
+// SetFirstName sets the value of FirstName.
+func (s *User) SetFirstName(val string) {
+	s.FirstName = val
 }
 
-func (*User) tgUsernameGetRes() {}
+// SetLastName sets the value of LastName.
+func (s *User) SetLastName(val OptString) {
+	s.LastName = val
+}
+
+// SetUsername sets the value of Username.
+func (s *User) SetUsername(val OptString) {
+	s.Username = val
+}
+
+// SetProfilePhoto sets the value of ProfilePhoto.
+func (s *User) SetProfilePhoto(val OptString) {
+	s.ProfilePhoto = val
+}
+
+func (*User) tgUserinfoPostRes() {}
 
 // Ref: #/components/schemas/UserMsgStat
 type UserMsgStat struct {
@@ -805,3 +836,5 @@ func (s *UserMsgStatMap) init() UserMsgStatMap {
 	}
 	return m
 }
+
+type UserQuery []int64

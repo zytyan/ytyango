@@ -5,12 +5,8 @@ type TgGroupStatGetRes interface {
 	tgGroupStatGetRes()
 }
 
-type TgProfilePhotoGetRes interface {
-	tgProfilePhotoGetRes()
-}
-
-type TgSearchGetRes interface {
-	tgSearchGetRes()
+type TgProfilePhotoFilenameGetRes interface {
+	tgProfilePhotoFilenameGetRes()
 }
 
 type TgSearchPostReq interface {
@@ -21,6 +17,6 @@ type TgSearchPostRes interface {
 	tgSearchPostRes()
 }
 
-type TgUsernameGetRes interface {
-	tgUsernameGetRes()
+type TgUserinfoPostRes interface {
+	tgUserinfoPostRes()
 }

@@ -20,30 +20,24 @@ type Handler interface {
 	//
 	// GET /tg/group_stat
 	TgGroupStatGet(ctx context.Context, params TgGroupStatGetParams) (TgGroupStatGetRes, error)
-	// TgProfilePhotoGet implements GET /tg/profile_photo operation.
+	// TgProfilePhotoFilenameGet implements GET /tg/profile_photo/{filename} operation.
 	//
 	// Get the user's profile photo in WEBP format.
 	//
-	// GET /tg/profile_photo
-	TgProfilePhotoGet(ctx context.Context, params TgProfilePhotoGetParams) (TgProfilePhotoGetRes, error)
-	// TgSearchGet implements GET /tg/search operation.
-	//
-	// Search messages within a group.
-	//
-	// GET /tg/search
-	TgSearchGet(ctx context.Context, params TgSearchGetParams) (TgSearchGetRes, error)
+	// GET /tg/profile_photo/{filename}
+	TgProfilePhotoFilenameGet(ctx context.Context, params TgProfilePhotoFilenameGetParams) (TgProfilePhotoFilenameGetRes, error)
 	// TgSearchPost implements POST /tg/search operation.
 	//
 	// Search messages within a group.
 	//
 	// POST /tg/search
 	TgSearchPost(ctx context.Context, req TgSearchPostReq) (TgSearchPostRes, error)
-	// TgUsernameGet implements GET /tg/username operation.
+	// TgUserinfoPost implements POST /tg/userinfo operation.
 	//
-	// Get a user name by Telegram user id.
+	// 使用Json同时获取多个用户的用户信息.
 	//
-	// GET /tg/username
-	TgUsernameGet(ctx context.Context, params TgUsernameGetParams) (TgUsernameGetRes, error)
+	// POST /tg/userinfo
+	TgUserinfoPost(ctx context.Context, req UserQuery) (TgUserinfoPostRes, error)
 }
 
 // Server implements http server based on OpenAPI v3 specification and

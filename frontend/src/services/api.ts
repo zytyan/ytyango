@@ -86,13 +86,17 @@ export async function fetchGroupStat(groupWebId: number, initData?: string): Pro
 
 export async function searchMessages(params: SearchParams, initData?: string): Promise<SearchResult> {
   const headers = initData ? { Authorization: `Telegram ${initData}` } : undefined
-  const qs = new URLSearchParams({
+  const payload: Record<string, string | number> = {
     q: params.q,
-    ins_id: String(params.ins_id),
-    page: String(params.page),
-  })
-  if (params.limit) {
-    qs.set('limit', String(params.limit))
+    ins_id: params.ins_id,
+    page: params.page,
   }
-  return requestJson(`/tg/search?${qs.toString()}`, { headers })
+  if (params.limit) {
+    payload.limit = params.limit
+  }
+  return requestJson(`/tg/search`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(payload),
+  })
 }
