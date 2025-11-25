@@ -28,6 +28,10 @@ type Backend struct {
 // --- auth helpers ---
 
 func (h *Backend) requireAuth(ctx context.Context) (*AuthInfo, *botapi.ErrorResponse) {
+	if g.GetConfig().TestMode {
+		h.log.Debug("test mode enabled; skipping token verification")
+		return &AuthInfo{}, nil
+	}
 	val := ctx.Value(authContextKey{})
 	apiKey, _ := val.(string)
 	if apiKey == "" {
