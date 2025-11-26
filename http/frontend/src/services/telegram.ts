@@ -9,7 +9,7 @@ export function useTelegram() {
     onMounted(() => {
         const webapp: WebApp = window.Telegram?.WebApp
         if (!webapp) return {available: false, initData: '', user: null}
-        if (webapp.initDataUnsafe === '') {
+        if (webapp.initData === '') {
             return {available: false, initData: '', user: null}
         }
         available.value = true
