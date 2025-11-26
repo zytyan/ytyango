@@ -1,20 +1,17 @@
-import {onMounted, ref} from 'vue'
-import {WebApp} from "telegram-web-app";
+import { onMounted, ref } from 'vue'
+import { WebApp, WebAppUser } from "telegram-web-app";
 
 export function useTelegram() {
     const initData = ref('')
-    const user = ref<TelegramWebAppUser | null>(null)
+    const user = ref<WebAppUser | null>(null)
     const available = ref(false)
 
     onMounted(() => {
         const webapp: WebApp = window.Telegram?.WebApp
-        if (!webapp) return {available: false, initData: '', user: null}
-        if (webapp.initData === '') {
-            return {available: false, initData: '', user: null}
-        }
+        if (!webapp || webapp.initData === '') return
         available.value = true
         initData.value = webapp.initData || ''
-        user.value = webapp.initDataUnsafe?.user || null
+        user.value = webapp.initDataUnsafe?.user ?? null
 
         if (!webapp.isExpanded) {
             webapp.expand()
