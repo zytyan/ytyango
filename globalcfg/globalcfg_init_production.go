@@ -1,4 +1,5 @@
-//go:build !test
+//go:build !test && !frontenddev
+// +build !test,!frontenddev
 
 package g
 

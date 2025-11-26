@@ -47,9 +47,15 @@ func (s *securityHandler) HandleTelegramAuth(ctx context.Context, _ botapi.Opera
 var botVerifyKey []byte
 
 func init() {
-	key := g.GetConfig().BotToken
+	ResetBotVerifyKey(g.GetConfig().BotToken)
+}
+
+// ResetBotVerifyKey recalculates the HMAC key for Telegram WebApp auth.
+// It is safe to call this during alternative build targets that override
+// the bot token after initialization (e.g. frontenddev fixture mode).
+func ResetBotVerifyKey(token string) {
 	mac := hmac.New(sha256.New, []byte("WebAppData"))
-	mac.Write([]byte(key))
+	mac.Write([]byte(token))
 	botVerifyKey = mac.Sum(nil)
 }
 
@@ -106,4 +112,9 @@ func checkTelegramAuth(str string) (AuthInfo, error) {
 		}
 	}
 	return res, nil
+}
+
+// ParseTelegramAuth exposes the signature check for testing or fixture builds.
+func ParseTelegramAuth(str string) (AuthInfo, error) {
+	return checkTelegramAuth(str)
 }

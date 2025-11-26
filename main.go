@@ -1,3 +1,5 @@
+//go:build !frontenddev
+
 package main
 
 import (
