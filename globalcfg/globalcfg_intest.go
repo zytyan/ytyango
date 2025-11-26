@@ -13,8 +13,27 @@ import (
 	"time"
 )
 
+// mustProjectRoot 递归向上查找 go.mod 以定位项目根路径
+func mustProjectRoot() string {
+	dir, err := os.Getwd()
+	if err != nil {
+		panic(err)
+	}
+	for {
+		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
+			return dir
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			panic("project root not found")
+		}
+		dir = parent
+	}
+}
+
 func initDatabaseInMemory(database *sql.DB) {
-	dir, err := os.ReadDir("../sql")
+	basedir := filepath.Join(mustProjectRoot(), "sql")
+	dir, err := os.ReadDir(basedir)
 	if err != nil {
 		panic(err)
 	}
@@ -26,7 +45,7 @@ func initDatabaseInMemory(database *sql.DB) {
 		if !strings.HasSuffix(name, ".sql") || !strings.HasPrefix(name, "schema_") {
 			continue
 		}
-		data, err := os.ReadFile(filepath.Join("../sql", name))
+		data, err := os.ReadFile(filepath.Join(basedir, name))
 		if err != nil {
 			panic(err)
 		}
@@ -34,6 +53,7 @@ func initDatabaseInMemory(database *sql.DB) {
 		_, err = database.Exec(string(data))
 	}
 }
+
 func init() {
 	if !testing.Testing() {
 		return

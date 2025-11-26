@@ -44,12 +44,14 @@ func (s *securityHandler) HandleTelegramAuth(ctx context.Context, _ botapi.Opera
 	return context.WithValue(ctx, authContextKey{}, t.APIKey), nil
 }
 
-var botVerifyKey = func() []byte {
+var botVerifyKey []byte
+
+func init() {
 	key := g.GetConfig().BotToken
 	mac := hmac.New(sha256.New, []byte("WebAppData"))
 	mac.Write([]byte(key))
-	return mac.Sum(nil)
-}()
+	botVerifyKey = mac.Sum(nil)
+}
 
 func checkTelegramAuth(str string) (AuthInfo, error) {
 	split := strings.Split(str, "&")
