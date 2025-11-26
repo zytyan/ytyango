@@ -42,7 +42,8 @@ body,
 body {
   margin: 0;
   padding: 0;
-  overflow: hidden; /* avoid double scrollbars inside Telegram WebView */
+    overflow-x: hidden;
+    overflow-y: auto;
   background: radial-gradient(circle at 20% 20%, color-mix(in srgb, var(--tg-link) 10%, transparent), transparent 25%),
     radial-gradient(circle at 80% 0%, color-mix(in srgb, var(--tg-link) 8%, transparent), transparent 20%),
     var(--tg-bg);
@@ -223,28 +224,24 @@ button:disabled {
 }
 
 .code {
-  background: #111827;
-  color: #e5e7eb;
-  padding: 6px 8px;
-  border-radius: 6px;
-  font-size: 13px;
-  display: inline-block;
+    font-family: 'JetBrains Mono', Consolas, 'Courier New', monospace;
+    white-space: pre-wrap;  /* 允许自动换行 */
+    word-break: break-all;  /* 允许长URL折行 */
+    overflow-x: auto;
+    padding: 8px 12px;
+    background: var(--tg-bg-secondary);
+    border-radius: 6px;
 }
-
-.code {
-  font-family: 'JetBrains Mono', Consolas, 'Courier New', monospace;
-  white-space: pre;
-  overflow-x: auto;
-  padding: 8px 12px;
-  background: var(--tg-bg-secondary);
-  border-radius: 6px;
+.panel {
+    min-width: 0; /* 允许被压缩，不会撑爆 */
 }
-
 .results {
   display: grid;
   gap: 12px;
 }
-
+.app-shell {
+    min-width: 0;
+}
 .result-card {
   border: 1px solid var(--tg-border);
   border-radius: 10px;
