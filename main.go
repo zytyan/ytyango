@@ -1,7 +1,6 @@
 package main
 
 import (
-	"main/bothttp"
 	g "main/globalcfg"
 	"main/myhandlers"
 	"net/http"
@@ -89,7 +88,6 @@ func main() {
 	b := newBot(token)
 	myhandlers.SetMainBot(b)
 	myhandlers.StartChatStatScheduler()
-	go bothttp.Run()
 	go myhandlers.HttpListen4019()
 	dLog := log.Desugar()
 	dispatcher := GroupedDispatcher{Dispatcher: ext.NewDispatcher(&ext.DispatcherOpts{
