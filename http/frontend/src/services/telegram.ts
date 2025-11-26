@@ -1,9 +1,6 @@
 import {onMounted, ref} from 'vue'
 
 export function useTelegram() {
-    if (typeof window !== 'undefined') {
-        return {available: false, initData: '', user: null}
-    }
     const initData = ref('')
     const user = ref<TelegramWebAppUser | null>(null)
     const available = ref(false)

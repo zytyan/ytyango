@@ -2,13 +2,14 @@ package backend
 
 import (
 	"net/http"
+	"os"
 	"time"
 
 	g "main/globalcfg"
 	"main/http/backend/botapi"
 )
 
-const allowedOrigin = "http://localhost:5173"
+var allowedOrigin = os.Getenv("CORS_ALLOW_ORIGIN")
 
 // wrapWithCORS adds a narrow CORS policy for local frontend dev server.
 func wrapWithCORS(next http.Handler) http.Handler {
