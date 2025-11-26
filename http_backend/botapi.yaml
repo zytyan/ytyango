@@ -56,11 +56,6 @@ paths:
           required: true
           description: bot返回的文件名，应为bot api中获取的 file id + .webp。
           schema: { type: string }
-        - name: sha256
-          in: query
-          required: true
-          description: bot给出的sha256签名，使用该签名验证用户有权访问该图片，验证方式为 hmac(secret, filename) == sha256
-          schema: { type: string }
       responses:
         200:
           description: Profile photo file.
@@ -70,11 +65,7 @@ paths:
                 type: string
                 format: binary
         400:
-          description: Missing or invalid user id, or profile photo does not exist.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
+          $ref: '#/components/responses/Error'
 
   /tg/group_stat:
     get:
