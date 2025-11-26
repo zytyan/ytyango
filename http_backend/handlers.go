@@ -3,9 +3,6 @@ package http_backend
 import (
 	"bytes"
 	"context"
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"io"
 	"net/http"
@@ -132,23 +129,6 @@ func sanitizeProfilePhotoFilename(name string) (string, error) {
 	}
 }
 
-func (h *Backend) profilePhotoSecret() []byte {
-	if v := os.Getenv("PROFILE_PHOTO_SECRET"); v != "" {
-		return []byte(v)
-	}
-	return []byte(g.GetConfig().BotToken)
-}
-
-func (h *Backend) verifyProfilePhotoSignature(filename, provided string) bool {
-	raw, err := hex.DecodeString(provided)
-	if err != nil {
-		return false
-	}
-	mac := hmac.New(sha256.New, h.profilePhotoSecret())
-	mac.Write([]byte(filename))
-	return hmac.Equal(raw, mac.Sum(nil))
-}
-
 // --- handler implementations ---
 
 func (h *Backend) PingGet(_ context.Context) (*botapi.PingResponse, error) {
@@ -177,9 +157,6 @@ func (h *Backend) TgProfilePhotoFilenameGet(ctx context.Context, params botapi.T
 	filename, err := sanitizeProfilePhotoFilename(params.Filename)
 	if err != nil {
 		return h.err(ErrArgInvalid, "invalid filename"), nil
-	}
-	if !h.verifyProfilePhotoSignature(filename, params.SHA256) {
-		return h.err(ErrValidFailed, "invalid signature"), nil
 	}
 	path := filepath.Join("data/profile_photo", filename)
 	fp, err := os.Open(path)

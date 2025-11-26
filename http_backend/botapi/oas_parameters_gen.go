@@ -76,9 +76,6 @@ func decodeTgGroupStatGetParams(args [0]string, argsEscaped bool, r *http.Reques
 type TgProfilePhotoFilenameGetParams struct {
 	// Bot返回的文件名，应为bot api中获取的 file id + .webp。.
 	Filename string
-	// Bot给出的sha256签名，使用该签名验证用户有权访问该图片，验证方式为
-	// hmac(secret, filename) == sha256.
-	SHA256 string
 }
 
 func unpackTgProfilePhotoFilenameGetParams(packed middleware.Parameters) (params TgProfilePhotoFilenameGetParams) {
@@ -89,18 +86,10 @@ func unpackTgProfilePhotoFilenameGetParams(packed middleware.Parameters) (params
 		}
 		params.Filename = packed[key].(string)
 	}
-	{
-		key := middleware.ParameterKey{
-			Name: "sha256",
-			In:   "query",
-		}
-		params.SHA256 = packed[key].(string)
-	}
 	return params
 }
 
 func decodeTgProfilePhotoFilenameGetParams(args [1]string, argsEscaped bool, r *http.Request) (params TgProfilePhotoFilenameGetParams, _ error) {
-	q := uri.NewQueryDecoder(r.URL.Query())
 	// Decode path: filename.
 	if err := func() error {
 		param := args[0]
@@ -143,42 +132,6 @@ func decodeTgProfilePhotoFilenameGetParams(args [1]string, argsEscaped bool, r *
 		return params, &ogenerrors.DecodeParamError{
 			Name: "filename",
 			In:   "path",
-			Err:  err,
-		}
-	}
-	// Decode query: sha256.
-	if err := func() error {
-		cfg := uri.QueryParameterDecodingConfig{
-			Name:    "sha256",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
-		}
-
-		if err := q.HasParam(cfg); err == nil {
-			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
-				val, err := d.DecodeValue()
-				if err != nil {
-					return err
-				}
-
-				c, err := conv.ToString(val)
-				if err != nil {
-					return err
-				}
-
-				params.SHA256 = c
-				return nil
-			}); err != nil {
-				return err
-			}
-		} else {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return params, &ogenerrors.DecodeParamError{
-			Name: "sha256",
-			In:   "query",
 			Err:  err,
 		}
 	}

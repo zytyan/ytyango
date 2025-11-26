@@ -265,10 +265,6 @@ func (s *Server) handleTgProfilePhotoFilenameGetRequest(args [1]string, argsEsca
 					Name: "filename",
 					In:   "path",
 				}: params.Filename,
-				{
-					Name: "sha256",
-					In:   "query",
-				}: params.SHA256,
 			},
 			Raw: r,
 		}
