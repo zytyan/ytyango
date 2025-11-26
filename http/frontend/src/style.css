@@ -12,6 +12,14 @@
   --tg-border: color-mix(in srgb, var(--tg-text) 12%, transparent);
   --tg-viewport-height: 100vh;
   --tg-viewport-stable-height: 100vh;
+  --tg-safe-area-inset-top: 0px;
+  --tg-safe-area-inset-bottom: 0px;
+  --tg-safe-area-inset-left: 0px;
+  --tg-safe-area-inset-right: 0px;
+  --tg-content-safe-area-inset-top: 0px;
+  --tg-content-safe-area-inset-bottom: 0px;
+  --tg-content-safe-area-inset-left: 0px;
+  --tg-content-safe-area-inset-right: 0px;
 
   font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   line-height: 1.6;
@@ -20,18 +28,20 @@
   background-color: var(--tg-bg);
 }
 
-html,
-body {
-  min-height: var(--tg-viewport-height, 100vh);
-  height: var(--tg-viewport-height, 100vh);
-}
-
 * {
   box-sizing: border-box;
 }
 
+html,
+body,
+#app {
+  min-height: var(--tg-viewport-height, 100vh);
+  height: var(--tg-viewport-height, 100vh);
+}
+
 body {
   margin: 0;
+  padding: 0;
   background: radial-gradient(circle at 20% 20%, color-mix(in srgb, var(--tg-link) 10%, transparent), transparent 25%),
     radial-gradient(circle at 80% 0%, color-mix(in srgb, var(--tg-link) 8%, transparent), transparent 20%),
     var(--tg-bg);
@@ -42,7 +52,8 @@ body {
   min-height: var(--tg-viewport-stable-height, 100vh);
   max-width: 1200px;
   margin: 0 auto;
-  padding: 24px;
+  padding: calc(16px + var(--tg-safe-area-inset-top, 0px)) 24px
+    calc(24px + var(--tg-content-safe-area-inset-bottom, 0px));
   display: flex;
   flex-direction: column;
 }
