@@ -11,8 +11,9 @@ export function useTelegram() {
         if (!webapp || webapp.initData === '') return
         available.value = true
         initData.value = webapp.initData || ''
-        user.value = webapp.initDataUnsafe?.user ?? null
-
+        user.value = webapp.initDataUnsafe.user ?? null
+        console.log(available, initData, user)
+        
         if (!webapp.isExpanded) {
             webapp.expand()
         }
