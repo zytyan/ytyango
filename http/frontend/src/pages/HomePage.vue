@@ -55,7 +55,7 @@
     <p v-if="error" class="alert error" style="margin-top: 12px">{{ error }}</p>
 
     <div v-if="stat" class="stats-grid" style="margin-top: 16px">
-      <div class="stat-card">
+      <div class="stat-card">https://core.telegram.org/bots/webapps
         <p class="stat-label">消息总数</p>
         <p class="stat-value">{{ stat.message_count }}</p>
       </div>
