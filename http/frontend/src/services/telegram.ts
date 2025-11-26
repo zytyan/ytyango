@@ -1,4 +1,5 @@
 import {onMounted, ref} from 'vue'
+import {WebApp} from "telegram-web-app";
 
 export function useTelegram() {
     const initData = ref('')
@@ -6,9 +7,9 @@ export function useTelegram() {
     const available = ref(false)
 
     onMounted(() => {
-        const webapp = window.Telegram?.WebApp
+        const webapp: WebApp = window.Telegram?.WebApp
         if (!webapp) return {available: false, initData: '', user: null}
-        if (webapp.initialized === '') {
+        if (webapp.initDataUnsafe === '') {
             return {available: false, initData: '', user: null}
         }
         available.value = true
