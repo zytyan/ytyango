@@ -1,6 +1,0 @@
-node_modules
-.idea
-.DS_Store
-dist
-.vite-ssg-temp
-npm-debug.log*
