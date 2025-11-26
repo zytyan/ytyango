@@ -3,7 +3,7 @@
     <h2>Telegram 登录状态</h2>
     <p class="muted">从 WebApp 注入的 <code>initData</code> 用作后端的 <code>Authorization: Telegram &lt;initData&gt;</code> 头。</p>
     <div v-if="telegram.available" class="alert info">
-      <span>已检测到 Telegram WebApp。当前用户：{{ telegram.user?.username || telegram.user?.first_name || telegram.user?.id }}</span>
+      <span>已检测到 Telegram WebApp。当前用户：{{ telegram.user?.value?.first_name || telegram.user?.value?.first_name || telegram.user?.value?.id }}</span>
     </div>
     <div v-else class="alert warn">
       未检测到 WebApp 环境，可能无法访问需要验证的接口。
