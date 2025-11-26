@@ -35,13 +35,14 @@
 html,
 body,
 #app {
-  min-height: var(--tg-viewport-height, 100vh);
-  height: var(--tg-viewport-height, 100vh);
+  min-height: var(--tg-viewport-stable-height, 100vh);
+  height: var(--tg-viewport-stable-height, 100vh);
 }
 
 body {
   margin: 0;
   padding: 0;
+  overflow: hidden; /* avoid double scrollbars inside Telegram WebView */
   background: radial-gradient(circle at 20% 20%, color-mix(in srgb, var(--tg-link) 10%, transparent), transparent 25%),
     radial-gradient(circle at 80% 0%, color-mix(in srgb, var(--tg-link) 8%, transparent), transparent 20%),
     var(--tg-bg);
@@ -56,6 +57,7 @@ body {
     calc(24px + var(--tg-content-safe-area-inset-bottom, 0px));
   display: flex;
   flex-direction: column;
+  overflow: auto;
 }
 
 .app-header {
@@ -221,13 +223,21 @@ button:disabled {
 }
 
 .code {
-  font-family: 'JetBrains Mono', Consolas, 'Courier New', monospace;
   background: #111827;
   color: #e5e7eb;
   padding: 6px 8px;
   border-radius: 6px;
   font-size: 13px;
   display: inline-block;
+}
+
+.code {
+  font-family: 'JetBrains Mono', Consolas, 'Courier New', monospace;
+  white-space: pre;
+  overflow-x: auto;
+  padding: 8px 12px;
+  background: var(--tg-bg-secondary);
+  border-radius: 6px;
 }
 
 .results {
