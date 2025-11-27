@@ -454,7 +454,7 @@ func Evaluate(expr string) (*big.Rat, error) {
 	return evalRPN(rpn)
 }
 
-var reFastCheck = regexp.MustCompile(`^[ \depiacpACP（(）)＋+－\-×*＊÷/／.!]+$`)
+var reFastCheck = regexp.MustCompile(`(?i)^[ \depiac（(）)＋+－\-×*＊÷/／.!^]+$`)
 
 func FastCheck(expr string) bool {
 	for _, c := range expr {

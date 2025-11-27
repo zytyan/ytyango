@@ -10,7 +10,7 @@ import (
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 )
 
-var reRank = regexp.MustCompile(`(\d)(.*\b(\d))`)
+var reRank = regexp.MustCompile(`(\d)(.*\b(\d))?`)
 
 func SendRandRacy(bot *gotgbot.Bot, ctx *ext.Context) error {
 	submatch := reRank.FindStringSubmatch(ctx.Message.Text)
