@@ -254,6 +254,7 @@ func downloadMedia(bot *gotgbot.Bot, key *dlKey, user *gotgbot.User, msgId, chat
 		return err
 	}
 	result := key.downloadToFile()
+	defer downloading.Delete(*key)
 	if result.err != nil {
 		_, err = bot.SendMessage(chatId, "下载过程中遇到错误: "+result.err.Error(), msgOpt)
 		return err

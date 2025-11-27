@@ -1,12 +1,16 @@
 package main
 
 import (
+	"context"
 	"main/bothttp"
 	g "main/globalcfg"
 	"main/myhandlers"
 	"net/http"
+	"os"
+	"os/signal"
 	"runtime/debug"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
@@ -85,10 +89,19 @@ func zapLogFields(b *gotgbot.Bot, ctx *ext.Context) []zap.Field {
 
 func main() {
 	log.Infof("compile time: %s", compileTime)
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	defer g.Q.FlushChatStats(context.Background())
+	go func() {
+		<-ctx.Done()
+		_ = g.Q.FlushChatStats(context.Background())
+		os.Exit(0)
+	}()
 	token := g.GetConfig().BotToken
 	b := newBot(token)
 	myhandlers.SetMainBot(b)
 	myhandlers.StartChatStatScheduler()
+	g.Q.StartChatStatAutoSave(ctx, time.Minute)
 	go bothttp.Run()
 	go myhandlers.HttpListen4019()
 	dLog := log.Desugar()
