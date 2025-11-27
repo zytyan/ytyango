@@ -89,26 +89,14 @@
       </div>
     </div>
 
-    <div v-if="searchResult" class="panel" style="margin-top: 16px; padding: 12px">
-      <h3>搜索结果（{{ searchResult.estimatedTotalHits }} 条，耗时 {{ searchResult.processingTimeMs }} ms）</h3>
-      <div v-if="searchResult.hits.length === 0" class="muted">没有匹配的消息。</div>
-      <div v-else class="results">
-        <article v-for="hit in searchResult.hits" :key="hit.mongo_id" class="result-card">
-          <div class="result-meta">
-            <span>用户: {{ hit.from_id }}</span>
-            <span>消息ID: {{ hit.msg_id }}</span>
-            <span>时间: {{ formatDate(hit.date) }}</span>
-          </div>
-          <p class="result-message">{{ hit.message || hit.image_text || hit.qr_result || '无正文' }}</p>
-        </article>
-      </div>
-    </div>
+    <MessageSearchResults v-if="searchResult" :result="searchResult" :query="query" />
   </section>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { fetchGroupStat, ping, searchMessages, type ChatStat, type SearchResult } from '../services/api'
+import MessageSearchResults from '../components/MessageSearchResults.vue'
 import { useTelegram } from '../services/telegram'
 const telegram = useTelegram()
 const groupWebId = ref<number | null>(null)
@@ -175,10 +163,5 @@ async function performSearch() {
   } finally {
     loadingSearch.value = false
   }
-}
-
-function formatDate(timestamp: number) {
-  const date = new Date(timestamp * 1000)
-  return date.toLocaleString()
 }
 </script>

@@ -199,6 +199,136 @@ button:disabled {
   margin-top: 6px;
 }
 
+.message-results {
+  margin-top: 16px;
+  padding: 16px;
+  background: var(--tg-bg-secondary);
+  border: 1px solid var(--tg-border);
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04);
+}
+
+.results-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.result-summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--tg-link) 10%, transparent);
+  color: var(--tg-text);
+}
+
+.summary-label {
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 12px;
+}
+
+.summary-value {
+  font-weight: 700;
+}
+
+.result-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.result-row {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--tg-border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--tg-bg-secondary) 80%, var(--tg-bg) 20%);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.04);
+}
+
+.avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  color: #fff;
+  text-transform: uppercase;
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.08);
+  flex-shrink: 0;
+}
+
+.result-content {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.result-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.user-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.user-name {
+  font-weight: 800;
+  color: var(--tg-text);
+}
+
+.user-id {
+  color: var(--tg-hint);
+  font-size: 13px;
+}
+
+.message-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  color: var(--tg-hint);
+  font-size: 13px;
+}
+
+.message-id {
+  font-weight: 700;
+  color: var(--tg-link);
+}
+
+.message-time {
+  white-space: nowrap;
+}
+
+.message-text {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.empty-hint {
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--tg-bg) 70%, var(--tg-bg-secondary) 30%);
+  color: var(--tg-hint);
+}
+
 .alert {
   padding: 12px;
   border-radius: 10px;
@@ -235,29 +365,6 @@ button:disabled {
 .panel {
     min-width: 0; /* 允许被压缩，不会撑爆 */
 }
-.results {
-  display: grid;
-  gap: 12px;
-}
 .app-shell {
     min-width: 0;
-}
-.result-card {
-  border: 1px solid var(--tg-border);
-  border-radius: 10px;
-  padding: 12px;
-  background: var(--tg-bg-secondary);
-}
-
-.result-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  color: var(--tg-hint);
-  font-size: 13px;
-}
-
-.result-message {
-  margin: 8px 0 0;
-  white-space: pre-wrap;
 }
