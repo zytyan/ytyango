@@ -160,10 +160,13 @@ func NsfwDetect(bot *gotgbot.Bot, ctx *ext.Context) error {
 
 func CmdScore(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
 	var photo *gotgbot.PhotoSize
+	var msg *gotgbot.Message
 	if len(ctx.Message.Photo) != 0 {
 		photo = &ctx.Message.Photo[len(ctx.Message.Photo)-1]
+		msg = ctx.Message
 	} else if ctx.Message.ReplyToMessage != nil && len(ctx.Message.ReplyToMessage.Photo) != 0 {
 		photo = &ctx.Message.ReplyToMessage.Photo[len(ctx.Message.ReplyToMessage.Photo)-1]
+		msg = ctx.Message.ReplyToMessage
 	} else {
 		_, err := ctx.Message.Reply(bot, "没有图片", nil)
 		if err != nil {
@@ -188,7 +191,7 @@ func CmdScore(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
 	}
 	replyMarkup := BuildNsfwRateButton(photo.FileUniqueId, nsfwCallbackButtonCmdScore)
 	text := fmt.Sprintf("bot评分: %d/6\n用户评分: %d/6", severity, userRate)
-	_, err = ctx.Message.Reply(bot, text, &gotgbot.SendMessageOpts{
+	_, err = msg.Reply(bot, text, &gotgbot.SendMessageOpts{
 		ReplyMarkup: replyMarkup,
 	})
 	if err != nil {
