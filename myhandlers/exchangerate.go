@@ -20,6 +20,7 @@ func IsCalcExchangeRate(msg *gotgbot.Message) bool {
 var exchangeAlias = map[string]string{
 	"RMB": "CNY",
 	"NTD": "TWD",
+	"SKW": "KRW",
 }
 
 func ExchangeRateCalc(bot *gotgbot.Bot, ctx *ext.Context) error {
