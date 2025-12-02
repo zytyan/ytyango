@@ -7,6 +7,8 @@ import (
 	"main/globalcfg/q"
 	"testing"
 	"time"
+
+	"go.uber.org/zap/zapcore"
 )
 
 func init() {
@@ -18,6 +20,7 @@ func init() {
 	gWriteSyncer = initWriteSyncer()
 	db = initDatabase(config.DatabasePath)
 	logger := GetLogger("database")
+	loggers["database"].Level.SetLevel(zapcore.WarnLevel)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	Q, err = q.PrepareWithLogger(ctx, db, logger.Desugar())

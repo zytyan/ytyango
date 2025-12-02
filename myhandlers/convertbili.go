@@ -14,9 +14,11 @@ import (
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
+	"go.uber.org/zap"
 )
 
 var log = g.GetLogger("handlers")
+var logD = log.Desugar()
 
 func BiliMsgFilter(msg *gotgbot.Message) bool {
 	if h.ChatAutoCvtBili(msg.Chat.Id) {
@@ -25,16 +27,21 @@ func BiliMsgFilter(msg *gotgbot.Message) bool {
 	if msg.ViaBot != nil || strings.HasPrefix(msg.Text, "/") {
 		return false
 	}
-	return msg.Text != ""
+	text := msg.GetText()
+	return strings.Contains(text, "b23.tv") ||
+		strings.Contains(text, "bilibili.com") ||
+		strings.Contains(text, "bili2233.cn")
 }
 
 func BiliMsgConverter(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
 	prepare, err := bili.ConvertBilibiliLinks(ctx.Message.Text)
 	if err != nil || !prepare.NeedClean {
+		logD.Info("Bilibili Links Error", zap.Error(err),
+			zap.String("text", ctx.Message.Text))
 		// 没有B站链接
 		return nil
 	}
-	log.Debugf("convert bilibili link %s", ctx.Message.Text)
+	logD.Info("convert bilibili link", zap.String("text", ctx.Message.Text))
 
 	bv := html.EscapeString(prepare.BvText)
 	text := fmt.Sprintf(`来自<a href="tg://user?id=%d">%s</a>的消息，其中的链接已自动转换%s%s`,
