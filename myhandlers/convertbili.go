@@ -21,7 +21,7 @@ var log = g.GetLogger("handlers")
 var logD = log.Desugar()
 
 func BiliMsgFilter(msg *gotgbot.Message) bool {
-	if h.ChatAutoCvtBili(msg.Chat.Id) {
+	if !h.ChatAutoCvtBili(msg.Chat.Id) {
 		return false
 	}
 	if msg.ViaBot != nil || strings.HasPrefix(msg.Text, "/") {
