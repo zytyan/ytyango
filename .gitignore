@@ -6,3 +6,5 @@
 /main
 __pycache__
 *.db
+/http/frontend/dist
+/http/frontend/node_modules

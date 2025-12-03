@@ -109,22 +109,34 @@ function view_log() {
     for arg in "$@"; do
         case "$arg" in
             -f) follow=1 ;;
-            --lines=*)
-                lines="${arg#--lines=}"
+            "") ;;
+            *)
+                if [[ "$arg" =~ ^[0-9]+$ ]]; then
+                    lines="$arg"
+                else
+                    echo "❌ Unknown option: $arg"
+                    usage
+                    exit 1
+                fi
                 ;;
         esac
     done
+
+    if ! command -v jq >/dev/null 2>&1; then
+        echo "❌ jq 未安装，请先安装 jq 用于格式化日志"
+        exit 1
+    fi
 
     if [[ ! -f "$LOG_FILE" ]]; then
         echo "❌ Log file not found: $LOG_FILE"
         exit 1
     fi
 
-    if [[ "$follow" -eq 1 ]]; then
-        tail -n "$lines" -f "$LOG_FILE"
-    else
-        tail -n "$lines" "$LOG_FILE"
-    fi
+    local tail_args=("-n" "$lines")
+    [[ "$follow" -eq 1 ]] && tail_args+=("-f")
+
+    # 使用 jq 格式化 JSON 日志，如果行不是合法 JSON 则原样输出
+    tail "${tail_args[@]}" "$LOG_FILE" | jq -R 'try fromjson catch .'
 }
 
 function usage() {
@@ -132,16 +144,16 @@ function usage() {
 Usage: $0 <command> [options]
 
 Commands:
-  build [--no-pull] [-y] [-n]        拉取代码并构建项目，支持自动重启服务
+  build build/ b [--no-pull] [-y] [-n]        拉取代码并构建项目，支持自动重启服务
   install                            安装 systemd 服务，创建用户组并设定权限
   start | stop | restart | status    控制 systemd 服务状态
-  log [-f] [--lines=N]               查看日志，支持 -f 追加模式 和 --lines 指定行数
+  log [N] [-f]                       查看日志，支持 -f 追加模式 和 指定行数，使用jq处理输出
 EOF
 }
 
 # 主控制逻辑
 case "$1" in
-    build)
+    build|build/|b)
         shift
         build "$@"
         ;;
@@ -160,4 +172,3 @@ case "$1" in
         exit 1
         ;;
 esac
-
