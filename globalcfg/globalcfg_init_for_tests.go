@@ -2,10 +2,37 @@ package g
 
 import (
 	"context"
+	"database/sql"
+	"log"
 	"main/globalcfg/q"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
+
+func initDatabaseInMemory(database *sql.DB) {
+	dir, err := os.ReadDir("../sql")
+	if err != nil {
+		panic(err)
+	}
+	for _, file := range dir {
+		if file.IsDir() {
+			continue
+		}
+		name := file.Name()
+		if !strings.HasSuffix(name, ".sql") || !strings.HasPrefix(name, "schema_") {
+			continue
+		}
+		data, err := os.ReadFile(filepath.Join("../sql", name))
+		if err != nil {
+			panic(err)
+		}
+		log.Printf("Executing: %s\n", name)
+		_, err = database.Exec(string(data))
+	}
+}
 
 func init() {
 	if !testing.Testing() {
@@ -43,5 +70,4 @@ func init() {
 		panic(err)
 	}
 	logger.Infof("Database initialized")
-
 }
