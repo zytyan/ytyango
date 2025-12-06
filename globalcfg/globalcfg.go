@@ -159,10 +159,10 @@ func initDatabase(dbPath string) *sql.DB {
 	return d
 }
 
-func NewTx() (*q.Queries, error) {
+func NewTx() (*q.Queries, *sql.Tx, error) {
 	tx, err := db.Begin()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return Q.WithTx(tx), nil
+	return Q.WithTx(tx), tx, nil
 }
