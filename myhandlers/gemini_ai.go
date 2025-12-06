@@ -234,7 +234,6 @@ func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 		SystemInstruction: genai.NewContentFromText(sysInst, genai.RoleModel),
 		Tools: []*genai.Tool{
 			{GoogleSearch: &genai.GoogleSearch{}},
-			{CodeExecution: &genai.ToolCodeExecution{}},
 			{URLContext: &genai.URLContext{}},
 		},
 	}
