@@ -167,7 +167,7 @@ func IsGeminiReq(msg *gotgbot.Message) bool {
 	return false
 }
 
-func GeminiGetSession(ctx context.Context, msg *gotgbot.Message, canCreate bool) *GeminiSession {
+func GeminiGetSession(ctx context.Context, msg *gotgbot.Message) *GeminiSession {
 	session := geminiSessions.s[msg.Chat.Id]
 	if session != nil {
 		return session
@@ -178,23 +178,23 @@ func GeminiGetSession(ctx context.Context, msg *gotgbot.Message, canCreate bool)
 	if session != nil {
 		return session
 	}
+	var err error
 	session = &GeminiSession{}
-	sessionId, err := g.Q.GetSessionIdByMessage(ctx, msg.Chat.Id, msg.MessageId)
-	if errors.Is(err, sql.ErrNoRows) {
-		if !canCreate {
+	if msg.ReplyToMessage != nil {
+		var sessionId int64
+		// 从被回复的消息中提取会话
+		sessionId, err = g.Q.GetSessionIdByMessage(ctx, msg.Chat.Id, msg.ReplyToMessage.MessageId)
+		if err != nil {
 			log.Infof("没有相关的Session，退出")
 			return nil
 		}
-		chatName := getChatName(&msg.Chat)
-		session.GeminiSession, err = g.Q.CreateNewGeminiSession(ctx, msg.Chat.Id, chatName, msg.Chat.Type)
-	} else {
 		session.GeminiSession, err = g.Q.GetSessionById(ctx, sessionId)
+	} else {
+		session.GeminiSession, err = g.Q.CreateNewGeminiSession(ctx, msg.Chat.Id, getChatName(&msg.Chat), msg.Chat.Type)
 	}
 	if err != nil {
-		// sqlc 那边应该记录日志了，这里不管
 		return nil
 	}
-
 	err = session.loadContentFromDatabase(ctx)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil
@@ -210,7 +210,7 @@ func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 	}
 	genCtx, cancel := context.WithTimeout(context.Background(), time.Second*15)
 	defer cancel()
-	session := GeminiGetSession(genCtx, ctx.EffectiveMessage, ctx.EffectiveMessage.ReplyToMessage == nil)
+	session := GeminiGetSession(genCtx, ctx.EffectiveMessage)
 	if session == nil {
 		return nil
 	}
