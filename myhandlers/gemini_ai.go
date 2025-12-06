@@ -212,6 +212,9 @@ func GeminiGetSession(ctx context.Context, msg *gotgbot.Message) *GeminiSession 
 		}
 		session.GeminiSession, err = g.Q.GetSessionById(ctx, sessionId)
 		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				goto create
+			}
 			return nil
 		}
 		err = session.loadContentFromDatabase(ctx)
@@ -222,6 +225,7 @@ func GeminiGetSession(ctx context.Context, msg *gotgbot.Message) *GeminiSession 
 		geminiSessions.chatIdToSess[msg.Chat.Id] = session
 		return session
 	}
+create:
 	geminiSessions.mu.Lock()
 	defer geminiSessions.mu.Unlock()
 	sess, ok := geminiSessions.chatIdToSess[msg.Chat.Id]
