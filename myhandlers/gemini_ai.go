@@ -36,8 +36,10 @@ const (
 
 type GeminiSession struct {
 	q.GeminiSession
-	mu       sync.Mutex
-	Contents []q.GeminiContent
+	mu          sync.Mutex
+	Contents    []q.GeminiContent
+	TempContent sql.Null[q.GeminiContent]
+	UpdateTime  time.Time
 }
 
 var geminiSessions struct {
@@ -75,19 +77,22 @@ type:%s
 	return
 }
 func (s *GeminiSession) ToGenaiContents() []*genai.Content {
-	contents := make([]*genai.Content, len(s.Contents))
+	contents := make([]*genai.Content, 0, len(s.Contents)+1)
 	for i := range s.Contents {
-		contents[i] = databaseContentToGenaiPart(&s.Contents[i])
+		contents = append(contents, databaseContentToGenaiPart(&s.Contents[i]))
+	}
+	if s.TempContent.Valid {
+		contents = append(contents, databaseContentToGenaiPart(&s.TempContent.V))
 	}
 	return contents
 }
 
-func (s *GeminiSession) AddTgMessage(bot *gotgbot.Bot, msg *gotgbot.Message) error {
+func (s *GeminiSession) AddTgMessage(bot *gotgbot.Bot, msg *gotgbot.Message, role genai.Role) (confirm func(), err error) {
 	content := q.GeminiContent{
 		SessionID: s.ID,
 		ChatID:    msg.Chat.Id,
 		MsgID:     msg.MessageId,
-		Role:      genai.RoleUser,
+		Role:      string(role),
 		SentTime:  q.UnixTime{Time: time.Unix(msg.Date, 0)},
 		Username:  msg.GetSender().Name(),
 	}
@@ -104,10 +109,11 @@ func (s *GeminiSession) AddTgMessage(bot *gotgbot.Bot, msg *gotgbot.Message) err
 		content.Text.Valid = true
 		content.Text.String = msg.Caption
 	}
+	var data []byte
 	if msg.Photo != nil {
-		data, err := h.GetFileBytes(bot, msg.Photo[len(msg.Photo)-1].FileId)
+		data, err = h.GetFileBytes(bot, msg.Photo[len(msg.Photo)-1].FileId)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		content.MsgType = "photo"
 
@@ -115,25 +121,27 @@ func (s *GeminiSession) AddTgMessage(bot *gotgbot.Bot, msg *gotgbot.Message) err
 		content.MimeType.Valid = true
 		content.MimeType.String = "image/jpeg"
 	} else if msg.Sticker != nil {
-		data, err := h.GetFileBytes(bot, msg.Sticker.FileId)
+		data, err = h.GetFileBytes(bot, msg.Sticker.FileId)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		content.Blob = data
 		content.MsgType = "sticker"
 		content.MimeType.Valid = true
 		if msg.Sticker.IsVideo {
-			content.MimeType.String = "image/webm"
+			content.MimeType.String = "video/webm"
 		} else {
 			content.MimeType.String = "image/webp"
 		}
 	}
-	err := content.Save(context.Background(), g.Q)
-	if err != nil {
-		return err
+	s.TempContent = sql.Null[q.GeminiContent]{V: content, Valid: true}
+	confirm = func() {
+		s.Contents = append(s.Contents, content)
+		s.UpdateTime = time.Now()
+		s.TempContent.Valid = false
+		_ = content.Save(context.Background(), g.Q)
 	}
-	s.Contents = append(s.Contents, content)
-	return nil
+	return
 }
 
 func (s *GeminiSession) loadContentFromDatabase(ctx context.Context) error {
@@ -230,7 +238,7 @@ func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 			{URLContext: &genai.URLContext{}},
 		},
 	}
-	err = session.AddTgMessage(bot, ctx.EffectiveMessage)
+	confirm, err := session.AddTgMessage(bot, ctx.EffectiveMessage, genai.RoleUser)
 	if err != nil {
 		return err
 	}
@@ -250,7 +258,18 @@ func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 		_, _ = ctx.EffectiveMessage.Reply(bot, fmt.Sprintf("error:%s", err), nil)
 		return err
 	}
-	_, err = ctx.EffectiveMessage.Reply(bot, res.Text(), nil)
+	respMsg, err := ctx.EffectiveMessage.Reply(bot, res.Text(), nil)
+	if err != nil {
+		j, err2 := res.MarshalJSON()
+		log.Warnf("genemi response: %s, error: %s", j, err2)
+		return err
+	}
+	confirm()
+	confirm, err = session.AddTgMessage(bot, respMsg, genai.RoleModel)
+	if err != nil {
+		return err
+	}
+	confirm()
 	return err
 }
 
