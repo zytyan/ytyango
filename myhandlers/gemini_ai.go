@@ -3,8 +3,10 @@ package myhandlers
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	g "main/globalcfg"
+	"main/globalcfg/h"
 	"main/globalcfg/q"
 	"strings"
 	"sync"
@@ -14,8 +16,6 @@ import (
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 	"google.golang.org/genai"
 )
-
-const geminiModel = "gemini-2.5-flash-preview-09-2025"
 
 var getGenAiClient = sync.OnceValues(func() (*genai.Client, error) {
 	ctx := context.Background()
@@ -29,56 +29,208 @@ var getGenAiClient = sync.OnceValues(func() (*genai.Client, error) {
 	return client, nil
 })
 
-func geminiTools() []*genai.Tool {
-	return []*genai.Tool{
-		{URLContext: &genai.URLContext{}},
-		{CodeExecution: &genai.ToolCodeExecution{}},
-		{GoogleSearch: &genai.GoogleSearch{}},
+const (
+	geminiSessionContentLimit = 100
+	geminiModel               = "gemini-2.5-flash-preview-09-2025"
+)
+
+type GeminiSession struct {
+	q.GeminiSession
+	mu       sync.Mutex
+	Contents []q.GeminiContent
+}
+
+var geminiSessions struct {
+	mu sync.RWMutex
+	s  map[int64]*GeminiSession
+}
+
+func databaseContentToGenaiPart(content *q.GeminiContent) (out *genai.Content) {
+	out = &genai.Content{}
+	label := fmt.Sprintf(`-start-label-
+id:%d
+time:%s
+name:%s
+type:%s
+`, content.MsgID, content.SentTime.Format("2006-01-02 15:04:05"), content.Username, content.MsgType)
+	if content.ReplyToMsgID.Valid {
+		label += fmt.Sprintf("reply:%d\n", content.ReplyToMsgID.Int64)
 	}
+	label += "-end-label-\n"
+	out.Parts = append(out.Parts, &genai.Part{
+		Text: label,
+	})
+	if content.Text.Valid {
+		out.Parts = append(out.Parts, &genai.Part{Text: content.Text.String})
+	}
+	if len(content.Blob) > 0 && content.MimeType.Valid {
+		out.Parts = append(out.Parts, &genai.Part{InlineData: &genai.Blob{
+			Data:     content.Blob,
+			MIMEType: content.MimeType.String,
+		}})
+	}
+	return
+}
+func (s *GeminiSession) ToGenaiContents() []*genai.Content {
+	contents := make([]*genai.Content, len(s.Contents))
+	for i := range s.Contents {
+		contents[i] = databaseContentToGenaiPart(&s.Contents[i])
+	}
+	return contents
+}
+
+func (s *GeminiSession) AddTgMessage(bot *gotgbot.Bot, msg *gotgbot.Message) error {
+	content := q.GeminiContent{
+		SessionID: s.ID,
+		ChatID:    msg.Chat.Id,
+		MsgID:     msg.MessageId,
+		Role:      genai.RoleUser,
+		SentTime:  q.UnixTime{Time: time.Unix(msg.Date, 0)},
+		Username:  msg.GetSender().Name(),
+	}
+	if msg.ReplyToMessage != nil {
+		content.ReplyToMsgID.Valid = true
+		content.ReplyToMsgID.Int64 = msg.ReplyToMessage.MessageId
+	}
+	if msg.Text != "" {
+		content.Text.Valid = true
+		content.Text.String = msg.Text
+		content.MsgType = "text"
+	}
+	if msg.Caption != "" {
+		content.Text.Valid = true
+		content.Text.String = msg.Caption
+	}
+	if msg.Photo != nil {
+		data, err := h.GetFileBytes(bot, msg.Photo[len(msg.Photo)-1].FileId)
+		if err != nil {
+			return err
+		}
+		content.MsgType = "photo"
+
+		content.Blob = data
+		content.MimeType.Valid = true
+		content.MimeType.String = "image/jpeg"
+	} else if msg.Sticker != nil {
+		data, err := h.GetFileBytes(bot, msg.Sticker.FileId)
+		if err != nil {
+			return err
+		}
+		content.Blob = data
+		content.MsgType = "sticker"
+		content.MimeType.Valid = true
+		if msg.Sticker.IsVideo {
+			content.MimeType.String = "image/webm"
+		} else {
+			content.MimeType.String = "image/webp"
+		}
+	}
+	err := content.Save(context.Background(), g.Q)
+	if err != nil {
+		return err
+	}
+	s.Contents = append(s.Contents, content)
+	return nil
+}
+
+func (s *GeminiSession) loadContentFromDatabase(ctx context.Context) error {
+	content, err := g.Q.GetAllMsgInSession(ctx, s.ID, geminiSessionContentLimit)
+	if err != nil {
+		return err
+	}
+	s.Contents = content
+	return nil
 }
 
 func IsGeminiReq(msg *gotgbot.Message) bool {
-	if msg == nil {
+	if strings.HasPrefix(msg.Text, "/") {
 		return false
 	}
-	text := getTextMsg(msg)
-	if strings.HasPrefix(text, "/") {
-		return false
+	if strings.Contains(msg.Text, "@"+mainBot.Username) {
+		return true
 	}
-	return messageMentionsBot(msg) || isReplyToBotOrSelf(msg)
+	if msg.ReplyToMessage != nil {
+		user := msg.ReplyToMessage.GetSender().User
+		return user != nil && user.Id == mainBot.Id
+	}
+	return false
+}
+
+func GeminiGetSession(ctx context.Context, msg *gotgbot.Message, canCreate bool) *GeminiSession {
+	session := geminiSessions.s[msg.Chat.Id]
+	if session != nil {
+		return session
+	}
+	geminiSessions.mu.Lock()
+	defer geminiSessions.mu.Unlock()
+	session = geminiSessions.s[msg.Chat.Id]
+	if session != nil {
+		return session
+	}
+	session = &GeminiSession{}
+	sessionId, err := g.Q.GetSessionIdByMessage(ctx, msg.Chat.Id, msg.MessageId)
+	if errors.Is(err, sql.ErrNoRows) {
+		if !canCreate {
+			log.Infof("没有相关的Session，退出")
+			return nil
+		}
+		chatName := getChatName(&msg.Chat)
+		session.GeminiSession, err = g.Q.CreateNewGeminiSession(ctx, msg.Chat.Id, chatName, msg.Chat.Type)
+	} else {
+		session.GeminiSession, err = g.Q.GetSessionById(ctx, sessionId)
+	}
+	if err != nil {
+		// sqlc 那边应该记录日志了，这里不管
+		return nil
+	}
+
+	err = session.loadContentFromDatabase(ctx)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return nil
+	}
+	geminiSessions.s[msg.Chat.Id] = session
+	return session
 }
 
 func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
-
 	client, err := getGenAiClient()
 	if err != nil {
 		return err
 	}
-	genCtx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+	genCtx, cancel := context.WithTimeout(context.Background(), time.Second*15)
 	defer cancel()
-
-	if ctx.EffectiveMessage == nil || ctx.EffectiveSender == nil {
+	session := GeminiGetSession(genCtx, ctx.EffectiveMessage, ctx.EffectiveMessage.ReplyToMessage == nil)
+	if session == nil {
 		return nil
 	}
-	userID := ctx.EffectiveSender.Id()
-	if userID == 0 && ctx.EffectiveUser != nil {
-		userID = ctx.EffectiveUser.Id
+	session.mu.Lock()
+	defer session.mu.Unlock()
+	sysInst := fmt.Sprintf(`now:%s
+这里是一个Telegram聊天 type:%s,name:%s
+你是一个Telegram机器人，name: %s username: %s
+你会看到很多消息，每个消息头部都有一个元数据，以 '-start-label-'开头， '-end-label-' 结尾，元数据中标记了消息的ID(id)，发送时间(time)，发送者的用户名（name)以及消息类型(type)
+消息类型有 text, photo, sticker三种，对应文本消息、图片消息及表情消息。
+若用户明确回复了某条消息，则有回复的消息的ID(reply)字段。
+这些元数据由代码自动生成，不要在模型的输出中加入该数据。
+请使用中文回复消息。
+不要使用markdown语法。`,
+		time.Now().Format("2006-01-02 15:04:05 -07:00"),
+		session.ChatType,
+		session.ChatName,
+		bot.FirstName+bot.LastName,
+		bot.Username)
+	config := &genai.GenerateContentConfig{
+		SystemInstruction: genai.NewContentFromText(sysInst, genai.RoleModel),
+		Tools: []*genai.Tool{
+			{GoogleSearch: &genai.GoogleSearch{}},
+			{CodeExecution: &genai.ToolCodeExecution{}},
+			{URLContext: &genai.URLContext{}},
+		},
 	}
-	mentioned := messageMentionsBot(ctx.EffectiveMessage)
-
-	session, replySeq, err := resolveGeminiSession(context.Background(), ctx.EffectiveMessage, userID, mentioned)
+	err = session.AddTgMessage(bot, ctx.EffectiveMessage)
 	if err != nil {
 		return err
 	}
-	if mentioned {
-		rememberGeminiSession(ctx.EffectiveMessage.Chat.Id, session.ID)
-	}
-
-	cleanText := sanitizeGeminiText(getText(ctx))
-	if cleanText == "" {
-		cleanText = strings.TrimSpace(getText(ctx))
-	}
-	//  "🤓", "👻", "👨‍💻", "👀",
 	_, err = ctx.EffectiveMessage.SetReaction(bot, &gotgbot.SetMessageReactionOpts{
 		Reaction: []gotgbot.ReactionType{gotgbot.ReactionTypeEmoji{Emoji: "👀"}},
 		IsBig:    false,
@@ -86,44 +238,7 @@ func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 	if err != nil {
 		log.Warnf("set reaction emoji to message %s(%d) failed ", getChatName(&ctx.EffectiveMessage.Chat), ctx.EffectiveMessage.MessageId)
 	}
-	lastSeq, err := g.Q.GetGeminiLastSeq(context.Background(), session.ID)
-	if err != nil {
-		return err
-	}
-	userSeq := lastSeq + 1
-	now := time.Now()
-	_, err = g.Q.CreateGeminiMessage(context.Background(), q.CreateGeminiMessageParams{
-		SessionID:   session.ID,
-		ChatID:      ctx.EffectiveMessage.Chat.Id,
-		TgMessageID: ctx.EffectiveMessage.MessageId,
-		FromID:      userID,
-		Role:        geminiRoleUser,
-		Content:     cleanText,
-		Seq:         userSeq,
-		ReplyToSeq:  replySeq,
-		CreatedAt:   q.UnixTime{Time: now},
-	})
-	if err != nil {
-		return err
-	}
-	_ = g.Q.TouchGeminiSession(context.Background(), q.UnixTime{Time: now}, session.ID)
-
-	history, err := g.Q.ListGeminiMessages(context.Background(), session.ID, geminiHistoryLimit)
-	if err != nil {
-		return err
-	}
-	sysInst := fmt.Sprintf(`time:%s
-这里是一个Telegram聊天 type:%s,name:%s。
-对话历史使用紧凑的ID格式：[u数字]代表用户消息，[b数字->数字]代表机器人消息以及它回复的消息ID。ID格式为程序自动编号，不要在输出中包含该格式。
-保持中文回复，不要使用Markdown，直接给出答案。`, time.Now().Format("2006-01-02 15:04:05 -07:00"),
-		ctx.EffectiveMessage.Chat.Type, getChatName(&ctx.EffectiveMessage.Chat))
-	config := &genai.GenerateContentConfig{
-		SystemInstruction: genai.NewContentFromText(sysInst, genai.RoleModel),
-		Tools:             geminiTools(),
-	}
-
-	contents := compactGeminiHistory(history)
-	res, err := callGeminiWithRetry(genCtx, client, contents, config)
+	res, err := client.Models.GenerateContent(genCtx, geminiModel, session.ToGenaiContents(), config)
 	if err != nil {
 		_, _ = ctx.EffectiveMessage.SetReaction(bot, &gotgbot.SetMessageReactionOpts{
 			Reaction: []gotgbot.ReactionType{gotgbot.ReactionTypeEmoji{Emoji: "😭"}},
@@ -132,51 +247,8 @@ func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 		_, _ = ctx.EffectiveMessage.Reply(bot, fmt.Sprintf("error:%s", err), nil)
 		return err
 	}
-	replyText := strings.TrimSpace(res.Text())
-	botSeq := userSeq + 1
-	sentMsg, sendErr := ctx.EffectiveMessage.Reply(bot, replyText, nil)
-	if sendErr != nil {
-		return sendErr
-	}
-	now = time.Now()
-	_, err = g.Q.CreateGeminiMessage(context.Background(), q.CreateGeminiMessageParams{
-		SessionID:   session.ID,
-		ChatID:      ctx.EffectiveMessage.Chat.Id,
-		TgMessageID: sentMsg.MessageId,
-		FromID:      bot.Id,
-		Role:        geminiRoleModel,
-		Content:     replyText,
-		Seq:         botSeq,
-		ReplyToSeq:  sql.NullInt64{Int64: userSeq, Valid: true},
-		CreatedAt:   q.UnixTime{Time: now},
-	})
-	if err != nil {
-		log.Warnf("save gemini reply failed chat %d msg %d: %v", ctx.EffectiveMessage.Chat.Id, sentMsg.MessageId, err)
-	}
-	_ = g.Q.TouchGeminiSession(context.Background(), q.UnixTime{Time: now}, session.ID)
+	_, err = ctx.EffectiveMessage.Reply(bot, res.Text(), nil)
 	return err
-}
-
-func callGeminiWithRetry(ctx context.Context, client *genai.Client, contents []*genai.Content, config *genai.GenerateContentConfig) (*genai.GenerateContentResponse, error) {
-	var lastErr error
-	backoff := geminiBackoffBase
-	for i := 0; i < geminiMaxRetry; i++ {
-		res, err := client.Models.GenerateContent(ctx, geminiModel, contents, config)
-		if err == nil {
-			return res, nil
-		}
-		lastErr = err
-		if i == geminiMaxRetry-1 {
-			break
-		}
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		case <-time.After(backoff):
-		}
-		backoff *= 2
-	}
-	return nil, lastErr
 }
 
 func SetUserTimeZone(bot *gotgbot.Bot, ctx *ext.Context) error {

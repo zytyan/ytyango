@@ -42,26 +42,25 @@ type ChatStatDaily struct {
 	MsgIDAtTimeStart   TenMinuteStats `json:"msg_id_at_time_start"`
 }
 
-type GeminiMessage struct {
-	ID          int64         `json:"id"`
-	SessionID   int64         `json:"session_id"`
-	ChatID      int64         `json:"chat_id"`
-	TgMessageID int64         `json:"tg_message_id"`
-	FromID      int64         `json:"from_id"`
-	Role        string        `json:"role"`
-	Content     string        `json:"content"`
-	Seq         int64         `json:"seq"`
-	ReplyToSeq  sql.NullInt64 `json:"reply_to_seq"`
-	CreatedAt   UnixTime      `json:"created_at"`
+type GeminiContent struct {
+	SessionID    int64          `json:"session_id"`
+	ChatID       int64          `json:"chat_id"`
+	MsgID        int64          `json:"msg_id"`
+	Role         string         `json:"role"`
+	SentTime     UnixTime       `json:"sent_time"`
+	Username     string         `json:"username"`
+	MsgType      string         `json:"msg_type"`
+	ReplyToMsgID sql.NullInt64  `json:"reply_to_msg_id"`
+	Text         sql.NullString `json:"text"`
+	Blob         []byte         `json:"blob"`
+	MimeType     sql.NullString `json:"mime_type"`
 }
 
 type GeminiSession struct {
-	ID           int64    `json:"id"`
-	ChatID       int64    `json:"chat_id"`
-	StarterID    int64    `json:"starter_id"`
-	RootMsgID    int64    `json:"root_msg_id"`
-	StartedAt    UnixTime `json:"started_at"`
-	LastActiveAt UnixTime `json:"last_active_at"`
+	ID       int64  `json:"id"`
+	ChatID   int64  `json:"chat_id"`
+	ChatName string `json:"chat_name"`
+	ChatType string `json:"chat_type"`
 }
 
 type PicRateCounter struct {
