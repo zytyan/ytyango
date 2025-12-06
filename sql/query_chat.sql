@@ -22,7 +22,7 @@ VALUES (?,
         TRUE,
         FALSE,
         FALSE,
-        0)
+        28800)
 RETURNING *;
 
 -- name: updateChatCfg :exec

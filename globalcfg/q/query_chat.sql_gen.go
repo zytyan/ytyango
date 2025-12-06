@@ -223,7 +223,7 @@ VALUES (?,
         TRUE,
         FALSE,
         FALSE,
-        0)
+        28800)
 RETURNING id, web_id, auto_cvt_bili, auto_ocr, auto_calculate, auto_exchange, auto_check_adult, save_messages, enable_coc, resp_nsfw_msg, timezone
 `
 
