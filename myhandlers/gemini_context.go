@@ -156,9 +156,7 @@ func compactGeminiHistory(history []q.GeminiMessage) []*genai.Content {
 		}
 		label += "]"
 		user := g.Q.GetUserById(context.Background(), msg.FromID)
-		if user != nil {
-			label += fmt.Sprintf(`(name:%s) `, user.Name())
-		}
+		label += fmt.Sprintf("(name:%s)\n", user.Name())
 		contents = append(contents, genai.NewContentFromText(label+msg.Content, role))
 	}
 	return contents
