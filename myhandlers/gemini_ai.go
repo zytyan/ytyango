@@ -45,6 +45,9 @@ var geminiSessions struct {
 	s  map[int64]*GeminiSession
 }
 
+func init() {
+	geminiSessions.s = make(map[int64]*GeminiSession)
+}
 func databaseContentToGenaiPart(content *q.GeminiContent) (out *genai.Content) {
 	out = &genai.Content{}
 	label := fmt.Sprintf(`-start-label-
