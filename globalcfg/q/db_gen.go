@@ -27,6 +27,12 @@ func New(db DBTX) *Queries {
 func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	q := Queries{db: db}
 	var err error
+	if q.addGeminiMessageStmt, err = db.PrepareContext(ctx, addGeminiMessage); err != nil {
+		return nil, fmt.Errorf("error preparing query AddGeminiMessage: %w", err)
+	}
+	if q.createNewGeminiSessionStmt, err = db.PrepareContext(ctx, createNewGeminiSession); err != nil {
+		return nil, fmt.Errorf("error preparing query CreateNewGeminiSession: %w", err)
+	}
 	if q.delCocCharAttrStmt, err = db.PrepareContext(ctx, delCocCharAttr); err != nil {
 		return nil, fmt.Errorf("error preparing query DelCocCharAttr: %w", err)
 	}
@@ -47,6 +53,12 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	}
 	if q.getPrprCacheStmt, err = db.PrepareContext(ctx, getPrprCache); err != nil {
 		return nil, fmt.Errorf("error preparing query GetPrprCache: %w", err)
+	}
+	if q.getSessionByIdStmt, err = db.PrepareContext(ctx, getSessionById); err != nil {
+		return nil, fmt.Errorf("error preparing query GetSessionById: %w", err)
+	}
+	if q.getSessionIdByMessageStmt, err = db.PrepareContext(ctx, getSessionIdByMessage); err != nil {
+		return nil, fmt.Errorf("error preparing query GetSessionIdByMessage: %w", err)
 	}
 	if q.getYtDlpDbCacheStmt, err = db.PrepareContext(ctx, getYtDlpDbCache); err != nil {
 		return nil, fmt.Errorf("error preparing query GetYtDlpDbCache: %w", err)
@@ -86,6 +98,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	}
 	if q.createNewUserStmt, err = db.PrepareContext(ctx, createNewUser); err != nil {
 		return nil, fmt.Errorf("error preparing query createNewUser: %w", err)
+	}
+	if q.getAllMsgInSessionReversedStmt, err = db.PrepareContext(ctx, getAllMsgInSessionReversed); err != nil {
+		return nil, fmt.Errorf("error preparing query getAllMsgInSessionReversed: %w", err)
 	}
 	if q.getChatStatStmt, err = db.PrepareContext(ctx, getChatStat); err != nil {
 		return nil, fmt.Errorf("error preparing query getChatStat: %w", err)
@@ -131,6 +146,16 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 
 func (q *Queries) Close() error {
 	var err error
+	if q.addGeminiMessageStmt != nil {
+		if cerr := q.addGeminiMessageStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing addGeminiMessageStmt: %w", cerr)
+		}
+	}
+	if q.createNewGeminiSessionStmt != nil {
+		if cerr := q.createNewGeminiSessionStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing createNewGeminiSessionStmt: %w", cerr)
+		}
+	}
 	if q.delCocCharAttrStmt != nil {
 		if cerr := q.delCocCharAttrStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing delCocCharAttrStmt: %w", cerr)
@@ -164,6 +189,16 @@ func (q *Queries) Close() error {
 	if q.getPrprCacheStmt != nil {
 		if cerr := q.getPrprCacheStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing getPrprCacheStmt: %w", cerr)
+		}
+	}
+	if q.getSessionByIdStmt != nil {
+		if cerr := q.getSessionByIdStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getSessionByIdStmt: %w", cerr)
+		}
+	}
+	if q.getSessionIdByMessageStmt != nil {
+		if cerr := q.getSessionIdByMessageStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getSessionIdByMessageStmt: %w", cerr)
 		}
 	}
 	if q.getYtDlpDbCacheStmt != nil {
@@ -229,6 +264,11 @@ func (q *Queries) Close() error {
 	if q.createNewUserStmt != nil {
 		if cerr := q.createNewUserStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing createNewUserStmt: %w", cerr)
+		}
+	}
+	if q.getAllMsgInSessionReversedStmt != nil {
+		if cerr := q.getAllMsgInSessionReversedStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getAllMsgInSessionReversedStmt: %w", cerr)
 		}
 	}
 	if q.getChatStatStmt != nil {
@@ -338,6 +378,8 @@ type Queries struct {
 	SlowQueryThreshold             time.Duration
 	txID                           string
 	tx                             *sql.Tx
+	addGeminiMessageStmt           *sql.Stmt
+	createNewGeminiSessionStmt     *sql.Stmt
 	delCocCharAttrStmt             *sql.Stmt
 	getBiliInlineDataStmt          *sql.Stmt
 	getCocCharAllAttrStmt          *sql.Stmt
@@ -345,6 +387,8 @@ type Queries struct {
 	getNsfwPicByFileUidStmt        *sql.Stmt
 	getPicRateDetailsByFileUidStmt *sql.Stmt
 	getPrprCacheStmt               *sql.Stmt
+	getSessionByIdStmt             *sql.Stmt
+	getSessionIdByMessageStmt      *sql.Stmt
 	getYtDlpDbCacheStmt            *sql.Stmt
 	incYtDlUploadCountStmt         *sql.Stmt
 	insertBiliInlineDataStmt       *sql.Stmt
@@ -358,6 +402,7 @@ type Queries struct {
 	createChatStatDailyStmt        *sql.Stmt
 	createNewChatCfgDefaultStmt    *sql.Stmt
 	createNewUserStmt              *sql.Stmt
+	getAllMsgInSessionReversedStmt *sql.Stmt
 	getChatStatStmt                *sql.Stmt
 	getPicByRateAndRandKeyStmt     *sql.Stmt
 	getPicByRateFirstStmt          *sql.Stmt
@@ -380,6 +425,8 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		SlowQueryThreshold:             q.SlowQueryThreshold,
 		txID:                           fmt.Sprintf("%p", tx),
 		tx:                             tx,
+		addGeminiMessageStmt:           q.addGeminiMessageStmt,
+		createNewGeminiSessionStmt:     q.createNewGeminiSessionStmt,
 		delCocCharAttrStmt:             q.delCocCharAttrStmt,
 		getBiliInlineDataStmt:          q.getBiliInlineDataStmt,
 		getCocCharAllAttrStmt:          q.getCocCharAllAttrStmt,
@@ -387,6 +434,8 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		getNsfwPicByFileUidStmt:        q.getNsfwPicByFileUidStmt,
 		getPicRateDetailsByFileUidStmt: q.getPicRateDetailsByFileUidStmt,
 		getPrprCacheStmt:               q.getPrprCacheStmt,
+		getSessionByIdStmt:             q.getSessionByIdStmt,
+		getSessionIdByMessageStmt:      q.getSessionIdByMessageStmt,
 		getYtDlpDbCacheStmt:            q.getYtDlpDbCacheStmt,
 		incYtDlUploadCountStmt:         q.incYtDlUploadCountStmt,
 		insertBiliInlineDataStmt:       q.insertBiliInlineDataStmt,
@@ -400,6 +449,7 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		createChatStatDailyStmt:        q.createChatStatDailyStmt,
 		createNewChatCfgDefaultStmt:    q.createNewChatCfgDefaultStmt,
 		createNewUserStmt:              q.createNewUserStmt,
+		getAllMsgInSessionReversedStmt: q.getAllMsgInSessionReversedStmt,
 		getChatStatStmt:                q.getChatStatStmt,
 		getPicByRateAndRandKeyStmt:     q.getPicByRateAndRandKeyStmt,
 		getPicByRateFirstStmt:          q.getPicByRateFirstStmt,

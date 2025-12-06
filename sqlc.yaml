@@ -25,6 +25,7 @@ sql:
       - "sql/query_pics.sql"
       - "sql/query_user.sql"
       - "sql/query_ytdl.sql"
+      - "sql/query_gemini.sql"
     schema:
       - "sql/schema_bilibili.sql"
       - "sql/schema_chat.sql"
@@ -32,6 +33,7 @@ sql:
       - "sql/schema_pics.sql"
       - "sql/schema_user.sql"
       - "sql/schema_ytdl.sql"
+      - "sql/schema_gemini.sql"
     codegen:
     - out: globalcfg/q
       plugin: mygen
