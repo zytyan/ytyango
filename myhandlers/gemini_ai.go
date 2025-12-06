@@ -32,23 +32,27 @@ var getGenAiClient = sync.OnceValues(func() (*genai.Client, error) {
 const (
 	geminiSessionContentLimit = 100
 	geminiModel               = "gemini-2.5-flash-preview-09-2025"
+	geminiInterval            = time.Minute * 3
 )
 
 type GeminiSession struct {
 	q.GeminiSession
 	mu          sync.Mutex
 	Contents    []q.GeminiContent
-	TempContent sql.Null[q.GeminiContent]
+	TmpContents []q.GeminiContent
 	UpdateTime  time.Time
 }
 
 var geminiSessions struct {
 	mu sync.RWMutex
-	s  map[int64]*GeminiSession
+	// session id -> session ，这是一个缓存
+	sidToSess    map[int64]*GeminiSession
+	chatIdToSess map[int64]*GeminiSession
 }
 
 func init() {
-	geminiSessions.s = make(map[int64]*GeminiSession)
+	geminiSessions.sidToSess = make(map[int64]*GeminiSession)
+	geminiSessions.chatIdToSess = make(map[int64]*GeminiSession)
 }
 func databaseContentToGenaiPart(content *q.GeminiContent) (out *genai.Content) {
 	out = &genai.Content{}
@@ -76,23 +80,41 @@ type:%s
 	}
 	return
 }
+
 func (s *GeminiSession) ToGenaiContents() []*genai.Content {
 	contents := make([]*genai.Content, 0, len(s.Contents)+1)
 	for i := range s.Contents {
 		contents = append(contents, databaseContentToGenaiPart(&s.Contents[i]))
 	}
-	if s.TempContent.Valid {
-		contents = append(contents, databaseContentToGenaiPart(&s.TempContent.V))
+	for i := range s.TmpContents {
+		contents = append(contents, databaseContentToGenaiPart(&s.TmpContents[i]))
 	}
 	return contents
 }
 
-func (s *GeminiSession) AddTgMessage(bot *gotgbot.Bot, msg *gotgbot.Message, role genai.Role) (confirm func(), err error) {
+func (s *GeminiSession) AddTgMessage(bot *gotgbot.Bot, msg *gotgbot.Message) (err error) {
+	if msg == nil {
+		return nil
+	}
+	for i := range s.Contents {
+		if msg.MessageId == s.Contents[i].MsgID {
+			return nil
+		}
+	}
+	for i := range s.TmpContents {
+		if msg.MessageId == s.TmpContents[i].MsgID {
+			return nil
+		}
+	}
+	role := genai.RoleUser
+	if msg.GetSender().Id() == mainBot.Id {
+		role = genai.RoleModel
+	}
 	content := q.GeminiContent{
 		SessionID: s.ID,
 		ChatID:    msg.Chat.Id,
 		MsgID:     msg.MessageId,
-		Role:      string(role),
+		Role:      role,
 		SentTime:  q.UnixTime{Time: time.Unix(msg.Date, 0)},
 		Username:  msg.GetSender().Name(),
 	}
@@ -113,17 +135,16 @@ func (s *GeminiSession) AddTgMessage(bot *gotgbot.Bot, msg *gotgbot.Message, rol
 	if msg.Photo != nil {
 		data, err = h.GetFileBytes(bot, msg.Photo[len(msg.Photo)-1].FileId)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		content.MsgType = "photo"
-
 		content.Blob = data
 		content.MimeType.Valid = true
 		content.MimeType.String = "image/jpeg"
 	} else if msg.Sticker != nil {
 		data, err = h.GetFileBytes(bot, msg.Sticker.FileId)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		content.Blob = data
 		content.MsgType = "sticker"
@@ -134,13 +155,7 @@ func (s *GeminiSession) AddTgMessage(bot *gotgbot.Bot, msg *gotgbot.Message, rol
 			content.MimeType.String = "image/webp"
 		}
 	}
-	s.TempContent = sql.Null[q.GeminiContent]{V: content, Valid: true}
-	confirm = func() {
-		s.Contents = append(s.Contents, content)
-		s.UpdateTime = time.Now()
-		s.TempContent.Valid = false
-		_ = content.Save(context.Background(), g.Q)
-	}
+	s.TmpContents = append(s.TmpContents, content)
 	return
 }
 
@@ -151,6 +166,23 @@ func (s *GeminiSession) loadContentFromDatabase(ctx context.Context) error {
 	}
 	s.Contents = content
 	return nil
+}
+
+func (s *GeminiSession) PersistTmpUpdates(ctx context.Context) error {
+	Q, tx, err := g.NewTx()
+	if err != nil {
+		return err
+	}
+	for i := range s.TmpContents {
+		err = s.TmpContents[i].Save(ctx, Q)
+		if err != nil {
+			return err
+		}
+	}
+	s.Contents = append(s.Contents, s.TmpContents...)
+	s.TmpContents = nil
+	s.UpdateTime = time.Now()
+	return tx.Commit()
 }
 
 func IsGeminiReq(msg *gotgbot.Message) bool {
@@ -168,38 +200,46 @@ func IsGeminiReq(msg *gotgbot.Message) bool {
 }
 
 func GeminiGetSession(ctx context.Context, msg *gotgbot.Message) *GeminiSession {
-	session := geminiSessions.s[msg.Chat.Id]
-	if session != nil {
+	session := &GeminiSession{}
+	if msg.ReplyToMessage != nil {
+		sessionId, err := g.Q.GetSessionIdByMessage(ctx, msg.Chat.Id, msg.ReplyToMessage.MessageId)
+		geminiSessions.mu.Lock()
+		defer geminiSessions.mu.Unlock()
+		if err == nil {
+			if sess, ok := geminiSessions.sidToSess[sessionId]; ok {
+				return sess
+			}
+		}
+		session.GeminiSession, err = g.Q.GetSessionById(ctx, sessionId)
+		if err != nil {
+			return nil
+		}
+		err = session.loadContentFromDatabase(ctx)
+		if err != nil {
+			return nil
+		}
+		geminiSessions.sidToSess[sessionId] = session
+		geminiSessions.chatIdToSess[msg.Chat.Id] = session
 		return session
 	}
 	geminiSessions.mu.Lock()
 	defer geminiSessions.mu.Unlock()
-	session = geminiSessions.s[msg.Chat.Id]
-	if session != nil {
-		return session
-	}
-	var err error
-	session = &GeminiSession{}
-	if msg.ReplyToMessage != nil {
-		var sessionId int64
-		// 从被回复的消息中提取会话
-		sessionId, err = g.Q.GetSessionIdByMessage(ctx, msg.Chat.Id, msg.ReplyToMessage.MessageId)
-		if err != nil {
-			log.Infof("没有相关的Session，退出")
-			return nil
+	sess, ok := geminiSessions.chatIdToSess[msg.Chat.Id]
+	if ok {
+		if time.Now().Sub(sess.UpdateTime) < geminiInterval {
+			return sess
 		}
-		session.GeminiSession, err = g.Q.GetSessionById(ctx, sessionId)
-	} else {
-		session.GeminiSession, err = g.Q.CreateNewGeminiSession(ctx, msg.Chat.Id, getChatName(&msg.Chat), msg.Chat.Type)
+		delete(geminiSessions.sidToSess, sess.ID)
 	}
-	if err != nil {
-		return nil
-	}
+	delete(geminiSessions.chatIdToSess, msg.Chat.Id)
+	var err error
+	session.GeminiSession, err = g.Q.CreateNewGeminiSession(ctx, msg.Chat.Id, getChatName(&msg.Chat), msg.Chat.Type)
 	err = session.loadContentFromDatabase(ctx)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil
 	}
-	geminiSessions.s[msg.Chat.Id] = session
+	geminiSessions.sidToSess[session.ID] = session
+	geminiSessions.chatIdToSess[msg.Chat.Id] = session
 	return session
 }
 
@@ -237,7 +277,8 @@ func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 			{URLContext: &genai.URLContext{}},
 		},
 	}
-	confirm, err := session.AddTgMessage(bot, ctx.EffectiveMessage, genai.RoleUser)
+	err = session.AddTgMessage(bot, ctx.EffectiveMessage.ReplyToMessage)
+	err = session.AddTgMessage(bot, ctx.EffectiveMessage)
 	if err != nil {
 		return err
 	}
@@ -263,13 +304,11 @@ func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 		log.Warnf("genemi response: %s, error: %s", j, err2)
 		return err
 	}
-	confirm()
-	confirm, err = session.AddTgMessage(bot, respMsg, genai.RoleModel)
+	err = session.AddTgMessage(bot, respMsg)
 	if err != nil {
 		return err
 	}
-	confirm()
-	return err
+	return session.PersistTmpUpdates(genCtx)
 }
 
 func SetUserTimeZone(bot *gotgbot.Bot, ctx *ext.Context) error {
