@@ -27,6 +27,12 @@ func New(db DBTX) *Queries {
 func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	q := Queries{db: db}
 	var err error
+	if q.createGeminiMessageStmt, err = db.PrepareContext(ctx, createGeminiMessage); err != nil {
+		return nil, fmt.Errorf("error preparing query CreateGeminiMessage: %w", err)
+	}
+	if q.createGeminiSessionStmt, err = db.PrepareContext(ctx, createGeminiSession); err != nil {
+		return nil, fmt.Errorf("error preparing query CreateGeminiSession: %w", err)
+	}
 	if q.delCocCharAttrStmt, err = db.PrepareContext(ctx, delCocCharAttr); err != nil {
 		return nil, fmt.Errorf("error preparing query DelCocCharAttr: %w", err)
 	}
@@ -38,6 +44,18 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	}
 	if q.getCocCharAttrStmt, err = db.PrepareContext(ctx, getCocCharAttr); err != nil {
 		return nil, fmt.Errorf("error preparing query GetCocCharAttr: %w", err)
+	}
+	if q.getGeminiLastSeqStmt, err = db.PrepareContext(ctx, getGeminiLastSeq); err != nil {
+		return nil, fmt.Errorf("error preparing query GetGeminiLastSeq: %w", err)
+	}
+	if q.getGeminiMessageByTgMsgStmt, err = db.PrepareContext(ctx, getGeminiMessageByTgMsg); err != nil {
+		return nil, fmt.Errorf("error preparing query GetGeminiMessageByTgMsg: %w", err)
+	}
+	if q.getGeminiSessionByIDStmt, err = db.PrepareContext(ctx, getGeminiSessionByID); err != nil {
+		return nil, fmt.Errorf("error preparing query GetGeminiSessionByID: %w", err)
+	}
+	if q.getGeminiSessionByTgMsgStmt, err = db.PrepareContext(ctx, getGeminiSessionByTgMsg); err != nil {
+		return nil, fmt.Errorf("error preparing query GetGeminiSessionByTgMsg: %w", err)
 	}
 	if q.getNsfwPicByFileUidStmt, err = db.PrepareContext(ctx, getNsfwPicByFileUid); err != nil {
 		return nil, fmt.Errorf("error preparing query GetNsfwPicByFileUid: %w", err)
@@ -57,11 +75,17 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.insertBiliInlineDataStmt, err = db.PrepareContext(ctx, insertBiliInlineData); err != nil {
 		return nil, fmt.Errorf("error preparing query InsertBiliInlineData: %w", err)
 	}
+	if q.listGeminiMessagesStmt, err = db.PrepareContext(ctx, listGeminiMessages); err != nil {
+		return nil, fmt.Errorf("error preparing query ListGeminiMessages: %w", err)
+	}
 	if q.setCocCharAttrStmt, err = db.PrepareContext(ctx, setCocCharAttr); err != nil {
 		return nil, fmt.Errorf("error preparing query SetCocCharAttr: %w", err)
 	}
 	if q.setPrprCacheStmt, err = db.PrepareContext(ctx, setPrprCache); err != nil {
 		return nil, fmt.Errorf("error preparing query SetPrprCache: %w", err)
+	}
+	if q.touchGeminiSessionStmt, err = db.PrepareContext(ctx, touchGeminiSession); err != nil {
+		return nil, fmt.Errorf("error preparing query TouchGeminiSession: %w", err)
 	}
 	if q.updateBiliInlineMsgIdStmt, err = db.PrepareContext(ctx, updateBiliInlineMsgId); err != nil {
 		return nil, fmt.Errorf("error preparing query UpdateBiliInlineMsgId: %w", err)
@@ -131,6 +155,16 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 
 func (q *Queries) Close() error {
 	var err error
+	if q.createGeminiMessageStmt != nil {
+		if cerr := q.createGeminiMessageStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing createGeminiMessageStmt: %w", cerr)
+		}
+	}
+	if q.createGeminiSessionStmt != nil {
+		if cerr := q.createGeminiSessionStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing createGeminiSessionStmt: %w", cerr)
+		}
+	}
 	if q.delCocCharAttrStmt != nil {
 		if cerr := q.delCocCharAttrStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing delCocCharAttrStmt: %w", cerr)
@@ -149,6 +183,26 @@ func (q *Queries) Close() error {
 	if q.getCocCharAttrStmt != nil {
 		if cerr := q.getCocCharAttrStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing getCocCharAttrStmt: %w", cerr)
+		}
+	}
+	if q.getGeminiLastSeqStmt != nil {
+		if cerr := q.getGeminiLastSeqStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getGeminiLastSeqStmt: %w", cerr)
+		}
+	}
+	if q.getGeminiMessageByTgMsgStmt != nil {
+		if cerr := q.getGeminiMessageByTgMsgStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getGeminiMessageByTgMsgStmt: %w", cerr)
+		}
+	}
+	if q.getGeminiSessionByIDStmt != nil {
+		if cerr := q.getGeminiSessionByIDStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getGeminiSessionByIDStmt: %w", cerr)
+		}
+	}
+	if q.getGeminiSessionByTgMsgStmt != nil {
+		if cerr := q.getGeminiSessionByTgMsgStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getGeminiSessionByTgMsgStmt: %w", cerr)
 		}
 	}
 	if q.getNsfwPicByFileUidStmt != nil {
@@ -181,6 +235,11 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing insertBiliInlineDataStmt: %w", cerr)
 		}
 	}
+	if q.listGeminiMessagesStmt != nil {
+		if cerr := q.listGeminiMessagesStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing listGeminiMessagesStmt: %w", cerr)
+		}
+	}
 	if q.setCocCharAttrStmt != nil {
 		if cerr := q.setCocCharAttrStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing setCocCharAttrStmt: %w", cerr)
@@ -189,6 +248,11 @@ func (q *Queries) Close() error {
 	if q.setPrprCacheStmt != nil {
 		if cerr := q.setPrprCacheStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing setPrprCacheStmt: %w", cerr)
+		}
+	}
+	if q.touchGeminiSessionStmt != nil {
+		if cerr := q.touchGeminiSessionStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing touchGeminiSessionStmt: %w", cerr)
 		}
 	}
 	if q.updateBiliInlineMsgIdStmt != nil {
@@ -338,18 +402,26 @@ type Queries struct {
 	SlowQueryThreshold             time.Duration
 	txID                           string
 	tx                             *sql.Tx
+	createGeminiMessageStmt        *sql.Stmt
+	createGeminiSessionStmt        *sql.Stmt
 	delCocCharAttrStmt             *sql.Stmt
 	getBiliInlineDataStmt          *sql.Stmt
 	getCocCharAllAttrStmt          *sql.Stmt
 	getCocCharAttrStmt             *sql.Stmt
+	getGeminiLastSeqStmt           *sql.Stmt
+	getGeminiMessageByTgMsgStmt    *sql.Stmt
+	getGeminiSessionByIDStmt       *sql.Stmt
+	getGeminiSessionByTgMsgStmt    *sql.Stmt
 	getNsfwPicByFileUidStmt        *sql.Stmt
 	getPicRateDetailsByFileUidStmt *sql.Stmt
 	getPrprCacheStmt               *sql.Stmt
 	getYtDlpDbCacheStmt            *sql.Stmt
 	incYtDlUploadCountStmt         *sql.Stmt
 	insertBiliInlineDataStmt       *sql.Stmt
+	listGeminiMessagesStmt         *sql.Stmt
 	setCocCharAttrStmt             *sql.Stmt
 	setPrprCacheStmt               *sql.Stmt
+	touchGeminiSessionStmt         *sql.Stmt
 	updateBiliInlineMsgIdStmt      *sql.Stmt
 	updateChatStatDailyStmt        *sql.Stmt
 	updateYtDlpCacheStmt           *sql.Stmt
@@ -380,18 +452,26 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		SlowQueryThreshold:             q.SlowQueryThreshold,
 		txID:                           fmt.Sprintf("%p", tx),
 		tx:                             tx,
+		createGeminiMessageStmt:        q.createGeminiMessageStmt,
+		createGeminiSessionStmt:        q.createGeminiSessionStmt,
 		delCocCharAttrStmt:             q.delCocCharAttrStmt,
 		getBiliInlineDataStmt:          q.getBiliInlineDataStmt,
 		getCocCharAllAttrStmt:          q.getCocCharAllAttrStmt,
 		getCocCharAttrStmt:             q.getCocCharAttrStmt,
+		getGeminiLastSeqStmt:           q.getGeminiLastSeqStmt,
+		getGeminiMessageByTgMsgStmt:    q.getGeminiMessageByTgMsgStmt,
+		getGeminiSessionByIDStmt:       q.getGeminiSessionByIDStmt,
+		getGeminiSessionByTgMsgStmt:    q.getGeminiSessionByTgMsgStmt,
 		getNsfwPicByFileUidStmt:        q.getNsfwPicByFileUidStmt,
 		getPicRateDetailsByFileUidStmt: q.getPicRateDetailsByFileUidStmt,
 		getPrprCacheStmt:               q.getPrprCacheStmt,
 		getYtDlpDbCacheStmt:            q.getYtDlpDbCacheStmt,
 		incYtDlUploadCountStmt:         q.incYtDlUploadCountStmt,
 		insertBiliInlineDataStmt:       q.insertBiliInlineDataStmt,
+		listGeminiMessagesStmt:         q.listGeminiMessagesStmt,
 		setCocCharAttrStmt:             q.setCocCharAttrStmt,
 		setPrprCacheStmt:               q.setPrprCacheStmt,
+		touchGeminiSessionStmt:         q.touchGeminiSessionStmt,
 		updateBiliInlineMsgIdStmt:      q.updateBiliInlineMsgIdStmt,
 		updateChatStatDailyStmt:        q.updateChatStatDailyStmt,
 		updateYtDlpCacheStmt:           q.updateYtDlpCacheStmt,

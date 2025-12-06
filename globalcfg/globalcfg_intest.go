@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	_ "embed"
+	"fmt"
 	"log"
 	"main/globalcfg/q"
 	"os"
@@ -31,7 +32,13 @@ func initDatabaseInMemory(database *sql.DB) {
 			panic(err)
 		}
 		log.Printf("Executing: %s\n", name)
-		_, err = database.Exec(string(data))
+		if _, err = database.Exec(string(data)); err != nil {
+			if strings.Contains(err.Error(), "no such module: fts5") {
+				log.Printf("Skip %s: %s\n", name, err)
+				continue
+			}
+			panic(fmt.Errorf("execute %s failed: %w", name, err))
+		}
 	}
 }
 func init() {

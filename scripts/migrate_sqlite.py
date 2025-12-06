@@ -24,6 +24,7 @@ SCHEMA_FILES = [
     SQL_DIR / "schema_bilibili.sql",
     SQL_DIR / "schema_pics.sql",
     SQL_DIR / "schema_ytdl.sql",
+    SQL_DIR / "schema_gemini.sql",
 ]
 SAVED_MESSAGE_SCHEMA = SQL_DIR / "schema_saved_msg.sql"
 

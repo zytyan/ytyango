@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS saved_msgs
     qr_result  TEXT,
     UNIQUE (mongo_id),
     UNIQUE (peer_id, msg_id)
-) STRICT;
+);
 
 CREATE INDEX IF NOT EXISTS idx_saved_msgs_peer_date
     ON saved_msgs (peer_id, date DESC, id DESC);
@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS saved_msgs_fts_state
 (
     id                INTEGER PRIMARY KEY CHECK (id = 1),
     last_saved_msg_id INTEGER NOT NULL DEFAULT 0
-) WITHOUT ROWID, STRICT;
+) WITHOUT ROWID;
 
 INSERT INTO saved_msgs_fts_state (id, last_saved_msg_id)
 VALUES (1, 0)

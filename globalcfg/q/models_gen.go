@@ -42,6 +42,28 @@ type ChatStatDaily struct {
 	MsgIDAtTimeStart   TenMinuteStats `json:"msg_id_at_time_start"`
 }
 
+type GeminiMessage struct {
+	ID          int64         `json:"id"`
+	SessionID   int64         `json:"session_id"`
+	ChatID      int64         `json:"chat_id"`
+	TgMessageID int64         `json:"tg_message_id"`
+	FromID      int64         `json:"from_id"`
+	Role        string        `json:"role"`
+	Content     string        `json:"content"`
+	Seq         int64         `json:"seq"`
+	ReplyToSeq  sql.NullInt64 `json:"reply_to_seq"`
+	CreatedAt   UnixTime      `json:"created_at"`
+}
+
+type GeminiSession struct {
+	ID           int64    `json:"id"`
+	ChatID       int64    `json:"chat_id"`
+	StarterID    int64    `json:"starter_id"`
+	RootMsgID    int64    `json:"root_msg_id"`
+	StartedAt    UnixTime `json:"started_at"`
+	LastActiveAt UnixTime `json:"last_active_at"`
+}
+
 type PicRateCounter struct {
 	Rate  int64 `json:"rate"`
 	Count int64 `json:"count"`
