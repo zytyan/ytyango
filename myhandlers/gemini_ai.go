@@ -200,11 +200,11 @@ func IsGeminiReq(msg *gotgbot.Message) bool {
 }
 
 func GeminiGetSession(ctx context.Context, msg *gotgbot.Message) *GeminiSession {
-	geminiSessions.mu.Lock()
-	defer geminiSessions.mu.Unlock()
 	session := &GeminiSession{}
 	if msg.ReplyToMessage != nil {
 		sessionId, err := g.Q.GetSessionIdByMessage(ctx, msg.Chat.Id, msg.ReplyToMessage.MessageId)
+		geminiSessions.mu.Lock()
+		defer geminiSessions.mu.Unlock()
 		if err == nil {
 			if sess, ok := geminiSessions.sidToSess[sessionId]; ok {
 				return sess
@@ -226,6 +226,8 @@ func GeminiGetSession(ctx context.Context, msg *gotgbot.Message) *GeminiSession 
 		return session
 	}
 create:
+	geminiSessions.mu.Lock()
+	defer geminiSessions.mu.Unlock()
 	sess, ok := geminiSessions.chatIdToSess[msg.Chat.Id]
 	if ok {
 		if time.Now().Sub(sess.UpdateTime) < geminiInterval {
