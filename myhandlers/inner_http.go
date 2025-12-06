@@ -1,7 +1,7 @@
 package myhandlers
 
 import (
-	"encoding/json"
+	"errors"
 	"fmt"
 	g "main/globalcfg"
 	"net"
@@ -12,6 +12,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	json "github.com/json-iterator/go"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -164,27 +166,34 @@ func listAllRoutes(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write([]byte("GET /loggers\nPUT /loggers/<name>/<:level,int8>\n"))
 }
 
-func withLoggingAndRecovery(logger *zap.SugaredLogger, next http.Handler) http.Handler {
+func withLoggingAndRecovery(logger *zap.Logger, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		recorder := &statusRecorder{ResponseWriter: w}
 		start := time.Now()
+
 		defer func() {
 			if rec := recover(); rec != nil {
 				if recorder.status == 0 {
 					recorder.WriteHeader(http.StatusInternalServerError)
 				}
-				logger.Errorw("inner http panic", "panic", rec, "stack", string(debug.Stack()))
+				logger.Error("inner http panic",
+					zap.Any("panic", rec),
+					zap.ByteString("stack", debug.Stack()),
+				)
 			}
+
 			if recorder.status == 0 {
 				recorder.status = http.StatusOK
 			}
-			logger.Infow("inner http request",
-				"method", r.Method,
-				"path", r.URL.Path,
-				"status", recorder.status,
-				"duration", time.Since(start),
+
+			logger.Info("inner http request",
+				zap.String("method", r.Method),
+				zap.String("path", r.URL.Path),
+				zap.Int("status", recorder.status),
+				zap.Duration("duration", time.Since(start)),
 			)
 		}()
+
 		next.ServeHTTP(recorder, r)
 	})
 }
@@ -197,7 +206,7 @@ func pprofHandlers(mux *http.ServeMux) {
 	mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
 }
 
-func buildHandler(logger *zap.SugaredLogger) http.Handler {
+func buildHandler(logger *zap.Logger) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/mars-counter", marsCounter)
 	mux.HandleFunc("/dio-ban", dioBan)
@@ -222,22 +231,22 @@ func resolveInnerHTTPAddr(envValue string) (addr string, enabled bool) {
 }
 
 func HttpListen4019() {
-	logger := g.GetLogger("yt-dlp")
+	logger := g.GetLogger("inner-http")
 	addr, enabled := resolveInnerHTTPAddr(os.Getenv(innerHTTPEnvKey))
 	if !enabled {
 		logger.Infof("%s=OFF, inner http server disabled", innerHTTPEnvKey)
 		return
 	}
 
-	handler := buildHandler(logger)
+	handler := buildHandler(logger.Desugar())
 	server := &http.Server{
 		Addr:              addr,
 		Handler:           handler,
-		ReadHeaderTimeout: 5 * time.Second,
+		ReadHeaderTimeout: 3 * time.Second,
 	}
 
 	logger.Infof("inner http server listening on %s", addr)
-	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		logger.Fatalf("inner http server error: %s", err)
 	}
 }
