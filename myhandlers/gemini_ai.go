@@ -154,10 +154,10 @@ func (s *GeminiSession) loadContentFromDatabase(ctx context.Context) error {
 }
 
 func IsGeminiReq(msg *gotgbot.Message) bool {
-	if strings.HasPrefix(msg.Text, "/") {
+	if strings.HasPrefix(msg.GetText(), "/") {
 		return false
 	}
-	if strings.Contains(msg.Text, "@"+mainBot.Username) {
+	if strings.Contains(msg.GetText(), "@"+mainBot.Username) {
 		return true
 	}
 	if msg.ReplyToMessage != nil {
