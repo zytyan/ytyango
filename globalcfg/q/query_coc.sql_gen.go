@@ -57,8 +57,10 @@ func (q *Queries) GetCocCharAllAttr(ctx context.Context, userID int64) ([]GetCoc
 		)
 	}
 	rows, err := q.query(ctx, q.getCocCharAllAttrStmt, getCocCharAllAttr, userID)
-	if err != nil {
+	defer func() {
 		q.logQuery(getCocCharAllAttr, logFields, err, start)
+	}()
+	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
@@ -66,20 +68,16 @@ func (q *Queries) GetCocCharAllAttr(ctx context.Context, userID int64) ([]GetCoc
 	for rows.Next() {
 		var i GetCocCharAllAttrRow
 		if err = rows.Scan(&i.AttrName, &i.AttrValue); err != nil {
-			q.logQuery(getCocCharAllAttr, logFields, err, start)
 			return nil, err
 		}
 		items = append(items, i)
 	}
 	if err = rows.Close(); err != nil {
-		q.logQuery(getCocCharAllAttr, logFields, err, start)
 		return nil, err
 	}
 	if err = rows.Err(); err != nil {
-		q.logQuery(getCocCharAllAttr, logFields, err, start)
 		return nil, err
 	}
-	q.logQuery(getCocCharAllAttr, logFields, err, start)
 	return items, nil
 }
 

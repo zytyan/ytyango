@@ -7,6 +7,7 @@ package q
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
@@ -490,7 +491,7 @@ func (q *Queries) logQuery(query string, params []zap.Field, err error, start ti
 		q.logger.Warn("slow query", fields...)
 		return
 	}
-	if err != nil {
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		q.logger.Error("query failed", fields...)
 		return
 	}

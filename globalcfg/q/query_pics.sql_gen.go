@@ -66,8 +66,10 @@ func (q *Queries) GetPicRateDetailsByFileUid(ctx context.Context, fileUid string
 		)
 	}
 	rows, err := q.query(ctx, q.getPicRateDetailsByFileUidStmt, getPicRateDetailsByFileUid, fileUid)
-	if err != nil {
+	defer func() {
 		q.logQuery(getPicRateDetailsByFileUid, logFields, err, start)
+	}()
+	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
@@ -75,20 +77,16 @@ func (q *Queries) GetPicRateDetailsByFileUid(ctx context.Context, fileUid string
 	for rows.Next() {
 		var i GetPicRateDetailsByFileUidRow
 		if err = rows.Scan(&i.Rating, &i.Count); err != nil {
-			q.logQuery(getPicRateDetailsByFileUid, logFields, err, start)
 			return nil, err
 		}
 		items = append(items, i)
 	}
 	if err = rows.Close(); err != nil {
-		q.logQuery(getPicRateDetailsByFileUid, logFields, err, start)
 		return nil, err
 	}
 	if err = rows.Err(); err != nil {
-		q.logQuery(getPicRateDetailsByFileUid, logFields, err, start)
 		return nil, err
 	}
-	q.logQuery(getPicRateDetailsByFileUid, logFields, err, start)
 	return items, nil
 }
 
@@ -200,8 +198,10 @@ func (q *Queries) getPicRateCounts(ctx context.Context) ([]PicRateCounter, error
 		start = time.Now()
 	}
 	rows, err := q.query(ctx, q.getPicRateCountsStmt, getPicRateCounts)
-	if err != nil {
+	defer func() {
 		q.logQuery(getPicRateCounts, logFields, err, start)
+	}()
+	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
@@ -209,20 +209,16 @@ func (q *Queries) getPicRateCounts(ctx context.Context) ([]PicRateCounter, error
 	for rows.Next() {
 		var i PicRateCounter
 		if err = rows.Scan(&i.Rate, &i.Count); err != nil {
-			q.logQuery(getPicRateCounts, logFields, err, start)
 			return nil, err
 		}
 		items = append(items, i)
 	}
 	if err = rows.Close(); err != nil {
-		q.logQuery(getPicRateCounts, logFields, err, start)
 		return nil, err
 	}
 	if err = rows.Err(); err != nil {
-		q.logQuery(getPicRateCounts, logFields, err, start)
 		return nil, err
 	}
-	q.logQuery(getPicRateCounts, logFields, err, start)
 	return items, nil
 }
 

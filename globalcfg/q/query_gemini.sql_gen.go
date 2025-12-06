@@ -184,8 +184,10 @@ func (q *Queries) getAllMsgInSessionReversed(ctx context.Context, sessionID int6
 		)
 	}
 	rows, err := q.query(ctx, q.getAllMsgInSessionReversedStmt, getAllMsgInSessionReversed, sessionID, limit)
-	if err != nil {
+	defer func() {
 		q.logQuery(getAllMsgInSessionReversed, logFields, err, start)
+	}()
+	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
@@ -205,19 +207,15 @@ func (q *Queries) getAllMsgInSessionReversed(ctx context.Context, sessionID int6
 			&i.Blob,
 			&i.MimeType,
 		); err != nil {
-			q.logQuery(getAllMsgInSessionReversed, logFields, err, start)
 			return nil, err
 		}
 		items = append(items, i)
 	}
 	if err = rows.Close(); err != nil {
-		q.logQuery(getAllMsgInSessionReversed, logFields, err, start)
 		return nil, err
 	}
 	if err = rows.Err(); err != nil {
-		q.logQuery(getAllMsgInSessionReversed, logFields, err, start)
 		return nil, err
 	}
-	q.logQuery(getAllMsgInSessionReversed, logFields, err, start)
 	return items, nil
 }
