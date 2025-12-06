@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	geminiHistoryLimit = 12
+	geminiHistoryLimit = 120
 	geminiMentionTTL   = time.Minute
 	geminiBackoffBase  = time.Second
 	geminiMaxRetry     = 3
@@ -147,14 +147,18 @@ func compactGeminiHistory(history []q.GeminiMessage) []*genai.Content {
 		role := genai.Role(genai.RoleUser)
 		prefix := "u"
 		if msg.Role != geminiRoleUser {
-			role = genai.Role(genai.RoleModel)
+			role = genai.RoleModel
 			prefix = "b"
 		}
 		label := fmt.Sprintf("[%s%d", prefix, msg.Seq)
 		if msg.ReplyToSeq.Valid {
 			label += "->" + strconv.FormatInt(msg.ReplyToSeq.Int64, 10)
 		}
-		label += "] "
+		label += "]"
+		user := g.Q.GetUserById(context.Background(), msg.FromID)
+		if user != nil {
+			label += fmt.Sprintf(`(name:%s) `, user.Name())
+		}
 		contents = append(contents, genai.NewContentFromText(label+msg.Content, role))
 	}
 	return contents

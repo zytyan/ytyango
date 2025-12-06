@@ -114,7 +114,7 @@ func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 	}
 	sysInst := fmt.Sprintf(`time:%s
 这里是一个Telegram聊天 type:%s,name:%s。
-对话历史使用紧凑的ID格式：[u数字]代表用户消息，[b数字->数字]代表机器人消息以及它回复的消息ID。
+对话历史使用紧凑的ID格式：[u数字]代表用户消息，[b数字->数字]代表机器人消息以及它回复的消息ID。ID格式为程序自动编号，不要在输出中包含该格式。
 保持中文回复，不要使用markdown，直接给出答案。`, time.Now().Format("2006-01-02 15:04:05 -07:00"),
 		ctx.EffectiveMessage.Chat.Type, getChatName(&ctx.EffectiveMessage.Chat))
 	config := &genai.GenerateContentConfig{
