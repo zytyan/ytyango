@@ -1,0 +1,101 @@
+:root {
+	color-scheme: dark;
+	--bg: var(--tg-theme-bg-color, #0f1117);
+	--bg-soft: var(--tg-theme-secondary-bg-color, #151a23);
+	--card: var(--tg-theme-section-bg-color, #1c212c);
+	--text: var(--tg-theme-text-color, #f4f7fb);
+	--muted: var(--tg-theme-hint-color, #9aa3b5);
+	--accent: var(--tg-theme-link-color, #8bd3ff);
+	--accent-strong: var(--tg-theme-button-color, #f3c969);
+	--surface-border: var(--tg-theme-section-separator-color, #242b38);
+	--shadow: 0 14px 40px rgba(0, 0, 0, 0.35);
+	--radius-lg: 18px;
+	--radius-md: 12px;
+	--radius-sm: 8px;
+	--blur: blur(12px);
+}
+
+:root[data-theme='light'] {
+	color-scheme: light;
+	--bg: var(--tg-theme-bg-color, #f6f8fb);
+	--bg-soft: var(--tg-theme-secondary-bg-color, #e7ecf5);
+	--card: var(--tg-theme-section-bg-color, #ffffff);
+	--text: var(--tg-theme-text-color, #0f172a);
+	--muted: var(--tg-theme-hint-color, #606775);
+	--accent: var(--tg-theme-link-color, #2f7df4);
+	--accent-strong: var(--tg-theme-button-color, #f29e4c);
+	--surface-border: var(--tg-theme-section-separator-color, #d7e1ef);
+	--shadow: 0 18px 44px rgba(12, 21, 36, 0.12);
+}
+
+@media (prefers-color-scheme: light) {
+	:root:not([data-theme]) {
+		color-scheme: light;
+		--bg: var(--tg-theme-bg-color, #f6f8fb);
+		--bg-soft: var(--tg-theme-secondary-bg-color, #e7ecf5);
+		--card: var(--tg-theme-section-bg-color, #ffffff);
+		--text: var(--tg-theme-text-color, #0f172a);
+		--muted: var(--tg-theme-hint-color, #606775);
+		--accent: var(--tg-theme-link-color, #2f7df4);
+		--accent-strong: var(--tg-theme-button-color, #f29e4c);
+		--surface-border: var(--tg-theme-section-separator-color, #d7e1ef);
+		--shadow: 0 18px 44px rgba(12, 21, 36, 0.12);
+	}
+}
+
+:global(body) {
+	margin: 0;
+	background: radial-gradient(circle at 20% 20%, rgba(139, 211, 255, 0.06), transparent 28%),
+		radial-gradient(circle at 80% 10%, rgba(243, 201, 105, 0.07), transparent 22%),
+		var(--bg);
+	color: var(--text);
+	font-family: 'Manrope Variable', 'Manrope', 'Space Grotesk', 'SF Pro Display', system-ui, -apple-system, sans-serif;
+	min-height: 100vh;
+}
+
+:global(*) {
+	box-sizing: border-box;
+}
+
+:global(a) {
+	color: var(--accent);
+	text-decoration: none;
+}
+
+:global(button) {
+	font-family: inherit;
+}
+
+:global(.app-shell) {
+	max-width: 960px;
+	margin: 0 auto;
+	padding: 32px clamp(18px, 3vw, 28px) 48px;
+}
+
+:global(.glass) {
+	backdrop-filter: var(--blur);
+	-webkit-backdrop-filter: var(--blur);
+}
+
+:global(.pill) {
+	border-radius: 999px;
+	padding: 6px 12px;
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	background: rgba(255, 255, 255, 0.04);
+	color: var(--muted);
+	font-size: 12px;
+}
+
+:global(.sr-only) {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border-width: 0;
+}

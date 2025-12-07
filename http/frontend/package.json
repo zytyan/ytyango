@@ -1,0 +1,54 @@
+{
+	"name": "frontend",
+	"private": true,
+	"version": "0.0.1",
+	"type": "module",
+	"scripts": {
+		"dev": "vite dev",
+		"build": "vite build",
+		"preview": "vite preview",
+		"prepare": "svelte-kit sync || echo ''",
+		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
+		"lint": "svelte-kit sync && eslint .",
+		"test": "vitest run",
+		"test:coverage": "vitest run --coverage",
+		"gen:api": "openapi --input ../openapi.yaml --output src/lib/api --client fetch --useOptions --useUnionTypes",
+		"format": "prettier -w \"src/**/*.{ts,svelte,js,json,css,md}\""
+	},
+	"devDependencies": {
+		"@eslint/js": "^9.15.0",
+		"@sveltejs/adapter-static": "^3.0.5",
+		"@sveltejs/kit": "^2.48.5",
+		"@sveltejs/vite-plugin-svelte": "^6.2.1",
+		"@testing-library/jest-dom": "^6.6.3",
+		"@testing-library/svelte": "^5.2.7",
+		"@typescript-eslint/eslint-plugin": "^8.18.2",
+		"@typescript-eslint/parser": "^8.18.2",
+		"@vitest/coverage-v8": "^2.1.8",
+		"eslint": "^9.15.0",
+		"eslint-plugin-svelte": "^3.0.3",
+		"globals": "^15.14.0",
+		"jsdom": "^26.0.0",
+		"openapi-typescript-codegen": "^0.29.0",
+		"prettier": "^3.4.2",
+		"prettier-plugin-svelte": "^3.3.2",
+		"svelte": "^5.43.8",
+		"svelte-check": "^4.3.4",
+		"typescript": "^5.9.3",
+		"typescript-eslint": "^8.18.2",
+		"vite": "^7.2.2",
+		"vitest": "^2.1.8"
+	},
+	"overrides": {
+		"vitest": {
+			"vite": "^7.2.2"
+		},
+		"vite-node": {
+			"vite": "^7.2.2"
+		}
+	},
+	"dependencies": {
+		"@fontsource-variable/manrope": "^5.1.1"
+	}
+}
