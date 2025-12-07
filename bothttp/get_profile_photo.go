@@ -1,6 +1,7 @@
 package bothttp
 
 import (
+	"context"
 	"fmt"
 	"image"
 	_ "image/jpeg"
