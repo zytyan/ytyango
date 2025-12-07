@@ -125,14 +125,226 @@
 
 ## **9. 数据结构（Data Models / API 契约示例）**
 
-* **SearchRequest**：`{ "query": string, "page": int?, "pageSize": int? }`
-* **SearchResultItem**：`{ "id": string, "title": string, "snippet": string, "url": string }`
-* **UserInfoRequest**：`{ "userIds": [string], maxItems: 50 }`
-* **UserInfo**：`{ "id": string, "name": string, "username": string?, "avatarUrl": string? }`
-* **AvatarEndpoint**：`GET /users/{userId}/avatar?tgauth=token` → 二进制/redirect；401/403 on invalid tgauth。
+### 9.1 Telegram 验证方法
+```go
+
+type WebInitUser struct {
+	Id              int    `json:"id"`
+	FirstName       string `json:"first_name"`
+	LastName        string `json:"last_name"`
+	Username        string `json:"username"`
+	LanguageCode    string `json:"language_code"`
+	IsPremium       bool   `json:"is_premium"`
+	AllowsWriteToPm bool   `json:"allows_write_to_pm"`
+}
+
+type AuthInfo struct {
+	QueryId  string      `json:"query_id"`
+	User     WebInitUser `json:"user"`
+	AuthDate time.Time   `json:"auth_date"`
+	Hash     string      `json:"hash"`
+}
+
+func checkTelegramAuth(str string, verifyKey []byte) (res AuthInfo, err error) {
+	split := strings.Split(str, "&")
+	const hashPrefix = "hash"
+	recvHash := ""
+	data := make([]string, 0, len(split))
+	for _, v := range split {
+		key, value, _ := strings.Cut(v, "=")
+		if key == hashPrefix {
+			recvHash = value
+			continue
+		}
+		key, err1 := url.QueryUnescape(key)
+		value, err2 := url.QueryUnescape(value)
+		if err1 != nil || err2 != nil {
+			err = fmt.Errorf("url unescape err %v %v", err1, err2)
+			return
+		}
+		data = append(data, key+"="+value)
+	}
+	if recvHash == "" {
+		err = fmt.Errorf("no hash")
+		return
+	}
+
+	slices.Sort(data)
+	initData := []byte(strings.Join(data, "\n"))
+	mac := hmac.New(sha256.New, verifyKey)
+	mac.Write(initData)
+	calcHash := hex.EncodeToString(mac.Sum(nil))
+	if recvHash != calcHash {
+		err = fmt.Errorf("wrong recvHash calc=%s*** recv=%s", calcHash[:4], recvHash)
+		return
+	}
+	for _, v := range data {
+		key, value, _ := strings.Cut(v, "=")
+		switch key {
+		case "auth_date":
+			parseInt, err := strconv.ParseInt(value, 10, 64)
+			if err != nil {
+				return AuthInfo{}, err
+			}
+			res.AuthDate = time.Unix(parseInt, 0)
+		case "hash":
+			res.Hash = value
+		case "query_id":
+			res.QueryId = value
+		case "user":
+			var user WebInitUser
+			err = jsoniter.Unmarshal([]byte(value), &user)
+			if err != nil {
+				return
+			}
+			res.User = user
+		}
+	}
+	return
+}
+```
+验签密钥取自 `sha256.Sum256(botToken)`，调用端需传入未经重排的原始 querystring，避免再造假数据。
+### 9.2 数据结构
+#### 9.2.1 查找数据结构
+```go
+type SearchQuery struct {
+	Query string    `json:"q"`
+	InsID JsonInt64 `json:"ins_id"`
+	Page  int       `json:"page"`
+	Limit int       `json:"limit,omitempty"`
+}
+```
+其中，JsonInt64为字符串表示的数字，可支持int64类型
+#### 9.2.2 查找功能实现
+查找功能已经在老版本中实现，且无关路由类型，复用该代码。
+```go
+type SearchResult struct {
+	Hits []myhandlers.MeiliMsg `json:"hits"`
+
+	Query              string `json:"query"`
+	ProcessingTimeMs   int    `json:"processingTimeMs"`
+	Limit              int    `json:"limit"`
+	Offset             int    `json:"offset"`
+	EstimatedTotalHits int    `json:"estimatedTotalHits"`
+}
+
+type MeiliQuery struct {
+	Q      string   `json:"q"`
+	Filter string   `json:"filter"`
+	Limit  int      `json:"limit"`
+	Offset int      `json:"offset"`
+	Sort   []string `json:"sort"`
+}
+
+func meiliSearch(query SearchQuery) (SearchResult, error) {
+	var result SearchResult
+	searchUrl := g.GetConfig().MeiliConfig.GetSearchUrl()
+	chat, err := g.Q.GetChatByWebId(context.Background(), int64(query.InsID))
+	if chat == nil {
+		return result, GroupNotFound
+	}
+	limit := query.GetLimit()
+	meiliQuery := MeiliQuery{
+		Q:      query.Query,
+		Filter: "peer_id = " + strconv.FormatInt(chat.ID, 10),
+		Limit:  limit,
+		Offset: (query.Page - 1) * limit,
+		Sort:   []string{"date:desc"},
+	}
+	data, err := jsoniter.Marshal(meiliQuery)
+	if err != nil {
+		return result, err
+	}
+	preparedPost, err := http.NewRequest(http.MethodPost, searchUrl, bytes.NewReader(data))
+	if err != nil {
+		return result, err
+	}
+	preparedPost.Header.Set("Authorization", "Bearer "+g.GetConfig().MeiliConfig.MasterKey)
+	preparedPost.Header.Set("Content-Type", "application/json")
+	post, err := http.DefaultClient.Do(preparedPost)
+	if err != nil {
+		return result, err
+	}
+	defer post.Body.Close()
+	data, _ = io.ReadAll(post.Body)
+	log.Infof("search result %s", data)
+	err = jsoniter.Unmarshal(data, &result)
+	if err != nil {
+		return result, err
+	}
+	return result, nil
+}
+```
 
 ---
+#### 9.2.3 用户数据结构体
+用户结构体定义在 `globalcfg/q/models_gen.go:User`结构体中，但返回的数据中只需要 `User.Name()`，无需其他数据。
+* **UserInfoRequest**：`POST /users/info <Headers> {"user_ids":[1,2,3...]}`
+#### 9.2.4 用户头像
+* **AvatarEndpoint**：`GET /users/{userId}/avatar?tgauth=token` → 二进制/redirect；401/403 on invalid tgauth。
+由于用户头像可能需要bot动态下载，所以依然在此复用老代码。
+```go
+func webpConvert(in, out string) error {
+	// if out path not exists, create it
+	fp, err := os.Open(in)
+	if err != nil {
+		return err
+	}
+	defer fp.Close()
+	img, _, err := image.Decode(fp)
+	if err != nil {
+		return err
+	}
+	outFp, err := os.Create(out)
+	if err != nil {
+		return err
+	}
+	defer outFp.Close()
+	opt, err := encoder.NewLossyEncoderOptions(encoder.PresetDefault, 80)
+	if err != nil {
+		return err
+	}
+	err = webp.Encode(outFp, img, opt)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+func getUserProfilePhotoWebp(userId int64) (string, error) {
+	user := g.Q.GetUserById(context.Background(), userId)
+	if user == nil {
+		return "", UserNotFound
+	}
+	if !user.ProfilePhoto.Valid {
+		return "", UserNoProfilePhoto
+	}
+	photoPath := fmt.Sprintf("data/profile_photo/p_%s.webp", user.ProfilePhoto.String)
+	if fileExists(photoPath) {
+		return photoPath, nil
+	}
+	path, err := user.DownloadProfilePhoto(myhandlers.GetMainBot())
+	if err != nil {
+		return "", err
+	}
+	err = webpConvert(path, photoPath)
+	if err != nil {
+		return "", err
+	}
+	return photoPath, nil
+}
 
+// 由于该代码在历史中被删除，所以重新放到这里
+func (u *User) DownloadProfilePhoto(bot *gotgbot.Bot) (string, error) {
+	if !u.ProfilePhoto.Valid || u.ProfilePhoto.String == "" {
+		return "", errors.New("no profile photo")
+	}
+	file, err := bot.GetFile(u.ProfilePhoto.String, nil)
+	if err != nil {
+		return "", err
+	}
+	return file.FilePath, err
+}
+```
 ## **10. 里程碑（Milestones）**
 
 | 时间      | 目标                                |
