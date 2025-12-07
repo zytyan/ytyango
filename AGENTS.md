@@ -29,7 +29,9 @@ prd的样例参考`prd/example-telegram-marsbot.md`。
 3. **每次**生成prd后，都进行一次 `git commit`，在这之后可能有用户手动修改，但用户可能不会commit，修改后需要重新检查prd，并commit。
 4. 用户修改prd后，查看相关修改，并根据这些修改提出相应建议。
 5. 在prd基本确认后，为对应的prd生成一份markdown格式的todo清单，命名为 `prd-name-todo.md`。
-6. 每个prd及todo清单都应该持久化保存，不应该删除。
+6. 为便于review，每当完成阶段性任务时，应刷新todo列表并commit修改。
+7. 若实际情况与todo列表产生差异，不要删除todo项目，而是在该项目下新增子项目。
+8. 每个prd及todo清单都应该持久化保存，不应该删除。
 
 # 开发说明
 - Go 单模块项目，模块定义在 `go.mod`。
