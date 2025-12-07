@@ -145,7 +145,7 @@ components:
         ins_id:
           type: string
           description: Web chat id (stringified int64)
-          pattern: '^[0-9]+$'
+          pattern: '^-?[0-9]+$'
         page:
           type: integer
           format: int32

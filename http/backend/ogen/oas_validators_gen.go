@@ -76,7 +76,7 @@ func (s *SearchRequest) Validate() error {
 			MaxLengthSet:  false,
 			Email:         false,
 			Hostname:      false,
-			Regex:         regexMap["^[0-9]+$"],
+			Regex:         regexMap["^-?[0-9]+$"],
 			MinNumeric:    0,
 			MinNumericSet: false,
 			MaxNumeric:    0,
