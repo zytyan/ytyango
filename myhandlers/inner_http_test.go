@@ -13,7 +13,7 @@ import (
 
 func newTestServer() *httptest.Server {
 	logger := g.GetLogger("inner-http-test")
-	return httptest.NewServer(buildHandler(logger))
+	return httptest.NewServer(buildHandler(logger.Desugar()))
 }
 
 func TestMarsCounterSuccess(t *testing.T) {
