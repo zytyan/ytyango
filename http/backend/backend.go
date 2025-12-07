@@ -3,6 +3,8 @@ package backend
 import (
 	"crypto/hmac"
 	"crypto/sha256"
+	"log"
+	"net/http"
 
 	g "main/globalcfg"
 	api "main/http/backend/ogen"
@@ -34,4 +36,25 @@ func NewHandler(bot *gotgbot.Bot) *Handler {
 func NewServer(bot *gotgbot.Bot) (*api.Server, error) {
 	h := NewHandler(bot)
 	return api.NewServer(h, h)
+}
+
+func ListenAndServe(addr string, bot *gotgbot.Bot) error {
+	server, err := NewServer(bot)
+	if err != nil {
+		return err
+	}
+	err = http.ListenAndServe(addr, server)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func GoListenAndServe(addr string, bot *gotgbot.Bot) {
+	go func() {
+		err := ListenAndServe(addr, bot)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}()
 }

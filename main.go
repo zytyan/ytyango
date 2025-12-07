@@ -2,8 +2,8 @@ package main
 
 import (
 	"context"
-	"main/bothttp"
 	g "main/globalcfg"
+	"main/http/backend"
 	"main/myhandlers"
 	"net/http"
 	"os"
@@ -102,7 +102,7 @@ func main() {
 	myhandlers.SetMainBot(b)
 	myhandlers.StartChatStatScheduler()
 	g.Q.StartChatStatAutoSave(ctx, time.Minute)
-	go bothttp.Run()
+	backend.GoListenAndServe("127.0.0.1:4021", b)
 	go myhandlers.HttpListen4019()
 	dLog := log.Desugar()
 	dispatcher := GroupedDispatcher{Dispatcher: ext.NewDispatcher(&ext.DispatcherOpts{
