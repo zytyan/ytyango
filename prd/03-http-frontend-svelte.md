@@ -90,7 +90,7 @@
 | ---- | --------------------------------------------------------------------------- | --- |
 | FR-12 | 搜索接口调用 `/search`，附带 `X-Telegram-Init-Data`（或约定 header）以满足后端 `TgAuth`。 | 高  |
 | FR-13 | 批量用户信息接口 `/users/info` 可用于补全昵称/用户名；超时或错误时使用占位名称。                | 中  |
-| FR-14 | 头像接口 `/users/{userId}/avatar?tgauth=...`，失败时退回到首字母圆形背景。                      | 高  |
+| FR-14 | 头像接口 `/users/{userId}/avatar?tgauth=...`，失败时退回到首字母圆形背景。背景颜色基于用户ID进行随机选择，为亮色与暗色分别配置8个颜色。                      | 高  |
 | FR-15 | 请求客户端自动处理 base URL（支持环境变量配置）、错误包装与重试策略（简单重试 1 次即可）。               | 中  |
 
 ### **6.4 性能与部署**
@@ -125,10 +125,47 @@
 * 使用 SvelteKit + `adapter-static` 实现 SSG；大部分页面预渲染，搜索结果通过 CSR 触发数据获取。
 * 通过 `openapi-typescript-codegen`（或同类工具）从 `http/openapi.yaml` 生成 TS 客户端与类型，输出至 `src/lib/api`。
 * 封装 fetch 层，注入 base URL、认证 header（`X-Telegram-Init-Data`）与错误处理。
-* UI 基于暗色、卡片化设计，使用自定义 CSS 变量；图标可用本地 SVG，字体使用本地化无衬线字体。
+* UI 基于两种模式（亮色、暗色）、卡片化设计，使用自定义 CSS 变量；图标可用本地 SVG，字体使用本地化无衬线字体。
 * 头像拉取失败时回退到彩色字母背景；星标状态保存在前端（本地存储）即可，暂不落库。
 * 提供示例配置 `.env.example`（如 `VITE_API_BASE_URL`, `VITE_TG_AUTH`），用于本地开发与静态托管。
 * 测试使用 Vitest + @testing-library/svelte 覆盖关键组件；提供简单 mock 数据驱动渲染。
+HTML中必须包含telegram提供的脚本
+```html
+<script src="https://telegram.org/js/telegram-web-app.js?59"></script>
+```
+
+## 8.1 消息卡片
+为消息结果制作可复用的消息卡片，以svelte文件方式提供。
+
+## 8.2 背景
+由于telegram提供了css变量，应优先使用telegram的css变量。
+### ThemeParams
+
+Mini Apps can [adjust the appearance](https://core.telegram.org/bots/webapps#color-schemes) of the interface to match the Telegram user's app in real time. This object contains the user's current theme settings:
+
+| Field                     | Type   | Description                                                  |
+| :------------------------ | :----- | :----------------------------------------------------------- |
+| bg_color                  | String | *Optional*. Background color in the `#RRGGBB` format. Also available as the CSS variable `var(--tg-theme-bg-color)`. |
+| text_color                | String | *Optional*. Main text color in the `#RRGGBB` format. Also available as the CSS variable `var(--tg-theme-text-color)`. |
+| hint_color                | String | *Optional*. Hint text color in the `#RRGGBB` format. Also available as the CSS variable `var(--tg-theme-hint-color)`. |
+| link_color                | String | *Optional*. Link color in the `#RRGGBB` format. Also available as the CSS variable `var(--tg-theme-link-color)`. |
+| button_color              | String | *Optional*. Button color in the `#RRGGBB` format. Also available as the CSS variable `var(--tg-theme-button-color)`. |
+| button_text_color         | String | *Optional*. Button text color in the `#RRGGBB` format. Also available as the CSS variable `var(--tg-theme-button-text-color)`. |
+| secondary_bg_color        | String | *Optional*. Bot API 6.1+ Secondary background color in the `#RRGGBB` format. Also available as the CSS variable `var(--tg-theme-secondary-bg-color)`. |
+| header_bg_color           | String | *Optional*. Bot API 7.0+ Header background color in the `#RRGGBB` format. Also available as the CSS variable `var(--tg-theme-header-bg-color)`. |
+| bottom_bar_bg_color       | String | *Optional*. Bot API 7.10+ Bottom background color in the `#RRGGBB` format. Also available as the CSS variable `var(--tg-theme-bottom-bar-bg-color)`. |
+| accent_text_color         | String | *Optional*. Bot API 7.0+ Accent text color in the `#RRGGBB` format. Also available as the CSS variable `var(--tg-theme-accent-text-color)`. |
+| section_bg_color          | String | *Optional*. Bot API 7.0+ Background color for the section in the `#RRGGBB` format. It is recommended to use this in conjunction with *secondary_bg_color*. Also available as the CSS variable `var(--tg-theme-section-bg-color)`. |
+| section_header_text_color | String | *Optional*. Bot API 7.0+ Header text color for the section in the `#RRGGBB` format. Also available as the CSS variable `var(--tg-theme-section-header-text-color)`. |
+| section_separator_color   | String | *Optional*. Bot API 7.6+ Section separator color in the `#RRGGBB` format. Also available as the CSS variable `var(--tg-theme-section-separator-color)`. |
+| subtitle_text_color       | String | *Optional*. Bot API 7.0+ Subtitle text color in the `#RRGGBB` format. Also available as the CSS variable `var(--tg-theme-subtitle-text-color)`. |
+| destructive_text_color    | String | *Optional*. Bot API 7.0+ Text color for destructive actions in the `#RRGGBB` format. Also available as the CSS variable `var(--tg-theme-destructive-text-color)`. |
+
+
+
+由于部分测试场景可能不存在telegram提供的基础css变量，所以要为其配置一套默认亮色及暗色主题，使用css媒体查询获取主题。
+## 8.3 Telegram文档
+Telegram的MiniApp文档参考 https://core.telegram.org/bots/webapps
 
 ---
 
