@@ -32,6 +32,7 @@ prd的样例参考`prd/example-telegram-marsbot.md`。
 6. 为便于review，每当完成阶段性任务时，应刷新todo列表并commit修改。
 7. 若实际情况与todo列表产生差异，不要删除todo项目，而是在该项目下新增子项目。
 8. 每个prd及todo清单都应该持久化保存，不应该删除。
+9. 一切完成时，将修改同步到master分支，保留本分支的历史记录，只在master分支上新增一个commit节点。
 
 # 开发说明
 - Go 单模块项目，模块定义在 `go.mod`。
