@@ -25,7 +25,7 @@
 # 模型要求
 1. 当Agent基于新代码需求运行时，总是从当前位置新建一个分支，若当前仍有未保存的文件，则立刻commit一次后新建分支。
 2. 当有新需求时，**不要**立刻生成代码，而是在prd目录下生成新的基于markdown的产品需求文档。
-prd的样例参考`prd/00-example-telegram-marsbot.md`。
+prd的样例参考`prd/00-example-telegram-marsbot.md`。每当新增prd时，为其新增编号。
 3. **每次**生成prd后，都进行一次 `git commit`，在这之后可能有用户手动修改，但用户可能不会commit，修改后需要重新检查prd，并commit。
 4. 用户修改prd后，查看相关修改，并根据这些修改提出相应建议。
 5. 在prd基本确认后，为对应的prd生成一份markdown格式的todo清单，命名为 `prd-name-todo.md`。
