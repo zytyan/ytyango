@@ -16,10 +16,9 @@ import (
 )
 
 func (h *Handler) GetUserAvatar(ctx context.Context, params api.GetUserAvatarParams) (api.GetUserAvatarRes, error) {
-	if err := h.verifyTgAuth(params.Tgauth, params.UserId); err != nil {
-		return &api.GetUserAvatarForbidden{Message: err.Error()}, nil
+	if err := h.verifyTgAuth(params.Tgauth); err != nil {
+		return &api.GetUserAvatarUnauthorized{Message: err.Error()}, nil
 	}
-
 	path, err := h.getUserProfilePhotoWebp(ctx, params.UserId)
 	if err != nil {
 		switch {
@@ -51,18 +50,17 @@ func (h *Handler) getUserProfilePhotoWebp(ctx context.Context, userId int64) (st
 	if !user.ProfilePhoto.Valid || user.ProfilePhoto.String == "" {
 		return "", errUserNoPhoto
 	}
-	if err := os.MkdirAll("data/profile_photo", 0o755); err != nil {
-		return "", err
-	}
 	photoPath := fmt.Sprintf("data/profile_photo/p_%s.webp", user.ProfilePhoto.String)
 	if fileExists(photoPath) {
 		return photoPath, nil
 	}
-	bot := h.botProvider()
-	if bot == nil {
+	if h.bot == nil {
 		return "", errBotUnavailable
 	}
-	path, err := user.DownloadProfilePhoto(bot)
+	if err := os.MkdirAll("data/profile_photo", 0o755); err != nil {
+		return "", err
+	}
+	path, err := user.DownloadProfilePhoto(h.bot)
 	if err != nil {
 		return "", err
 	}

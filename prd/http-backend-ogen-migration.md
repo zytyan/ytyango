@@ -175,7 +175,7 @@ func checkTelegramAuth(str string, verifyKey []byte) (res AuthInfo, err error) {
 	mac.Write(initData)
 	calcHash := hex.EncodeToString(mac.Sum(nil))
 	if recvHash != calcHash {
-		err = fmt.Errorf("wrong recvHash calc=%s*** recv=%s", calcHash[:4], recvHash)
+		err = fmt.Errorf("wrong recvHash calc=%s recv=%s", calcHash, recvHash)
 		return
 	}
 	for _, v := range data {

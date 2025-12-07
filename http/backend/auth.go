@@ -1,10 +1,12 @@
 package backend
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	api "main/http/backend/ogen"
 	"net/url"
 	"slices"
 	"strconv"
@@ -62,7 +64,7 @@ func checkTelegramAuth(str string, verifyKey []byte) (res authInfo, err error) {
 	mac.Write(initData)
 	calcHash := hex.EncodeToString(mac.Sum(nil))
 	if recvHash != calcHash {
-		err = fmt.Errorf("wrong recvHash calc=%s*** recv=%s", calcHash[:4], recvHash)
+		err = fmt.Errorf("wrong recvHash calc=%s recv=%s", calcHash, recvHash)
 		return
 	}
 	for _, v := range data {
@@ -90,13 +92,14 @@ func checkTelegramAuth(str string, verifyKey []byte) (res authInfo, err error) {
 	return
 }
 
-func (h *Handler) verifyTgAuth(raw string, userID int64) error {
-	info, err := checkTelegramAuth(raw, h.verifyKey)
-	if err != nil {
-		return err
-	}
-	if userID > 0 && int64(info.User.Id) != userID {
-		return fmt.Errorf("tgauth user mismatch: expect %d got %d", userID, info.User.Id)
-	}
-	return nil
+func (h *Handler) verifyTgAuth(raw string) error {
+	_, err := checkTelegramAuth(raw, h.verifyKey)
+	return err
+}
+
+func (h *Handler) HandleTgAuth(ctx context.Context,
+	_ api.OperationName, t api.TgAuth) (context.Context, error) {
+	authData := t.GetAPIKey()
+	_, err := checkTelegramAuth(authData, h.verifyKey)
+	return ctx, err
 }

@@ -1146,12 +1146,19 @@ func (s *UserInfo) encodeFields(e *jx.Encoder) {
 			s.Username.Encode(e)
 		}
 	}
+	{
+		if s.Error.Set {
+			e.FieldStart("error")
+			s.Error.Encode(e)
+		}
+	}
 }
 
-var jsonFieldsNameOfUserInfo = [3]string{
+var jsonFieldsNameOfUserInfo = [4]string{
 	0: "id",
 	1: "name",
 	2: "username",
+	3: "error",
 }
 
 // Decode decodes UserInfo from json.
@@ -1196,6 +1203,16 @@ func (s *UserInfo) Decode(d *jx.Decoder) error {
 				return nil
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"username\"")
+			}
+		case "error":
+			if err := func() error {
+				s.Error.Reset()
+				if err := s.Error.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"error\"")
 			}
 		default:
 			return d.Skip()

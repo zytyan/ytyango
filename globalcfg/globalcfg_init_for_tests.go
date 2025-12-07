@@ -3,7 +3,6 @@ package g
 import (
 	"context"
 	"database/sql"
-	"log"
 	"main/globalcfg/q"
 	"os"
 	"path/filepath"
@@ -49,7 +48,6 @@ func initDatabaseInMemory(database *sql.DB) {
 		if err != nil {
 			panic(err)
 		}
-		log.Printf("Executing: %s\n", name)
 		_, err = database.Exec(string(data))
 	}
 }

@@ -530,11 +530,37 @@ func (s *SearchResult) SetEstimatedTotalHits(val int32) {
 
 func (*SearchResult) searchMessagesRes() {}
 
+type TgAuth struct {
+	APIKey string
+	Roles  []string
+}
+
+// GetAPIKey returns the value of APIKey.
+func (s *TgAuth) GetAPIKey() string {
+	return s.APIKey
+}
+
+// GetRoles returns the value of Roles.
+func (s *TgAuth) GetRoles() []string {
+	return s.Roles
+}
+
+// SetAPIKey sets the value of APIKey.
+func (s *TgAuth) SetAPIKey(val string) {
+	s.APIKey = val
+}
+
+// SetRoles sets the value of Roles.
+func (s *TgAuth) SetRoles(val []string) {
+	s.Roles = val
+}
+
 // Ref: #/components/schemas/UserInfo
 type UserInfo struct {
 	ID       int64        `json:"id"`
 	Name     string       `json:"name"`
 	Username OptNilString `json:"username"`
+	Error    OptNilString `json:"error"`
 }
 
 // GetID returns the value of ID.
@@ -552,6 +578,11 @@ func (s *UserInfo) GetUsername() OptNilString {
 	return s.Username
 }
 
+// GetError returns the value of Error.
+func (s *UserInfo) GetError() OptNilString {
+	return s.Error
+}
+
 // SetID sets the value of ID.
 func (s *UserInfo) SetID(val int64) {
 	s.ID = val
@@ -565,6 +596,11 @@ func (s *UserInfo) SetName(val string) {
 // SetUsername sets the value of Username.
 func (s *UserInfo) SetUsername(val OptNilString) {
 	s.Username = val
+}
+
+// SetError sets the value of Error.
+func (s *UserInfo) SetError(val OptNilString) {
+	s.Error = val
 }
 
 // Ref: #/components/schemas/UserInfoRequest

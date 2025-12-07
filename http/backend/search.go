@@ -3,6 +3,7 @@ package backend
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"io"
@@ -14,6 +15,7 @@ import (
 	"main/myhandlers"
 
 	jsoniter "github.com/json-iterator/go"
+	"go.uber.org/zap"
 )
 
 type searchQuery struct {
@@ -42,10 +44,6 @@ type meiliQuery struct {
 }
 
 func (h *Handler) SearchMessages(ctx context.Context, req *api.SearchRequest) (api.SearchMessagesRes, error) {
-	if err := req.Validate(); err != nil {
-		return &api.SearchMessagesBadRequest{Message: err.Error()}, nil
-	}
-
 	insID, err := strconv.ParseInt(req.InsID, 10, 64)
 	if err != nil {
 		return &api.SearchMessagesBadRequest{Message: "invalid ins_id"}, nil
@@ -54,7 +52,7 @@ func (h *Handler) SearchMessages(ctx context.Context, req *api.SearchRequest) (a
 	if page <= 0 {
 		page = 1
 	}
-	limit := clampLimit(int(req.Limit.Or(0)))
+	limit := int(req.Limit.Or(20))
 
 	res, err := h.meiliSearch(ctx, searchQuery{
 		Query: req.Q,
@@ -63,7 +61,7 @@ func (h *Handler) SearchMessages(ctx context.Context, req *api.SearchRequest) (a
 		Limit: limit,
 	})
 	if err != nil {
-		if errors.Is(err, errGroupNotFound) {
+		if errors.Is(err, sql.ErrNoRows) {
 			return &api.SearchMessagesBadRequest{Message: "group not found"}, nil
 		}
 		return &api.SearchMessagesInternalServerError{Message: err.Error()}, nil
@@ -77,11 +75,7 @@ func (h *Handler) meiliSearch(ctx context.Context, query searchQuery) (*api.Sear
 	if err != nil {
 		return nil, err
 	}
-	if chat == nil {
-		return nil, errGroupNotFound
-	}
-
-	limit := clampLimit(query.Limit)
+	limit := query.Limit
 	meiliPayload := meiliQuery{
 		Q:      query.Query,
 		Filter: "peer_id = " + strconv.FormatInt(chat.ID, 10),
@@ -112,7 +106,11 @@ func (h *Handler) meiliSearch(ctx context.Context, query searchQuery) (*api.Sear
 		return nil, err
 	}
 	if post.StatusCode < 200 || post.StatusCode >= 300 {
-		return nil, fmt.Errorf("search request failed: status=%d body=%s", post.StatusCode, string(body))
+		h.log.Error("status code not ok",
+			zap.Int("status_code", post.StatusCode),
+			zap.ByteString("body", body),
+		)
+		return nil, fmt.Errorf("search request failed: status=%d", post.StatusCode)
 	}
 
 	var result searchResult
@@ -145,14 +143,4 @@ func mapMeiliMsg(src myhandlers.MeiliMsg) api.MeiliMsg {
 		ImageText: api.NewOptString(src.ImageText),
 		QrResult:  api.NewOptString(src.QrResult),
 	}
-}
-
-func clampLimit(limit int) int {
-	if limit <= 0 {
-		return 20
-	}
-	if limit > 50 {
-		return 50
-	}
-	return limit
 }
