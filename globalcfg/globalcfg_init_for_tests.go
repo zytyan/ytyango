@@ -12,8 +12,28 @@ import (
 	"time"
 )
 
+func mustGetProjectRootDir() string {
+	current, err := os.Getwd()
+	if err != nil {
+		panic(err)
+	}
+	for {
+		parent := filepath.Dir(current)
+		modFile := filepath.Join(parent, "go.mod")
+		if stat, err := os.Stat(modFile); err == nil && !stat.IsDir() {
+			return parent
+		}
+		if current == "/" {
+			panic(modFile)
+		}
+		current = parent
+	}
+}
+
 func initDatabaseInMemory(database *sql.DB) {
-	dir, err := os.ReadDir("../sql")
+	projRoot := mustGetProjectRootDir()
+	sqlDir := filepath.Join(projRoot, "sql")
+	dir, err := os.ReadDir(sqlDir)
 	if err != nil {
 		panic(err)
 	}
@@ -25,7 +45,7 @@ func initDatabaseInMemory(database *sql.DB) {
 		if !strings.HasSuffix(name, ".sql") || !strings.HasPrefix(name, "schema_") {
 			continue
 		}
-		data, err := os.ReadFile(filepath.Join("../sql", name))
+		data, err := os.ReadFile(filepath.Join(sqlDir, name))
 		if err != nil {
 			panic(err)
 		}
