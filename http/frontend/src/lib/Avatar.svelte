@@ -24,7 +24,7 @@
         { bg: "#334155", fg: "#FFFFFF" },
 
         { bg: "#E5E7EB", fg: "#1F2937" }, // light gray + dark text
-    ] as const;
+    ];
 
     function simpleHash(str: string): number {
         let hash = 0;
@@ -36,7 +36,6 @@
         return Math.abs(hash);
     }
     let {bg, fg} = $derived(avatarColors[simpleHash(fallbackKey) % avatarColors.length]);
-
     let initial = $derived(name.charAt(0).toUpperCase());
     let showFallback = $state(true);
     let size = 48;
@@ -98,4 +97,5 @@
         align-items: center;
         justify-content: center;
     }
+
 </style>
