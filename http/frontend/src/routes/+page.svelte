@@ -1,10 +1,7 @@
-<script lang="ts">
+<script>
 	import Avatar from "$lib/Avatar.svelte";
-    import SearchBar from "$lib/SearchBar.svelte";
-    function onSearch(query: string){
-        console.log(query);
-    }
-</script>
+	import SearchBar from "$lib/SearchBar.svelte";
 
-<SearchBar {onSearch}></SearchBar>
-<Avatar src="https://i.pravatar.cc/300" name="Zest" fallbackKey="f12w23" />
+</script>
+<SearchBar/>
+<Avatar src="asdf" name="Test" fallbackKey="fjieo"/>
