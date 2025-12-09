@@ -4,6 +4,16 @@ pnpm-lock.yaml
 yarn.lock
 bun.lock
 bun.lockb
+/node_modules
 
 # Miscellaneous
 /static/
+
+#output
+.svelte-kit
+build
+
+#ide
+/.idea
+/.vscode
+/.gemini

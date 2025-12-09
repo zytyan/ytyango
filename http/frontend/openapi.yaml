@@ -7,7 +7,7 @@ info:
     Minimal HTTP backend exposing search, batch user info, and avatar retrieval.
     Requests and responses are fully defined here for ogen codegen.
 servers:
-  - url: http://localhost:8080
+  - url: https://tgapi.zchan.moe/api/v1
 paths:
   /search:
     post:
@@ -21,18 +21,18 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/SearchRequest"
+              $ref: '#/components/schemas/SearchRequest'
       responses:
-        "200":
+        '200':
           description: Search results
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SearchResult"
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "500":
-          $ref: "#/components/responses/InternalError"
+                $ref: '#/components/schemas/SearchResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
   /users/info:
     post:
       summary: Get basic info for multiple users
@@ -45,42 +45,42 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/UserInfoRequest"
+              $ref: '#/components/schemas/UserInfoRequest'
       responses:
-        "200":
+        '200':
           description: Batch user info
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/UserInfoResponse"
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "500":
-          $ref: "#/components/responses/InternalError"
+                $ref: '#/components/schemas/UserInfoResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
   /users/{userId}/avatar:
     get:
       summary: Get a user's avatar (webp)
       operationId: getUserAvatar
       tags: [users]
       parameters:
-        - $ref: "#/components/parameters/UserId"
-        - $ref: "#/components/parameters/TgAuth"
+        - $ref: '#/components/parameters/UserId'
+        - $ref: '#/components/parameters/TgAuth'
       responses:
-        "200":
+        '200':
           description: Avatar image in webp format
           content:
             image/webp:
               schema:
                 type: string
                 format: binary
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "403":
-          $ref: "#/components/responses/Forbidden"
-        "404":
-          $ref: "#/components/responses/NotFound"
-        "500":
-          $ref: "#/components/responses/InternalError"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
 components:
   parameters:
     UserId:
@@ -108,31 +108,31 @@ components:
       content:
         application/json:
           schema:
-            $ref: "#/components/schemas/Error"
+            $ref: '#/components/schemas/Error'
     Unauthorized:
       description: Missing or invalid authentication
       content:
         application/json:
           schema:
-            $ref: "#/components/schemas/Error"
+            $ref: '#/components/schemas/Error'
     Forbidden:
       description: Authentication failed
       content:
         application/json:
           schema:
-            $ref: "#/components/schemas/Error"
+            $ref: '#/components/schemas/Error'
     NotFound:
       description: Resource not found
       content:
         application/json:
           schema:
-            $ref: "#/components/schemas/Error"
+            $ref: '#/components/schemas/Error'
     InternalError:
       description: Internal server error
       content:
         application/json:
           schema:
-            $ref: "#/components/schemas/Error"
+            $ref: '#/components/schemas/Error'
   schemas:
     SearchRequest:
       type: object
@@ -145,7 +145,7 @@ components:
         ins_id:
           type: string
           description: Web chat id (stringified int64)
-          pattern: "^-?[0-9]+$"
+          pattern: '^-?[0-9]+$'
         page:
           type: integer
           format: int32
@@ -182,13 +182,12 @@ components:
           type: string
     SearchResult:
       type: object
-      required:
-        [hits, query, processingTimeMs, limit, offset, estimatedTotalHits]
+      required: [hits, query, processingTimeMs, limit, offset, estimatedTotalHits]
       properties:
         hits:
           type: array
           items:
-            $ref: "#/components/schemas/MeiliMsg"
+            $ref: '#/components/schemas/MeiliMsg'
         query:
           type: string
         processingTimeMs:
@@ -236,7 +235,7 @@ components:
         users:
           type: array
           items:
-            $ref: "#/components/schemas/UserInfo"
+            $ref: '#/components/schemas/UserInfo'
     Error:
       type: object
       required: [message]
