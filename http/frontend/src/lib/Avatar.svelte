@@ -37,7 +37,18 @@
 		return Math.abs(hash);
 	}
 	let { bg, fg } = $derived(avatarColors[simpleHash(fallbackKey) % avatarColors.length]);
-	let initial = $derived(name.charAt(0).toUpperCase());
+	const segmenter = new Intl.Segmenter('en', { granularity: 'grapheme' });
+
+	function firstGrapheme(str: string): string {
+		const it = segmenter.segment(str)[Symbol.iterator]().next();
+		let res = it.value?.segment ?? '';
+		if (/^a-z/.test(res)){
+			return res.toUpperCase();
+		}
+		return res;
+	}
+
+	let initial = $derived(firstGrapheme(name));
 	let showFallback = $state(true);
 	let size = 48;
 	function onLoad() {

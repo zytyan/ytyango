@@ -1,0 +1,11 @@
+name = "ytyango"
+compatibility_date = "2025-12-10"
+
+# Cloudflare Pages build 输出目录
+assets = { directory = "./build/" }
+
+# 禁用不需要的 workers.dev 测试域名
+workers_dev = false
+
+# 禁用不需要的 Preview URLs
+preview_urls = false

@@ -8,7 +8,7 @@
 		user: Deferred<string> | undefined;
 	};
 	let { message, user }: Props = $props();
-	let name = $state(``);
+	let name = $state('');
 	$effect(() => {
 		if (name == '') {
 			name = `U${message?.from_id ?? 0}`;
@@ -17,7 +17,8 @@
 			name = s;
 		});
 	});
-	let auth = window?.Telegram.WebApp.initData || 'noInitData';
+
+	let auth = encodeURIComponent(window?.Telegram.WebApp.initData || 'noInitData');
 	let time = $derived(dayjs((message?.date ?? 0) * 1000).format('YYYY-MM-DD HH:mm:ss'));
 </script>
 
@@ -30,7 +31,7 @@
 				fallbackKey={message.from_id}
 			/>
 			<div>
-				<div class="sender-name">U{message.from_id}</div>
+				<div class="sender-name">{name}</div>
 				<div class="send-time">{time}</div>
 			</div>
 		</div>
