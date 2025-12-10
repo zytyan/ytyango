@@ -2,19 +2,31 @@
 	import dayjs from 'dayjs';
 	import Avatar from './Avatar.svelte';
 	import type { MeiliMsg } from './api';
-	let prop = $props();
-	let message: MeiliMsg = prop.message;
+	import { baseUrl, type Deferred } from './api/search';
+	type Props = {
+		message: MeiliMsg;
+		user: Deferred<string> | undefined;
+	};
+	let { message, user }: Props = $props();
+	let name = $state(``);
+	$effect(() => {
+		if (name == '') {
+			name = `U${message?.from_id ?? 0}`;
+		}
+		user?.promise.then((s) => {
+			name = s;
+		});
+	});
 	let auth = window?.Telegram.WebApp.initData || 'noInitData';
-	let time = dayjs((message?.date ?? 0) * 1000).format('YYYY-MM-DD HH:mm:ss');
-	// TODO: 使用API获取人名
+	let time = $derived(dayjs((message?.date ?? 0) * 1000).format('YYYY-MM-DD HH:mm:ss'));
 </script>
 
 <div class="message-card">
 	<div class="message-header">
 		<div class="header-left">
 			<Avatar
-				src="/users/{message.from_id}/avatar?tgauth={auth}"
-				name="U{message.from_id}"
+				src="{baseUrl}/users/{message.from_id}/avatar?tgauth={auth}"
+				{name}
 				fallbackKey={message.from_id}
 			/>
 			<div>
@@ -24,7 +36,12 @@
 		</div>
 
 		<div style="display:flex; gap:10px; align-items:center;">
-			<div class="more-button">⋮</div>
+			<symbol id="material-symbols--chat-paste-go-outline-rounded" viewBox="0 0 24 24"
+				><path
+					fill="currentColor"
+					d="M18.175 18H15q-.425 0-.712-.288T14 17t.288-.712T15 16h3.175l-.875-.875q-.275-.3-.288-.712t.288-.713t.7-.3t.7.3l2.6 2.6q.3.3.3.7t-.3.7l-2.6 2.6q-.3.3-.7.3t-.7-.3t-.288-.712t.288-.713zM6 18l-2.15 2.15q-.25.25-.55.125T3 19.8V6q0-.825.588-1.412T5 4h12q.825 0 1.413.588T19 6v4q0 .425-.288.713T18 11t-.712-.288T17 10V6H5v10h6q.425 0 .713.288T12 17t-.288.713T11 18zm2-8h6q.425 0 .713-.288T15 9t-.288-.712T14 8H8q-.425 0-.712.288T7 9t.288.713T8 10m0 4h3q.425 0 .713-.288T12 13t-.288-.712T11 12H8q-.425 0-.712.288T7 13t.288.713T8 14m-3 2V6z"
+				/></symbol
+			>
 		</div>
 	</div>
 
@@ -47,7 +64,7 @@
 		position: relative;
 	}
 
-	/* 顶部行：头像 + 名字 + 时间 + 星标 + 三点 */
+	/* 顶部行：头像 + 名字 + 时间 + 三点 */
 	.message-header {
 		display: flex;
 		align-items: center;
@@ -73,15 +90,6 @@
 		color: var(--hint-color);
 		margin-top: 2px;
 	}
-
-	/* 三点菜单 */
-	.more-button {
-		color: var(--hint-color);
-		font-size: 20px;
-		cursor: pointer;
-		padding: 4px;
-	}
-
 	/* 消息正文 */
 	.message-body {
 		margin: 6px 0;

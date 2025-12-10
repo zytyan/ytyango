@@ -22,7 +22,7 @@ func (h *Handler) GetUsersInfo(ctx context.Context, req *api.UserInfoRequest) (a
 			apiUser.Error = api.NewOptNilString("user not found")
 			goto addUser
 		}
-		apiUser.Username = api.NewOptNilString(user.Name())
+		apiUser.Name = user.Name()
 	addUser:
 		users = append(users, apiUser)
 	}
