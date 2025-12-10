@@ -3,11 +3,23 @@
 	import Avatar from './Avatar.svelte';
 	import type { MeiliMsg } from './api';
 	import { baseUrl, type Deferred } from './api/search';
+	function getMsgLink(msg: MeiliMsg) {
+		if (!msg.peer_id || !msg.msg_id) {
+			return '';
+		}
+		console.log(msg);
+		if (msg.peer_id < -1000000000000) {
+			let id = -msg.peer_id - 1000000000000;
+			return `https://t.me/c/${id}/${msg.msg_id}`;
+		}
+		return '';
+	}
 	type Props = {
 		message: MeiliMsg;
 		user: Deferred<string> | undefined;
 	};
 	let { message, user }: Props = $props();
+	let link = $derived(getMsgLink(message));
 	let name = $state('');
 	$effect(() => {
 		if (name == '') {
@@ -20,8 +32,20 @@
 
 	let auth = encodeURIComponent(window?.Telegram.WebApp.initData || 'noInitData');
 	let time = $derived(dayjs((message?.date ?? 0) * 1000).format('YYYY-MM-DD HH:mm:ss'));
+	function onclick() {
+		console.log(link);
+		window?.Telegram.WebApp.openTelegramLink(link);
+	}
 </script>
 
+<svg style="display:none">
+	<symbol id="material-symbols--chat-paste-go-outline-rounded" viewBox="0 0 24 24">
+		<path
+			fill="currentColor"
+			d="M18.175 18H15q-.425 0-.712-.288T14 17t.288-.712T15 16h3.175l-.875-.875q-.275-.3-.288-.712t.288-.713t.7-.3t.7.3l2.6 2.6q.3.3.3.7t-.3.7l-2.6 2.6q-.3.3-.7.3t-.7-.3t-.288-.712t.288-.713zM6 18l-2.15 2.15q-.25.25-.55.125T3 19.8V6q0-.825.588-1.412T5 4h12q.825 0 1.413.588T19 6v4q0 .425-.288.713T18 11t-.712-.288T17 10V6H5v10h6q.425 0 .713.288T12 17t-.288.713T11 18zm2-8h6q.425 0 .713-.288T15 9t-.288-.712T14 8H8q-.425 0-.712.288T7 9t.288.713T8 10m0 4h3q.425 0 .713-.288T12 13t-.288-.712T11 12H8q-.425 0-.712.288T7 13t.288.713T8 14m-3 2V6z"
+		/>
+	</symbol>
+</svg>
 <div class="message-card">
 	<div class="message-header">
 		<div class="header-left">
@@ -36,14 +60,11 @@
 			</div>
 		</div>
 
-		<div style="display:flex; gap:10px; align-items:center;">
-			<symbol id="material-symbols--chat-paste-go-outline-rounded" viewBox="0 0 24 24"
-				><path
-					fill="currentColor"
-					d="M18.175 18H15q-.425 0-.712-.288T14 17t.288-.712T15 16h3.175l-.875-.875q-.275-.3-.288-.712t.288-.713t.7-.3t.7.3l2.6 2.6q.3.3.3.7t-.3.7l-2.6 2.6q-.3.3-.7.3t-.7-.3t-.288-.712t.288-.713zM6 18l-2.15 2.15q-.25.25-.55.125T3 19.8V6q0-.825.588-1.412T5 4h12q.825 0 1.413.588T19 6v4q0 .425-.288.713T18 11t-.712-.288T17 10V6H5v10h6q.425 0 .713.288T12 17t-.288.713T11 18zm2-8h6q.425 0 .713-.288T15 9t-.288-.712T14 8H8q-.425 0-.712.288T7 9t.288.713T8 10m0 4h3q.425 0 .713-.288T12 13t-.288-.712T11 12H8q-.425 0-.712.288T7 13t.288.713T8 14m-3 2V6z"
-				/></symbol
-			>
-		</div>
+		<button class="icon-btn" {onclick} title="goto message">
+			<svg class="icon">
+				<use href="#material-symbols--chat-paste-go-outline-rounded"></use>
+			</svg>
+		</button>
 	</div>
 
 	<div class="message-body">{message.message}</div>
@@ -108,5 +129,40 @@
 		color: var(--hint-color);
 		word-break: break-all;
 		overflow-wrap: anywhere;
+	}
+	.icon-btn {
+		all: unset; /* 彻底移除 button 默认样式 */
+		cursor: pointer;
+		position: relative;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+
+		width: 32px;
+		height: 32px;
+
+		border-radius: 50%;
+		background: rgba(255, 255, 255, 0.05); /* 轻微可视圆底，可调 */
+
+		transition: background 0.15s ease;
+		overflow: hidden; /* 水波纹溢出隐藏 */
+	}
+
+	.icon-btn:hover {
+		background: rgba(255, 255, 255, 0.1);
+	}
+
+	.icon {
+		width: 20px;
+		height: 20px;
+		fill: currentColor;
+		color: var(--text-color);
+	}
+
+	@keyframes ripple {
+		to {
+			transform: scale(2.5);
+			opacity: 0;
+		}
 	}
 </style>
