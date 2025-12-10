@@ -97,6 +97,8 @@
 		line-height: 1.45;
 		font-size: 15px;
 		color: var(--text-color);
+		word-break: break-all;
+		overflow-wrap: anywhere;
 	}
 
 	/* OCR 文本（灰色次级） */
@@ -104,5 +106,7 @@
 		margin-top: 4px;
 		font-size: 13px;
 		color: var(--hint-color);
+		word-break: break-all;
+		overflow-wrap: anywhere;
 	}
 </style>

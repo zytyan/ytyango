@@ -42,7 +42,7 @@
 	function firstGrapheme(str: string): string {
 		const it = segmenter.segment(str)[Symbol.iterator]().next();
 		let res = it.value?.segment ?? '';
-		if (/^a-z/.test(res)){
+		if (/^a-z/.test(res)) {
 			return res.toUpperCase();
 		}
 		return res;
