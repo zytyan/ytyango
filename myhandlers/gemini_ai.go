@@ -8,6 +8,7 @@ import (
 	g "main/globalcfg"
 	"main/globalcfg/h"
 	"main/globalcfg/q"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -247,10 +248,13 @@ create:
 
 func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 	client, err := getGenAiClient()
+	if slices.Contains([]int64{-1001471592463,-1001282155019,-1001126241898,-1001170816274}, ctx.EffectiveChat.Id) {
+		return nil
+	}
 	if err != nil {
 		return err
 	}
-	genCtx, cancel := context.WithTimeout(context.Background(), time.Second*15)
+	genCtx, cancel := context.WithTimeout(context.Background(), time.Second*120)
 	defer cancel()
 	session := GeminiGetSession(genCtx, ctx.EffectiveMessage)
 	if session == nil {
