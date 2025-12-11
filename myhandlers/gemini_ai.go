@@ -248,7 +248,7 @@ create:
 
 func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 	client, err := getGenAiClient()
-	if slices.Contains([]int64{-1001471592463,-1001282155019,-1001126241898,-1001170816274}, ctx.EffectiveChat.Id) {
+	if !slices.Contains([]int64{-1001471592463,-1001282155019,-1001126241898,-1001170816274}, ctx.EffectiveChat.Id) {
 		return nil
 	}
 	if err != nil {
