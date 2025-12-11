@@ -27,7 +27,7 @@ func (q *Queries) BuildCountByRatePrefixSum() error {
 	defer psMu.Unlock()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	counts, err := q.getPicRateCounts(ctx)
+	counts, err := q.listNsfwPicRateCounter(ctx)
 	if err != nil {
 		return err
 	}
@@ -90,9 +90,9 @@ func getRandomRangeByWeight(start, end int) (int, error) {
 
 func (q *Queries) GetPicByUserRate(ctx context.Context, rate int) (SavedPic, error) {
 	rnd := int64(rand.Uint64())
-	result, err := q.getPicByRateAndRandKey(ctx, int64(rate), rnd)
+	result, err := q.getNsfwPicByRateAndRandKey(ctx, int64(rate), rnd)
 	if errors.Is(err, sql.ErrNoRows) {
-		return q.getPicByRateFirst(ctx, int64(rate))
+		return q.getNsfwPicByRateFirst(ctx, int64(rate))
 	}
 	return result, err
 }
@@ -112,13 +112,12 @@ func (q *Queries) AddPic(ctx context.Context, fileUid, fileId string, botRate in
 	defer psMu.Unlock()
 	for i := 0; i < 3; i++ {
 		rnd := int64(rand.Uint64())
-		_, err := q.insertPic(ctx, insertPicParams{
-			FileUid:  fileUid,
-			FileID:   fileId,
-			BotRate:  int64(botRate),
-			RandKey:  rnd,
-			UserRate: int64(botRate),
-		})
+		_, err := q.createOrUpdateNsfwPic(ctx,
+			fileUid,
+			fileId,
+			int64(botRate),
+			rnd,
+		)
 
 		// RandKey 冲突 → 重试
 		var sErr *sqlite3.Error
@@ -136,9 +135,9 @@ func (q *Queries) AddPic(ctx context.Context, fileUid, fileId string, botRate in
 }
 
 func (q *Queries) RatePic(ctx context.Context, fileUid string, userID int64, newRate int64) (bool, int64, error) {
-	rate, err := q.getPicRateByUserId(ctx, fileUid, userID)
+	rate, err := q.getNsfwPicRateByUserId(ctx, fileUid, userID)
 	if errors.Is(err, sql.ErrNoRows) {
-		err = q.ratePic(ctx, fileUid, userID, newRate)
+		err = q.createNsfwPicUserRate(ctx, fileUid, userID, newRate)
 		return false, 0, err
 	} else if err != nil {
 		return false, 0, err
@@ -146,6 +145,6 @@ func (q *Queries) RatePic(ctx context.Context, fileUid string, userID int64, new
 	if rate == newRate {
 		return true, rate, nil
 	}
-	err = q.updatePicRate(ctx, newRate, fileUid, userID)
+	err = q.updateNsfwPicUserRate(ctx, newRate, fileUid, userID)
 	return true, rate, err
 }

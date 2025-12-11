@@ -1,17 +1,24 @@
 -- encoding: utf-8
 
-CREATE TABLE IF NOT EXISTS saved_pics
+CREATE TABLE saved_pics
 (
     file_uid        TEXT    NOT NULL,
-    file_id         TEXT    NOT NULL, --插入时，若file_uid相同，则更新file_id
-    bot_rate        INTEGER NOT NULL, -- 目前为[-1,7]的整数，-1时相当于删除
+    file_id         TEXT    NOT NULL, -- 插入时，若 file_uid 相同，则更新 file_id
+    bot_rate        INTEGER NOT NULL, -- 目前为 [-1,7] 的整数，-1 时相当于删除
     rand_key        INTEGER NOT NULL,
-    user_rate       INTEGER NOT NULL, -- 用户的评分，默认是bot的评分
+    -- user_rate 为生成列：有评分时为平均分；否则回退到 bot_rate
+    user_rate       INTEGER NOT NULL GENERATED ALWAYS AS (
+        CASE
+            WHEN rate_user_count > 0
+                THEN CAST(ROUND(user_rating_sum * 1.0 / rate_user_count) AS INTEGER)
+            ELSE bot_rate
+        END
+    ) STORED,
     user_rating_sum INTEGER NOT NULL DEFAULT 0,
     rate_user_count INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (file_uid),
     UNIQUE (user_rate, rand_key),
-    UNIQUE (rand_key)                 -- 再加一个rand_key自身的索引，确保user_rate变动时不会非常不巧碰上另一个unique
+    UNIQUE (rand_key)                 -- 确保 rand_key 自身唯一
 ) WITHOUT ROWID, STRICT;
 
 
@@ -31,12 +38,7 @@ CREATE TRIGGER IF NOT EXISTS saved_pics_rating_insert_trigger
 BEGIN
     UPDATE saved_pics
     SET user_rating_sum = user_rating_sum + new.rating,
-        rate_user_count = rate_user_count + 1,
-        user_rate       = CASE
-                              WHEN rate_user_count + 1 > 0
-                                  THEN CAST(ROUND((user_rating_sum + new.rating) * 1.0 / (rate_user_count + 1)) AS INTEGER)
-                              ELSE user_rate
-            END
+        rate_user_count = rate_user_count + 1
     WHERE file_uid = new.file_uid;
 END;
 
@@ -45,12 +47,7 @@ CREATE TRIGGER IF NOT EXISTS saved_pics_rating_update_trigger
     ON saved_pics_rating
 BEGIN
     UPDATE saved_pics
-    SET user_rating_sum = user_rating_sum - old.rating + new.rating,
-        user_rate       = CASE
-                              WHEN rate_user_count > 0
-                                  THEN CAST(ROUND((user_rating_sum - old.rating + new.rating) * 1.0 / rate_user_count) AS INTEGER)
-                              ELSE user_rate
-            END
+    SET user_rating_sum = user_rating_sum - old.rating + new.rating
     WHERE file_uid = old.file_uid;
 END;
 
@@ -60,12 +57,7 @@ CREATE TRIGGER IF NOT EXISTS saved_pics_rating_delete_trigger
 BEGIN
     UPDATE saved_pics
     SET user_rating_sum = user_rating_sum - old.rating,
-        rate_user_count = rate_user_count - 1,
-        user_rate       = CASE
-                              WHEN rate_user_count - 1 > 0
-                                  THEN CAST(ROUND((user_rating_sum - old.rating) * 1.0 / (rate_user_count - 1)) AS INTEGER)
-                              ELSE bot_rate -- 用户评分清空后回到 bot_rate
-            END
+        rate_user_count = rate_user_count - 1
     WHERE file_uid = old.file_uid;
 END;
 

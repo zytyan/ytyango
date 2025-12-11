@@ -30,7 +30,7 @@ func BuildNsfwRateButton(fileUid, extraCmd string) *gotgbot.InlineKeyboardMarkup
 		return fmt.Sprintf("%s (%d 用户评分)", s, count)
 	}
 	var rateTable [8]int64
-	rateList, err := g.Q.GetPicRateDetailsByFileUid(context.Background(), fileUid)
+	rateList, err := g.Q.ListNsfwPicUserRatesByFileUid(context.Background(), fileUid)
 	if err == nil {
 		for _, rate := range rateList {
 			if rate.Rating >= 8 || rate.Rating < 0 {
