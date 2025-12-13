@@ -24,6 +24,8 @@ func initByConfig() {
 	if err != nil {
 		panic(err)
 	}
+	// 设定50ms为慢查询的基线，这对嵌入式的SQLite算是慢的了，说明可能有性能抖动或查询本身有问题。
+	Q.SlowQueryThreshold = time.Millisecond * 50
 	err = Q.BuildCountByRatePrefixSum()
 	if err != nil {
 		panic(err)
@@ -38,6 +40,7 @@ func initByConfig() {
 	if err != nil {
 		panic(err)
 	}
+	Msgs.SlowQueryThreshold = time.Millisecond * 50
 	logger.Infof("Database msgs initialized")
 }
 
