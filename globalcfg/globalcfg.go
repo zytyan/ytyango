@@ -2,6 +2,7 @@ package g
 
 import (
 	"database/sql"
+	"main/globalcfg/msgs"
 	"main/globalcfg/q"
 	"main/helpers/azure"
 	"os"
@@ -41,6 +42,7 @@ type Config struct {
 	TmpPath            string      `yaml:"tmp-path"`
 	DatabasePath       string      `yaml:"database-path"`
 	GeminiKey          string      `yaml:"gemini-key"`
+	MsgDbPath          string      `yaml:"msg-db-path"`
 }
 
 var Ocr *azure.Ocr
@@ -137,7 +139,10 @@ func GetAllLoggers() map[string]LoggerWithLevel {
 }
 
 var db *sql.DB
+var msgDb *sql.DB
+
 var Q *q.Queries
+var Msgs *msgs.Queries
 
 func initDatabase(dbPath string) *sql.DB {
 	check := func(_ sql.Result, e error) {
@@ -154,15 +159,15 @@ func initDatabase(dbPath string) *sql.DB {
 						PRAGMA synchronous=NORMAL;
 						PRAGMA mmap_size=67108864; -- 64MB
 						PRAGMA cache_size = -32768; -- 32MB page cache
-						PRAGMA busy_timeout=5000;`,
-	))
+						PRAGMA busy_timeout=5000;
+						PRAGMA optimize;`))
 	return d
 }
 
-func NewTx() (*q.Queries, *sql.Tx, error) {
-	tx, err := db.Begin()
-	if err != nil {
-		return nil, nil, err
-	}
-	return Q.WithTx(tx), tx, nil
+func RawMainDb() *sql.DB {
+	return db
+}
+
+func RawMsgsDb() *sql.DB {
+	return msgDb
 }

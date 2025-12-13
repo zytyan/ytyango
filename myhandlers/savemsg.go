@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	g "main/globalcfg"
 	"main/globalcfg/h"
@@ -47,8 +48,17 @@ func SaveMessage(bot *gotgbot.Bot, ctx *ext.Context) error {
 		if err := UpdateUser(bot, ctx); err != nil {
 			log.Errorf("save user error %s, update id %d", err, ctx.Update.UpdateId)
 		}
-		err := saveMessage(bot, ctx)
-		if err != nil {
+		msg := ctx.EffectiveMessage
+		if msg == nil {
+			return
+		}
+		if shouldPersistMessages(ctx) {
+			if err := persistSavedMessage(ctx, msg); err != nil {
+				log.Warnf("persist saved message error %s, update id %d", err, ctx.Update.UpdateId)
+			}
+			persistRawUpdate(ctx)
+		}
+		if err := saveMessage(bot, ctx, msg); err != nil {
 			log.Errorf("save message error %s, update id %d", err, ctx.Update.UpdateId)
 		}
 	}()
@@ -77,26 +87,26 @@ func setImageText(bot *gotgbot.Bot, msg *gotgbot.Message, meili *MeiliMsg) error
 	return err
 }
 
-func saveMessage(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
-	if ctx.Message == nil {
+func saveMessage(bot *gotgbot.Bot, ctx *ext.Context, msg *gotgbot.Message) (err error) {
+	if msg == nil {
 		return nil
 	}
-	if !h.ChatSaveMessages(ctx.EffectiveChat.Id) {
+	if !shouldPersistMessages(ctx) {
 		return nil
 	}
 	mongoId := snowflakeNode().Generate().Base32()
 	meiliMsg := &MeiliMsg{
 		MongoId:   mongoId,
 		PeerId:    ctx.EffectiveChat.Id,
-		FromId:    ctx.EffectiveSender.User.Id,
-		MsgId:     ctx.EffectiveMessage.MessageId,
-		Date:      float64(ctx.Message.Date),
+		FromId:    getSenderID(ctx, msg),
+		MsgId:     msg.MessageId,
+		Date:      float64(msg.Date),
 		Message:   getText(ctx),
 		ImageText: "",
 		QrResult:  "",
 	}
 	if cfg, err := g.Q.ChatCfgById(context.Background(), ctx.EffectiveChat.Id); err == nil && cfg.AutoOcr {
-		err = setImageText(bot, ctx.Message, meiliMsg)
+		err = setImageText(bot, msg, meiliMsg)
 		if err != nil {
 			log.Warnf("set image text error %s, update id %d", err, ctx.Update.UpdateId)
 		}
@@ -133,4 +143,49 @@ func saveMessage(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
 		log.Debugf("post to meili %s, update id %d", data, ctx.Update.UpdateId)
 	}
 	return err
+}
+
+func shouldPersistMessages(ctx *ext.Context) bool {
+	cfg := g.GetConfig()
+	if cfg == nil || !cfg.SaveMessage {
+		return false
+	}
+	if ctx == nil || ctx.EffectiveChat == nil {
+		return false
+	}
+	return h.ChatSaveMessages(ctx.EffectiveChat.Id)
+}
+
+func persistSavedMessage(ctx *ext.Context, msg *gotgbot.Message) error {
+	if g.Msgs == nil {
+		return errors.New("msgs querier is nil")
+	}
+	if ctx != nil && ctx.Update != nil && (ctx.Update.EditedMessage != nil || ctx.Update.EditedChannelPost != nil) {
+		return g.Msgs.SaveEditedMsg(msg)
+	}
+	return g.Msgs.SaveNewMsg(msg)
+}
+
+func persistRawUpdate(ctx *ext.Context) {
+	if g.Msgs == nil {
+		return
+	}
+	if err := g.Msgs.SaveRawUpdate(ctx); err != nil {
+		log.Warnf("save raw update failed: %s", err)
+	}
+}
+
+func getSenderID(ctx *ext.Context, msg *gotgbot.Message) int64 {
+	if ctx != nil && ctx.EffectiveSender != nil {
+		return ctx.EffectiveSender.Id()
+	}
+	if msg != nil {
+		if msg.From != nil {
+			return msg.From.Id
+		}
+		if msg.SenderChat != nil {
+			return msg.SenderChat.Id
+		}
+	}
+	return 0
 }

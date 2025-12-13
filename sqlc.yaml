@@ -16,6 +16,12 @@ overrides:
         nullable: false
         go_type:
           type: "bool"
+      - db_type: "JSON_TEXT"
+        engine: "sqlite"
+        nullable: true
+        go_type:
+          type: "NullString"
+          import: "database/sql"
 sql:
   - engine: "sqlite"
     queries:
@@ -60,6 +66,12 @@ sql:
           nullable: false
           go_type:
             type: "bool"
+        - db_type: "JSON_TEXT"
+          engine: "sqlite"
+          nullable: true
+          go_type:
+            type: "NullString"
+            import: "database/sql"
         - db_type: "BLOB_USER_TO_CNT"
           engine: "sqlite"
           go_type:
@@ -94,3 +106,18 @@ sql:
               engine: "sqlite"
               go_type:
                 type: "UnixTime"
+            - db_type: "INT_UNIX_SEC"
+              engine: "sqlite"
+              nullable: true
+              go_type:
+                type: "Null[UnixTime]"
+                import: "database/sql"
+            - db_type: "JSON_TEXT"
+              engine: "sqlite"
+              go_type:
+                type: "[]byte"
+            - db_type: "JSON_TEXT"
+              engine: "sqlite"
+              nullable: true
+              go_type:
+                type: '[]byte'

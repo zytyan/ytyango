@@ -2,6 +2,7 @@ package g
 
 import (
 	"context"
+	"main/globalcfg/msgs"
 	"main/globalcfg/q"
 	"testing"
 	"time"
@@ -35,10 +36,14 @@ func init() {
 	gWriteSyncer = initWriteSyncer()
 	logger := GetLogger("database")
 	db = initDatabase(config.DatabasePath)
-	initDatabaseInMemory(db)
+	initMainDatabaseInMemory(db)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	Q, err = q.PrepareWithLogger(ctx, db, logger.Desugar())
+	if err != nil {
+		panic(err)
+	}
+	Msgs, err = msgs.PrepareWithLogger(ctx, db, logger.Desugar())
 	if err != nil {
 		panic(err)
 	}

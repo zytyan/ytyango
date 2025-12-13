@@ -1,14 +1,11 @@
 package g
 
 import (
-	"context"
 	"database/sql"
-	"main/globalcfg/q"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 )
 
 func mustGetProjectRootDir() string {
@@ -29,7 +26,7 @@ func mustGetProjectRootDir() string {
 	}
 }
 
-func initDatabaseInMemory(database *sql.DB) {
+func initMainDatabaseInMemory(database *sql.DB) {
 	projRoot := mustGetProjectRootDir()
 	sqlDir := filepath.Join(projRoot, "sql")
 	dir, err := os.ReadDir(sqlDir)
@@ -49,6 +46,9 @@ func initDatabaseInMemory(database *sql.DB) {
 			panic(err)
 		}
 		_, err = database.Exec(string(data))
+		if err != nil {
+			panic(err)
+		}
 	}
 }
 
@@ -59,7 +59,6 @@ func init() {
 	if Q != nil {
 		return
 	}
-	var err error
 	config = &Config{
 		// 此处的Token已经废弃，可放心使用
 		BotToken:           "554277510:AAEKxRdcRfhEjtSIfxpaYtL19XFgdDcY23U",
@@ -76,16 +75,8 @@ func init() {
 		TmpPath:            "",
 		DatabasePath:       ":memory:",
 		GeminiKey:          "",
+		Msgs
 	}
 	gWriteSyncer = initWriteSyncer()
-	logger := GetLogger("database")
-	db = initDatabase(config.DatabasePath)
-	initDatabaseInMemory(db)
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	Q, err = q.PrepareWithLogger(ctx, db, logger.Desugar())
-	if err != nil {
-		panic(err)
-	}
-	logger.Infof("Database initialized")
+	initByConfig()
 }

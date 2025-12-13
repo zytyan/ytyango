@@ -170,12 +170,18 @@ func (s *GeminiSession) loadContentFromDatabase(ctx context.Context) error {
 }
 
 func (s *GeminiSession) PersistTmpUpdates(ctx context.Context) error {
-	Q, tx, err := g.NewTx()
+	tx, err := g.RawMainDb().BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+	newQ := g.Q.WithTx(tx)
 	for i := range s.TmpContents {
-		err = s.TmpContents[i].Save(ctx, Q)
+		err = s.TmpContents[i].Save(ctx, newQ)
 		if err != nil {
 			return err
 		}

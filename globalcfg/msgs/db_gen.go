@@ -28,11 +28,17 @@ func New(db DBTX) *Queries {
 func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	q := Queries{db: db}
 	var err error
-	if q.createNewMessageStmt, err = db.PrepareContext(ctx, createNewMessage); err != nil {
-		return nil, fmt.Errorf("error preparing query CreateNewMessage: %w", err)
-	}
 	if q.getSavedMessageByIdStmt, err = db.PrepareContext(ctx, getSavedMessageById); err != nil {
 		return nil, fmt.Errorf("error preparing query GetSavedMessageById: %w", err)
+	}
+	if q.insertRawUpdateStmt, err = db.PrepareContext(ctx, insertRawUpdate); err != nil {
+		return nil, fmt.Errorf("error preparing query InsertRawUpdate: %w", err)
+	}
+	if q.insertSavedMessageStmt, err = db.PrepareContext(ctx, insertSavedMessage); err != nil {
+		return nil, fmt.Errorf("error preparing query InsertSavedMessage: %w", err)
+	}
+	if q.listEditHistoryByMessageStmt, err = db.PrepareContext(ctx, listEditHistoryByMessage); err != nil {
+		return nil, fmt.Errorf("error preparing query ListEditHistoryByMessage: %w", err)
 	}
 	if q.updateMessageTextStmt, err = db.PrepareContext(ctx, updateMessageText); err != nil {
 		return nil, fmt.Errorf("error preparing query UpdateMessageText: %w", err)
@@ -42,14 +48,24 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 
 func (q *Queries) Close() error {
 	var err error
-	if q.createNewMessageStmt != nil {
-		if cerr := q.createNewMessageStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing createNewMessageStmt: %w", cerr)
-		}
-	}
 	if q.getSavedMessageByIdStmt != nil {
 		if cerr := q.getSavedMessageByIdStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing getSavedMessageByIdStmt: %w", cerr)
+		}
+	}
+	if q.insertRawUpdateStmt != nil {
+		if cerr := q.insertRawUpdateStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing insertRawUpdateStmt: %w", cerr)
+		}
+	}
+	if q.insertSavedMessageStmt != nil {
+		if cerr := q.insertSavedMessageStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing insertSavedMessageStmt: %w", cerr)
+		}
+	}
+	if q.listEditHistoryByMessageStmt != nil {
+		if cerr := q.listEditHistoryByMessageStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing listEditHistoryByMessageStmt: %w", cerr)
 		}
 	}
 	if q.updateMessageTextStmt != nil {
@@ -94,26 +110,30 @@ func (q *Queries) queryRow(ctx context.Context, stmt *sql.Stmt, query string, ar
 }
 
 type Queries struct {
-	db                      DBTX
-	logger                  *zap.Logger
-	SlowQueryThreshold      time.Duration
-	txID                    string
-	tx                      *sql.Tx
-	createNewMessageStmt    *sql.Stmt
-	getSavedMessageByIdStmt *sql.Stmt
-	updateMessageTextStmt   *sql.Stmt
+	db                           DBTX
+	logger                       *zap.Logger
+	SlowQueryThreshold           time.Duration
+	txID                         string
+	tx                           *sql.Tx
+	getSavedMessageByIdStmt      *sql.Stmt
+	insertRawUpdateStmt          *sql.Stmt
+	insertSavedMessageStmt       *sql.Stmt
+	listEditHistoryByMessageStmt *sql.Stmt
+	updateMessageTextStmt        *sql.Stmt
 }
 
 func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 	return &Queries{
-		db:                      tx,
-		logger:                  q.logger,
-		SlowQueryThreshold:      q.SlowQueryThreshold,
-		txID:                    fmt.Sprintf("%p", tx),
-		tx:                      tx,
-		createNewMessageStmt:    q.createNewMessageStmt,
-		getSavedMessageByIdStmt: q.getSavedMessageByIdStmt,
-		updateMessageTextStmt:   q.updateMessageTextStmt,
+		db:                           tx,
+		logger:                       q.logger,
+		SlowQueryThreshold:           q.SlowQueryThreshold,
+		txID:                         fmt.Sprintf("%p", tx),
+		tx:                           tx,
+		getSavedMessageByIdStmt:      q.getSavedMessageByIdStmt,
+		insertRawUpdateStmt:          q.insertRawUpdateStmt,
+		insertSavedMessageStmt:       q.insertSavedMessageStmt,
+		listEditHistoryByMessageStmt: q.listEditHistoryByMessageStmt,
+		updateMessageTextStmt:        q.updateMessageTextStmt,
 	}
 }
 
