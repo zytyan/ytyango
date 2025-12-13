@@ -9,11 +9,13 @@ import (
 	g "main/globalcfg"
 	"main/globalcfg/h"
 	"net/http"
+	"runtime/debug"
 	"strings"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 	"github.com/bwmarrin/snowflake"
+	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
 
@@ -40,13 +42,17 @@ type MeiliMsg struct {
 
 func SaveMessage(bot *gotgbot.Bot, ctx *ext.Context) error {
 	go func() {
+		updateId := zap.Int64("update_id", ctx.UpdateId)
 		defer func() {
 			if r := recover(); r != nil {
-				log.Errorf("save message panic %s, update id %d", r, ctx.Update.UpdateId)
+				logD.Error("save message panic",
+					zap.Any("panic", r),
+					zap.ByteString("stack", debug.Stack()),
+					updateId)
 			}
 		}()
 		if err := UpdateUser(bot, ctx); err != nil {
-			log.Errorf("save user error %s, update id %d", err, ctx.Update.UpdateId)
+			logD.Error("save user error", zap.Error(err), updateId)
 		}
 		msg := ctx.EffectiveMessage
 		if msg == nil {
@@ -54,12 +60,12 @@ func SaveMessage(bot *gotgbot.Bot, ctx *ext.Context) error {
 		}
 		if shouldPersistMessages(ctx) {
 			if err := persistSavedMessage(ctx, msg); err != nil {
-				log.Warnf("persist saved message error %s, update id %d", err, ctx.Update.UpdateId)
+				logD.Warn("persist saved message", zap.Error(err), updateId)
 			}
 			persistRawUpdate(ctx)
 		}
-		if err := saveMessage(bot, ctx, msg); err != nil {
-			log.Errorf("save message error %s, update id %d", err, ctx.Update.UpdateId)
+		if err := saveMessageToMeilisearch(bot, ctx, msg); err != nil {
+			logD.Error("save message error", zap.Error(err), updateId)
 		}
 	}()
 	return nil
@@ -87,11 +93,8 @@ func setImageText(bot *gotgbot.Bot, msg *gotgbot.Message, meili *MeiliMsg) error
 	return err
 }
 
-func saveMessage(bot *gotgbot.Bot, ctx *ext.Context, msg *gotgbot.Message) (err error) {
+func saveMessageToMeilisearch(bot *gotgbot.Bot, ctx *ext.Context, msg *gotgbot.Message) (err error) {
 	if msg == nil {
-		return nil
-	}
-	if !shouldPersistMessages(ctx) {
 		return nil
 	}
 	mongoId := snowflakeNode().Generate().Base32()
@@ -160,10 +163,21 @@ func persistSavedMessage(ctx *ext.Context, msg *gotgbot.Message) error {
 	if g.Msgs == nil {
 		return errors.New("msgs querier is nil")
 	}
-	if ctx != nil && ctx.Update != nil && (ctx.Update.EditedMessage != nil || ctx.Update.EditedChannelPost != nil) {
-		return g.Msgs.SaveEditedMsg(msg)
+	tx, err := g.RawMsgsDb().BeginTx(context.Background(), nil)
+	if err != nil {
+		return err
 	}
-	return g.Msgs.SaveNewMsg(msg)
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+	err = g.Msgs.SaveNewMsg(msg)
+	persistRawUpdate(ctx)
+	if err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func persistRawUpdate(ctx *ext.Context) {
