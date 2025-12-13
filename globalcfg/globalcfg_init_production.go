@@ -33,7 +33,7 @@ func initByConfig() {
 	logger.Infof("Database main initialized")
 
 	msgDb = initDatabase(config.MsgDbPath)
-	logger = GetLogger("msgs_db")
+	logger = GetLogger("msgs_database")
 	loggers["msgs_database"].Level.SetLevel(zapcore.WarnLevel)
 	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
