@@ -26,10 +26,6 @@ func initByConfig() {
 	if err != nil {
 		panic(err)
 	}
-	Msgs, err = msgs.PrepareWithLogger(ctx, db, logger.Desugar())
-	if err != nil {
-		panic(err)
-	}
 	err = Q.BuildCountByRatePrefixSum()
 	if err != nil {
 		panic(err)
@@ -38,14 +34,10 @@ func initByConfig() {
 
 	msgDb = initDatabase(config.MsgDbPath)
 	logger = GetLogger("msgs_db")
-	loggers["msgs_db"].Level.SetLevel(zapcore.WarnLevel)
+	loggers["msgs_database"].Level.SetLevel(zapcore.WarnLevel)
 	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	Msgs, err = msgs.PrepareWithLogger(ctx, msgDb, logger.Desugar())
-	if err != nil {
-		panic(err)
-	}
-	err = Q.BuildCountByRatePrefixSum()
 	if err != nil {
 		panic(err)
 	}
