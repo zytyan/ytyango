@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS saved_msgs
 
 CREATE TABLE IF NOT EXISTS raw_update
 (
-    id         INTEGER NOT NULL PRIMARY KEY,
+    id         INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     chat_id    INTEGER,
     message_id INTEGER,
     raw_update JSON_TEXT CHECK (raw_update IS NULL OR json_valid(raw_update))

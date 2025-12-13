@@ -9,10 +9,12 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"go.uber.org/zap"
 )
 
 func newTestServer() *httptest.Server {
-	logger := g.GetLogger("inner-http-test")
+	logger := g.GetLogger("inner-http-test", zap.InfoLevel)
 	return httptest.NewServer(buildHandler(logger.Desugar()))
 }
 
@@ -31,6 +33,9 @@ func TestMarsCounterSuccess(t *testing.T) {
 	}
 
 	stat := g.Q.ChatStatToday(groupID)
+	if stat == nil {
+		t.Fatalf("Q.ChatStatToday(groupID) is nil")
+	}
 	if stat.MarsCount != 1 {
 		t.Fatalf("expected MarsCount=1 got %d", stat.MarsCount)
 	}
@@ -73,6 +78,9 @@ func TestDioBanActions(t *testing.T) {
 	resp.Body.Close()
 
 	stat := g.Q.ChatStatToday(groupID)
+	if stat == nil {
+		t.Fatalf("expected stat != nil, got nil")
+	}
 	if stat.DioAddUserCount != 1 {
 		t.Fatalf("expected DioAddUserCount=1 got %d", stat.DioAddUserCount)
 	}

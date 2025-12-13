@@ -106,14 +106,14 @@ type LoggerWithLevel struct {
 	Logger *zap.SugaredLogger
 }
 
-func GetLogger(name string) *zap.SugaredLogger {
+func GetLogger(name string, level zapcore.Level) *zap.SugaredLogger {
 	gLoggerMu.Lock()
 	defer gLoggerMu.Unlock()
 	if logger, ok := loggers[name]; ok {
 		return logger.Logger
 	}
 	lvl := zap.NewAtomicLevel()
-	lvl.SetLevel(zapcore.Level(config.LogLevel))
+	lvl.SetLevel(level)
 	core := zapcore.NewCore(
 		zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig()),
 		gWriteSyncer,

@@ -8,6 +8,7 @@ import (
 	"io"
 	g "main/globalcfg"
 	"main/globalcfg/h"
+	"main/globalcfg/msgs"
 	"net/http"
 	"runtime/debug"
 	"strings"
@@ -40,34 +41,35 @@ type MeiliMsg struct {
 	QrResult  string  `json:"qr_result,omitempty"`
 }
 
-func SaveMessage(bot *gotgbot.Bot, ctx *ext.Context) error {
-	go func() {
-		updateId := zap.Int64("update_id", ctx.UpdateId)
-		defer func() {
-			if r := recover(); r != nil {
-				logD.Error("save message panic",
-					zap.Any("panic", r),
-					zap.ByteString("stack", debug.Stack()),
-					updateId)
-			}
-		}()
-		if err := UpdateUser(bot, ctx); err != nil {
-			logD.Error("save user error", zap.Error(err), updateId)
-		}
-		msg := ctx.EffectiveMessage
-		if msg == nil {
-			return
-		}
-		if shouldPersistMessages(ctx) {
-			if err := persistSavedMessage(ctx, msg); err != nil {
-				logD.Warn("persist saved message", zap.Error(err), updateId)
-			}
-			persistRawUpdate(ctx)
-		}
-		if err := saveMessageToMeilisearch(bot, ctx, msg); err != nil {
-			logD.Error("save message error", zap.Error(err), updateId)
+func saveMessage(bot *gotgbot.Bot, ctx *ext.Context) {
+	updateId := zap.Int64("update_id", ctx.UpdateId)
+	defer func() {
+		if r := recover(); r != nil {
+			logD.Error("save message panic",
+				zap.Any("panic", r),
+				zap.ByteString("stack", debug.Stack()),
+				updateId)
 		}
 	}()
+	if err := UpdateUser(bot, ctx); err != nil {
+		logD.Warn("save user error", zap.Error(err), updateId)
+	}
+	msg := ctx.EffectiveMessage
+	if msg == nil {
+		return
+	}
+	if shouldPersistMessages(ctx) {
+		if err := persistSavedMessage(ctx, msg); err != nil {
+			logD.Warn("persist saved message", zap.Error(err), updateId)
+		}
+	}
+	if err := saveMessageToMeilisearch(bot, ctx, msg); err != nil {
+		logD.Error("save message error", zap.Error(err), updateId)
+	}
+}
+
+func SaveMessage(bot *gotgbot.Bot, ctx *ext.Context) error {
+	go saveMessage(bot, ctx)
 	return nil
 }
 
@@ -101,7 +103,7 @@ func saveMessageToMeilisearch(bot *gotgbot.Bot, ctx *ext.Context, msg *gotgbot.M
 	meiliMsg := &MeiliMsg{
 		MongoId:   mongoId,
 		PeerId:    ctx.EffectiveChat.Id,
-		FromId:    getSenderID(ctx, msg),
+		FromId:    msg.GetSender().Id(),
 		MsgId:     msg.MessageId,
 		Date:      float64(msg.Date),
 		Message:   getText(ctx),
@@ -153,7 +155,7 @@ func shouldPersistMessages(ctx *ext.Context) bool {
 	if cfg == nil || !cfg.SaveMessage {
 		return false
 	}
-	if ctx == nil || ctx.EffectiveChat == nil {
+	if ctx.EffectiveChat == nil {
 		return false
 	}
 	return h.ChatSaveMessages(ctx.EffectiveChat.Id)
@@ -172,34 +174,20 @@ func persistSavedMessage(ctx *ext.Context, msg *gotgbot.Message) error {
 			_ = tx.Rollback()
 		}
 	}()
-	err = g.Msgs.SaveNewMsg(msg)
-	persistRawUpdate(ctx)
+	mdb := g.Msgs.WithTx(tx)
+	err = mdb.SaveNewMsg(msg)
+	persistRawUpdate(ctx, mdb)
 	if err != nil {
 		return err
 	}
 	return tx.Commit()
 }
 
-func persistRawUpdate(ctx *ext.Context) {
+func persistRawUpdate(ctx *ext.Context, mdb *msgs.Queries) {
 	if g.Msgs == nil {
 		return
 	}
-	if err := g.Msgs.SaveRawUpdate(ctx); err != nil {
+	if err := mdb.SaveRawUpdate(ctx); err != nil {
 		log.Warnf("save raw update failed: %s", err)
 	}
-}
-
-func getSenderID(ctx *ext.Context, msg *gotgbot.Message) int64 {
-	if ctx != nil && ctx.EffectiveSender != nil {
-		return ctx.EffectiveSender.Id()
-	}
-	if msg != nil {
-		if msg.From != nil {
-			return msg.From.Id
-		}
-		if msg.SenderChat != nil {
-			return msg.SenderChat.Id
-		}
-	}
-	return 0
 }

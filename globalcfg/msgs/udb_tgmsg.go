@@ -13,13 +13,6 @@ import (
 
 const defaultDBTimeout = 2 * time.Second
 
-func logWarn(logger *zap.Logger, msg string, err error) {
-	if logger == nil {
-		return
-	}
-	logger.Warn(msg, zap.Error(err))
-}
-
 func nullString(s string) sql.NullString {
 	return sql.NullString{String: s, Valid: s != ""}
 }
@@ -37,8 +30,8 @@ func marshalJSON(v any) ([]byte, error) {
 
 func (q *Queries) marshalWithWarn(v any, field string) []byte {
 	js, err := marshalJSON(v)
-	if err != nil {
-		logWarn(q.logger, "marshal "+field+" failed", err)
+	if err != nil && q.logger != nil {
+		q.logger.Warn("marshal json failed", zap.String("field", field), zap.Error(err))
 		return nil
 	}
 	return js
@@ -63,7 +56,7 @@ func (q *Queries) SaveRawUpdate(ctx *ext.Context) error {
 	}
 	c, cancel := context.WithTimeout(context.Background(), defaultDBTimeout)
 	defer cancel()
-	return q.InsertRawUpdate(c, ctx.Update.UpdateId, chatID, msgID, raw)
+	return q.InsertRawUpdate(c, chatID, msgID, raw)
 }
 
 func forwardInfo(msg *gotgbot.Message) (sql.NullString, sql.NullInt64) {
@@ -241,7 +234,7 @@ func (q *Queries) SaveNewMsg(msg *gotgbot.Message) error {
 		ViaBotID:          viaBot,
 		EditDate:          sql.Null[UnixTime]{Valid: false},
 		MediaGroupID:      nullString(msg.MediaGroupId),
-		Text:              nullString(selectText(msg)),
+		Text:              nullString(msg.GetText()),
 		EntitiesJson:      entities,
 		MediaID:           media.id,
 		MediaUid:          media.uid,
@@ -265,7 +258,7 @@ func (q *Queries) SaveEditedMsg(msg *gotgbot.Message) error {
 	defer cancel()
 
 	err := q.UpdateMessageText(c, UpdateMessageTextParams{
-		Text:         nullString(selectText(msg)),
+		Text:         nullString(msg.GetText()),
 		EntitiesJson: entities,
 		EditDate:     sql.Null[UnixTime]{V: UnixTime{time.Unix(msg.EditDate, 0)}, Valid: true},
 		ChatID:       msg.Chat.Id,
@@ -275,14 +268,4 @@ func (q *Queries) SaveEditedMsg(msg *gotgbot.Message) error {
 		return err
 	}
 	return nil
-}
-
-func selectText(msg *gotgbot.Message) string {
-	if msg == nil {
-		return ""
-	}
-	if msg.Text != "" {
-		return msg.Text
-	}
-	return msg.Caption
 }

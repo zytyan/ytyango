@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap"
 )
 
 func initByConfig() {
@@ -17,9 +17,7 @@ func initByConfig() {
 	config = initConfig()
 	gWriteSyncer = initWriteSyncer()
 	db = initDatabase(config.DatabasePath)
-	logger := GetLogger("database")
-	loggers["database"].Level.SetLevel(zapcore.WarnLevel)
-
+	logger := GetLogger("database", zap.WarnLevel)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	Q, err = q.PrepareWithLogger(ctx, db, logger.Desugar())
@@ -33,8 +31,7 @@ func initByConfig() {
 	logger.Infof("Database main initialized")
 
 	msgDb = initDatabase(config.MsgDbPath)
-	logger = GetLogger("msgs_database")
-	loggers["msgs_database"].Level.SetLevel(zapcore.WarnLevel)
+	logger = GetLogger("msgs_database", zap.WarnLevel)
 	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	Msgs, err = msgs.PrepareWithLogger(ctx, msgDb, logger.Desugar())

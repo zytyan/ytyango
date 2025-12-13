@@ -45,9 +45,8 @@ WHERE chat_id = ?
   AND message_id = ?;
 
 -- name: InsertRawUpdate :exec
-INSERT INTO raw_update (id, chat_id, message_id, raw_update)
-VALUES (?, ?, ?, ?)
-ON CONFLICT(id) DO NOTHING;
+INSERT INTO raw_update (chat_id, message_id, raw_update)
+VALUES (?, ?, ?);
 
 -- name: ListEditHistoryByMessage :many
 SELECT chat_id,

@@ -17,7 +17,7 @@ import (
 	"go.uber.org/zap"
 )
 
-var log = g.GetLogger("handlers")
+var log = g.GetLogger("handlers", zap.InfoLevel)
 var logD = log.Desugar()
 
 func BiliMsgFilter(msg *gotgbot.Message) bool {

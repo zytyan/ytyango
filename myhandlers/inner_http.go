@@ -231,7 +231,7 @@ func resolveInnerHTTPAddr(envValue string) (addr string, enabled bool) {
 }
 
 func HttpListen4019() {
-	logger := g.GetLogger("inner-http")
+	logger := g.GetLogger("inner-http", zap.WarnLevel)
 	addr, enabled := resolveInnerHTTPAddr(os.Getenv(innerHTTPEnvKey))
 	if !enabled {
 		logger.Infof("%s=OFF, inner http server disabled", innerHTTPEnvKey)

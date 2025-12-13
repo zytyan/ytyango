@@ -28,7 +28,7 @@ func NewHandler(bot *gotgbot.Bot) *Handler {
 	return &Handler{
 		verifyKey: sum,
 		bot:       bot,
-		log:       g.GetLogger("backend").Desugar(),
+		log:       g.GetLogger("http-backend", zap.WarnLevel).Desugar(),
 	}
 }
 

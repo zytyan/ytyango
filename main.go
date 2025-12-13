@@ -22,7 +22,7 @@ import (
 	"go.uber.org/zap"
 )
 
-var log = g.GetLogger("main")
+var log = g.GetLogger("main", zap.InfoLevel)
 var compileTime = "unknown"
 
 type GroupedDispatcher struct {

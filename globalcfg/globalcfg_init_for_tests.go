@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap"
 )
 
 func mustGetProjectRootDir() string {
@@ -86,8 +86,7 @@ func initForTests() {
 		MsgDbPath:          ":memory:",
 	}
 	gWriteSyncer = initWriteSyncer()
-	logger := GetLogger("database")
-	loggers["database"].Level.SetLevel(zapcore.WarnLevel)
+	logger := GetLogger("database", zap.DebugLevel)
 	db = initDatabase(config.DatabasePath)
 	msgDb = db
 	initMainDatabaseInMemory(db)

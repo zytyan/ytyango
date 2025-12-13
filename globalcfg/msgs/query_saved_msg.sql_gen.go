@@ -79,30 +79,23 @@ func (q *Queries) GetSavedMessageById(ctx context.Context, chatID int64, message
 }
 
 const insertRawUpdate = `-- name: InsertRawUpdate :exec
-INSERT INTO raw_update (id, chat_id, message_id, raw_update)
-VALUES (?, ?, ?, ?)
-ON CONFLICT(id) DO NOTHING
+INSERT INTO raw_update (chat_id, message_id, raw_update)
+VALUES (?, ?, ?)
 `
 
-func (q *Queries) InsertRawUpdate(ctx context.Context, iD int64, chatID sql.NullInt64, messageID sql.NullInt64, rawUpdate []byte) error {
+func (q *Queries) InsertRawUpdate(ctx context.Context, chatID sql.NullInt64, messageID sql.NullInt64, rawUpdate []byte) error {
 	var logFields []zap.Field
 	var start time.Time
 	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 4+5)
+		logFields = make([]zap.Field, 0, 3+5)
 		start = time.Now()
 		logFields = append(logFields,
-			zap.Int64("id", iD),
 			zapNullInt64("chat_id", chatID),
 			zapNullInt64("message_id", messageID),
 			zap.ByteString("raw_update", rawUpdate),
 		)
 	}
-	_, err := q.exec(ctx, q.insertRawUpdateStmt, insertRawUpdate,
-		iD,
-		chatID,
-		messageID,
-		rawUpdate,
-	)
+	_, err := q.exec(ctx, q.insertRawUpdateStmt, insertRawUpdate, chatID, messageID, rawUpdate)
 	q.logQuery(insertRawUpdate, logFields, err, start)
 	return err
 }
