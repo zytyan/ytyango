@@ -91,10 +91,16 @@ func main() {
 	log.Infof("compile time: %s", compileTime)
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	defer g.Q.FlushChatStats(context.Background())
+	defer func() {
+		if err := g.Q.FlushChatStats(context.Background()); err != nil {
+			log.Errorf("flush chat stats: %s", err)
+		}
+	}()
 	go func() {
 		<-ctx.Done()
-		_ = g.Q.FlushChatStats(context.Background())
+		if err := g.Q.FlushChatStats(context.Background()); err != nil {
+			log.Errorf("flush chat stats: %s", err)
+		}
 		os.Exit(0)
 	}()
 	token := g.GetConfig().BotToken

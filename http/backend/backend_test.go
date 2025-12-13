@@ -74,12 +74,14 @@ func TestSecurity(t *testing.T) {
 	resp, err = http.Get(path + "?tgauth=" + url.QueryEscape("hash=00000000"))
 	as.NoError(err)
 	as.Equal(401, resp.StatusCode)
-	respData, err = io.ReadAll(resp.Body)
+	_, err = io.ReadAll(resp.Body)
+	as.NoError(err)
 
 	path = baseUrl + "users/1000/avatar"
 	resp, err = http.Get(path + "?tgauth=" + url.QueryEscape(hAuthData))
 	as.NoError(err)
 	respData, err = io.ReadAll(resp.Body)
+	as.NoError(err)
 	as.Equal(404, resp.StatusCode)
 	as.Equal(`{"message":"user has no profile photo"}`, string(respData))
 }

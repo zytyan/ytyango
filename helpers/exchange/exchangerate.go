@@ -99,7 +99,7 @@ func (a *ApiResp) Exchange(req Req) (resp Resp, err error) {
 var lastReqTime = time.Unix(0, 0)
 
 func globalCanUpdate() bool {
-	return time.Now().Sub(lastReqTime) > 1*time.Hour
+	return time.Since(lastReqTime) > 1*time.Hour
 }
 func findLeastAvailableExchangeRate(prefer string) string {
 	if prefer != "" {
@@ -158,7 +158,7 @@ func GetExchangeRate(req Req) (Resp, error) {
 	}
 	err := refreshCache(req)
 	if err != nil {
-		// todo
+		return resp, err
 	}
 	leastAvail := findLeastAvailableExchangeRate(req.From)
 	e, ok := exchangeCache[leastAvail]

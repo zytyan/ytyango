@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"hash/fnv"
 	"html"
-	"main/globalcfg"
+	g "main/globalcfg"
 	"main/globalcfg/h"
 	"main/helpers/bili"
 	"strconv"
@@ -112,6 +112,10 @@ func BiliMsgConverterInline(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
 	}
 
 	uid, err := g.Q.InsertBiliInlineData(context.Background())
+	if err != nil {
+		logD.Warn("insert into bilibili error", zap.Error(err))
+		return err
+	}
 	callbackData := biliInlineCallbackPrefix + strconv.FormatInt(uid, 16)
 	var btns [][]gotgbot.InlineKeyboardButton
 	if bili.HasVideoLink(links.BvText) {

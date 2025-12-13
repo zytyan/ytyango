@@ -153,5 +153,5 @@ func formatTensIdx(tens []int, idx int) string {
 
 	}
 	tensPlaces := strings.Join(buf, ", ")
-	return fmt.Sprintf("%s", tensPlaces)
+	return tensPlaces
 }

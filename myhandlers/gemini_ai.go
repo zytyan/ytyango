@@ -235,7 +235,7 @@ func GeminiGetSession(ctx context.Context, msg *gotgbot.Message) *GeminiSession 
 create:
 	sess, ok := geminiSessions.chatIdToSess[msg.Chat.Id]
 	if ok {
-		if time.Now().Sub(sess.UpdateTime) < geminiInterval {
+		if time.Since(sess.UpdateTime) < geminiInterval {
 			return sess
 		}
 		delete(geminiSessions.sidToSess, sess.ID)
@@ -243,6 +243,9 @@ create:
 	delete(geminiSessions.chatIdToSess, msg.Chat.Id)
 	var err error
 	session.GeminiSession, err = g.Q.CreateNewGeminiSession(ctx, msg.Chat.Id, getChatName(&msg.Chat), msg.Chat.Type)
+	if err != nil {
+		return nil
+	}
 	err = session.loadContentFromDatabase(ctx)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil
@@ -289,9 +292,10 @@ func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 			//{URLContext: &genai.URLContext{}},
 		},
 	}
-	err = session.AddTgMessage(bot, ctx.EffectiveMessage.ReplyToMessage)
-	err = session.AddTgMessage(bot, ctx.EffectiveMessage)
-	if err != nil {
+	if err := session.AddTgMessage(bot, ctx.EffectiveMessage.ReplyToMessage); err != nil {
+		return err
+	}
+	if err := session.AddTgMessage(bot, ctx.EffectiveMessage); err != nil {
 		return err
 	}
 	_, err = ctx.EffectiveMessage.SetReaction(bot, &gotgbot.SetMessageReactionOpts{

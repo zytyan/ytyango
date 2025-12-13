@@ -12,8 +12,7 @@ import (
 
 func GetAllTextIncludeReply(msg *gotgbot.Message) string {
 	buf := strings.Builder{}
-	length := 1
-	length = len(msg.Text) + len(msg.Caption)
+	length := len(msg.Text) + len(msg.Caption)
 	if reply := msg.ReplyToMessage; reply != nil {
 		length += len(reply.Text) + len(msg.Caption) + 2
 	}
@@ -38,8 +37,7 @@ func GetAllTextIncludeReply(msg *gotgbot.Message) string {
 
 func GetAllText(msg *gotgbot.Message) string {
 	buf := strings.Builder{}
-	length := 1
-	length = len(msg.Text) + len(msg.Caption)
+	length := len(msg.Text) + len(msg.Caption)
 	buf.Grow(length)
 	if msg.Text != "" {
 		buf.WriteString(msg.Text)
@@ -64,7 +62,7 @@ func MentionUserHtml(user *gotgbot.User) string {
 	return fmt.Sprintf(`<a href="tg://user?id=%d">%s</a>`, user.Id, html.EscapeString(name))
 }
 
-func LocalFile(filename string)gotgbot.InputFileOrString {
+func LocalFile(filename string) gotgbot.InputFileOrString {
 	if !filepath.IsAbs(filename) {
 		var err error
 		filename, err = filepath.Abs(filename)

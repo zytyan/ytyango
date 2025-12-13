@@ -157,6 +157,9 @@ func (o *Ocr) OcrFile(path string) (*OcrResult, error) {
 	}
 	req.ContentLength = stat.Size()
 	resp, err := o.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
 	res := &OcrResult{}
 	err = unmarshalResponse(resp, res)
 	return res, err

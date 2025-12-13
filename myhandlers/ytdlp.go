@@ -239,7 +239,9 @@ func downloadMedia(bot *gotgbot.Bot, key *dlKey, user *gotgbot.User, msgId, chat
 		ReplyParameters: MakeReplyToMsgID(msgId),
 	}
 	if key == nil || key.Url == "" {
-		_, err = bot.SendMessage(chatId, "bot没有找到任何有效的链接", msgOpt)
+		if _, sendErr := bot.SendMessage(chatId, "bot没有找到任何有效的链接", msgOpt); sendErr != nil {
+			return sendErr
+		}
 		return errNoURL
 	}
 	if dbr := key.findInDb(); dbr != nil {

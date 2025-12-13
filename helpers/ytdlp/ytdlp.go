@@ -195,7 +195,7 @@ func getBilibiliVideoInfo(url string) (info Info, err error) {
 		return info, fmt.Errorf("regex cannot found %s", location)
 	}
 	bv := submatch[1]
-	reqUrl := ``
+	var reqUrl string
 	switch bv[0] {
 	case 'A', 'a':
 		reqUrl = fmt.Sprintf(`https://api.bilibili.com/x/web-interface/view?aid=%s`, bv[2:])

@@ -252,7 +252,6 @@ func refreshMsgFromBtn(bot *gotgbot.Bot, ctx *ext.Context, fileUid, cmd string) 
 	if err != nil {
 		log.Warnf("edit message button failed, err: %s", err)
 	}
-	return
 }
 
 func RateNsfwPicByBtn(bot *gotgbot.Bot, ctx *ext.Context) error {

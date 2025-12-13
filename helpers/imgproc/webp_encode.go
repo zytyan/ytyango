@@ -11,8 +11,6 @@ import (
 	"github.com/kolesa-team/go-webp/webp"
 )
 
-const webpEnabled = true
-
 func encodeToWebp(img image.Image, file string) error {
 	if img == nil {
 		return errors.New("nil image")
