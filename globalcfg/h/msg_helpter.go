@@ -35,19 +35,6 @@ func GetAllTextIncludeReply(msg *gotgbot.Message) string {
 	return buf.String()
 }
 
-func GetAllText(msg *gotgbot.Message) string {
-	buf := strings.Builder{}
-	length := len(msg.Text) + len(msg.Caption)
-	buf.Grow(length)
-	if msg.Text != "" {
-		buf.WriteString(msg.Text)
-	} else if msg.Caption != "" {
-		buf.WriteByte('\n')
-		buf.WriteString(msg.Caption)
-	}
-	return buf.String()
-}
-
 func MentionUserHtml(user *gotgbot.User) string {
 	if user == nil {
 		return ""
