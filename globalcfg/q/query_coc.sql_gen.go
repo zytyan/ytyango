@@ -23,11 +23,13 @@ func (q *Queries) DelCocCharAttr(ctx context.Context, userID int64, attrName str
 	var logFields []zap.Field
 	var start time.Time
 	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 2+5)
+		logFields = make([]zap.Field, 0, 6)
 		start = time.Now()
 		logFields = append(logFields,
-			zap.Int64("user_id", userID),
-			zap.String("attr_name", attrName),
+			zap.Dict("fields",
+				zap.Int64("user_id", userID),
+				zap.String("attr_name", attrName),
+			),
 		)
 	}
 	_, err := q.exec(ctx, q.delCocCharAttrStmt, delCocCharAttr, userID, attrName)
@@ -50,10 +52,12 @@ func (q *Queries) GetCocCharAllAttr(ctx context.Context, userID int64) ([]GetCoc
 	var logFields []zap.Field
 	var start time.Time
 	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 1+5)
+		logFields = make([]zap.Field, 0, 6)
 		start = time.Now()
 		logFields = append(logFields,
-			zap.Int64("user_id", userID),
+			zap.Dict("fields",
+				zap.Int64("user_id", userID),
+			),
 		)
 	}
 	rows, err := q.query(ctx, q.getCocCharAllAttrStmt, getCocCharAllAttr, userID)
@@ -94,11 +98,13 @@ func (q *Queries) GetCocCharAttr(ctx context.Context, userID int64, attrName str
 	var logFields []zap.Field
 	var start time.Time
 	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 2+5)
+		logFields = make([]zap.Field, 0, 6)
 		start = time.Now()
 		logFields = append(logFields,
-			zap.Int64("user_id", userID),
-			zap.String("attr_name", attrName),
+			zap.Dict("fields",
+				zap.Int64("user_id", userID),
+				zap.String("attr_name", attrName),
+			),
 		)
 	}
 	row := q.queryRow(ctx, q.getCocCharAttrStmt, getCocCharAttr, userID, attrName)
@@ -119,12 +125,14 @@ func (q *Queries) SetCocCharAttr(ctx context.Context, userID int64, attrName str
 	var logFields []zap.Field
 	var start time.Time
 	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 3+5)
+		logFields = make([]zap.Field, 0, 6)
 		start = time.Now()
 		logFields = append(logFields,
-			zap.Int64("user_id", userID),
-			zap.String("attr_name", attrName),
-			zap.String("attr_value", attrValue),
+			zap.Dict("fields",
+				zap.Int64("user_id", userID),
+				zap.String("attr_name", attrName),
+				zap.String("attr_value", attrValue),
+			),
 		)
 	}
 	_, err := q.exec(ctx, q.setCocCharAttrStmt, setCocCharAttr, userID, attrName, attrValue)

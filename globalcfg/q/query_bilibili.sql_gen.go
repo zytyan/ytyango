@@ -30,10 +30,12 @@ func (q *Queries) GetBiliInlineData(ctx context.Context, uid int64) (GetBiliInli
 	var logFields []zap.Field
 	var start time.Time
 	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 1+5)
+		logFields = make([]zap.Field, 0, 6)
 		start = time.Now()
 		logFields = append(logFields,
-			zap.Int64("uid", uid),
+			zap.Dict("fields",
+				zap.Int64("uid", uid),
+			),
 		)
 	}
 	row := q.queryRow(ctx, q.getBiliInlineDataStmt, getBiliInlineData, uid)
@@ -54,8 +56,9 @@ func (q *Queries) InsertBiliInlineData(ctx context.Context) (int64, error) {
 	var logFields []zap.Field
 	var start time.Time
 	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 0+5)
+		logFields = make([]zap.Field, 0, 6)
 		start = time.Now()
+		logFields = append(logFields, zap.Dict("fields"))
 	}
 	row := q.queryRow(ctx, q.insertBiliInlineDataStmt, insertBiliInlineData)
 	var uid int64
@@ -76,13 +79,15 @@ func (q *Queries) UpdateBiliInlineMsgId(ctx context.Context, text string, chatID
 	var logFields []zap.Field
 	var start time.Time
 	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 4+5)
+		logFields = make([]zap.Field, 0, 6)
 		start = time.Now()
 		logFields = append(logFields,
-			zap.String("text", text),
-			zap.Int64("chat_id", chatID),
-			zap.Int64("msg_id", msgID),
-			zap.Int64("uid", uid),
+			zap.Dict("fields",
+				zap.String("text", text),
+				zap.Int64("chat_id", chatID),
+				zap.Int64("msg_id", msgID),
+				zap.Int64("uid", uid),
+			),
 		)
 	}
 	_, err := q.exec(ctx, q.updateBiliInlineMsgIdStmt, updateBiliInlineMsgId,

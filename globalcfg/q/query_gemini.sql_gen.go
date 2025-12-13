@@ -46,20 +46,22 @@ func (q *Queries) AddGeminiMessage(ctx context.Context, arg AddGeminiMessagePara
 	var logFields []zap.Field
 	var start time.Time
 	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 11+5)
+		logFields = make([]zap.Field, 0, 6)
 		start = time.Now()
 		logFields = append(logFields,
-			zap.Int64("session_id", arg.SessionID),
-			zap.Int64("chat_id", arg.ChatID),
-			zap.Int64("msg_id", arg.MsgID),
-			zap.String("role", arg.Role),
-			zap.Any("sent_time", arg.SentTime),
-			zap.String("username", arg.Username),
-			zap.String("msg_type", arg.MsgType),
-			zapNullInt64("reply_to_msg_id", arg.ReplyToMsgID),
-			zapNullString("text", arg.Text),
-			zap.ByteString("blob", arg.Blob),
-			zapNullString("mime_type", arg.MimeType),
+			zap.Dict("fields",
+				zap.Int64("session_id", arg.SessionID),
+				zap.Int64("chat_id", arg.ChatID),
+				zap.Int64("msg_id", arg.MsgID),
+				zap.String("role", arg.Role),
+				arg.SentTime.ZapObject("sent_time"),
+				zap.String("username", arg.Username),
+				zap.String("msg_type", arg.MsgType),
+				zapNullInt64("reply_to_msg_id", arg.ReplyToMsgID),
+				zapNullString("text", arg.Text),
+				zap.ByteString("blob", arg.Blob),
+				zapNullString("mime_type", arg.MimeType),
+			),
 		)
 	}
 	_, err := q.exec(ctx, q.addGeminiMessageStmt, addGeminiMessage,
@@ -91,12 +93,14 @@ func (q *Queries) CreateNewGeminiSession(ctx context.Context, chatID int64, chat
 	var logFields []zap.Field
 	var start time.Time
 	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 3+5)
+		logFields = make([]zap.Field, 0, 6)
 		start = time.Now()
 		logFields = append(logFields,
-			zap.Int64("chat_id", chatID),
-			zap.String("chat_name", chatName),
-			zap.String("chat_type", chatType),
+			zap.Dict("fields",
+				zap.Int64("chat_id", chatID),
+				zap.String("chat_name", chatName),
+				zap.String("chat_type", chatType),
+			),
 		)
 	}
 	row := q.queryRow(ctx, q.createNewGeminiSessionStmt, createNewGeminiSession, chatID, chatName, chatType)
@@ -121,10 +125,12 @@ func (q *Queries) GetSessionById(ctx context.Context, id int64) (GeminiSession, 
 	var logFields []zap.Field
 	var start time.Time
 	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 1+5)
+		logFields = make([]zap.Field, 0, 6)
 		start = time.Now()
 		logFields = append(logFields,
-			zap.Int64("id", id),
+			zap.Dict("fields",
+				zap.Int64("id", id),
+			),
 		)
 	}
 	row := q.queryRow(ctx, q.getSessionByIdStmt, getSessionById, id)
@@ -150,11 +156,13 @@ func (q *Queries) GetSessionIdByMessage(ctx context.Context, chatID int64, msgID
 	var logFields []zap.Field
 	var start time.Time
 	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 2+5)
+		logFields = make([]zap.Field, 0, 6)
 		start = time.Now()
 		logFields = append(logFields,
-			zap.Int64("chat_id", chatID),
-			zap.Int64("msg_id", msgID),
+			zap.Dict("fields",
+				zap.Int64("chat_id", chatID),
+				zap.Int64("msg_id", msgID),
+			),
 		)
 	}
 	row := q.queryRow(ctx, q.getSessionIdByMessageStmt, getSessionIdByMessage, chatID, msgID)
@@ -176,11 +184,13 @@ func (q *Queries) getAllMsgInSessionReversed(ctx context.Context, sessionID int6
 	var logFields []zap.Field
 	var start time.Time
 	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 2+5)
+		logFields = make([]zap.Field, 0, 6)
 		start = time.Now()
 		logFields = append(logFields,
-			zap.Int64("session_id", sessionID),
-			zap.Int64("limit", limit),
+			zap.Dict("fields",
+				zap.Int64("session_id", sessionID),
+				zap.Int64("limit", limit),
+			),
 		)
 	}
 	rows, err := q.query(ctx, q.getAllMsgInSessionReversedStmt, getAllMsgInSessionReversed, sessionID, limit)

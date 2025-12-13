@@ -172,40 +172,51 @@ func zapNullString(key string, v sql.NullString) zap.Field {
 	if v.Valid {
 		return zap.String(key, v.String)
 	}
-	return zap.String(key, "<nil>")
+	return zap.Any(key, nil)
 }
 
 func zapNullBool(key string, v sql.NullBool) zap.Field {
 	if v.Valid {
 		return zap.Bool(key, v.Bool)
 	}
-	return zap.String(key, "<nil>")
+	return zap.Any(key, nil)
 }
 
 func zapNullInt32(key string, v sql.NullInt32) zap.Field {
 	if v.Valid {
 		return zap.Int32(key, v.Int32)
 	}
-	return zap.String(key, "<nil>")
+	return zap.Any(key, nil)
 }
 
 func zapNullInt64(key string, v sql.NullInt64) zap.Field {
 	if v.Valid {
 		return zap.Int64(key, v.Int64)
 	}
-	return zap.String(key, "<nil>")
+	return zap.Any(key, nil)
 }
 
 func zapNullFloat64(key string, v sql.NullFloat64) zap.Field {
 	if v.Valid {
 		return zap.Float64(key, v.Float64)
 	}
-	return zap.String(key, "<nil>")
+	return zap.Any(key, nil)
 }
 
 func zapNullTime(key string, v sql.NullTime) zap.Field {
 	if v.Valid {
 		return zap.Time(key, v.Time)
 	}
-	return zap.String(key, "<nil>")
+	return zap.Any(key, nil)
+}
+
+type zapObj interface {
+	ZapObject(name string) zap.Field
+}
+
+func zapNullOf[T zapObj](name string, optObj sql.Null[T]) zap.Field {
+	if optObj.Valid {
+		return optObj.V.ZapObject(name)
+	}
+	return zap.Any(name, nil)
 }

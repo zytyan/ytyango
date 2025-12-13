@@ -23,10 +23,12 @@ func (q *Queries) GetPrprCache(ctx context.Context, profilePhotoUid string) (str
 	var logFields []zap.Field
 	var start time.Time
 	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 1+5)
+		logFields = make([]zap.Field, 0, 6)
 		start = time.Now()
 		logFields = append(logFields,
-			zap.String("profile_photo_uid", profilePhotoUid),
+			zap.Dict("fields",
+				zap.String("profile_photo_uid", profilePhotoUid),
+			),
 		)
 	}
 	row := q.queryRow(ctx, q.getPrprCacheStmt, getPrprCache, profilePhotoUid)
@@ -45,11 +47,13 @@ func (q *Queries) SetPrprCache(ctx context.Context, profilePhotoUid string, prpr
 	var logFields []zap.Field
 	var start time.Time
 	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 2+5)
+		logFields = make([]zap.Field, 0, 6)
 		start = time.Now()
 		logFields = append(logFields,
-			zap.String("profile_photo_uid", profilePhotoUid),
-			zap.String("prpr_file_id", prprFileID),
+			zap.Dict("fields",
+				zap.String("profile_photo_uid", profilePhotoUid),
+				zap.String("prpr_file_id", prprFileID),
+			),
 		)
 	}
 	_, err := q.exec(ctx, q.setPrprCacheStmt, setPrprCache, profilePhotoUid, prprFileID)
@@ -76,15 +80,17 @@ func (q *Queries) createNewUser(ctx context.Context, arg createNewUserParams) (i
 	var logFields []zap.Field
 	var start time.Time
 	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 6+5)
+		logFields = make([]zap.Field, 0, 6)
 		start = time.Now()
 		logFields = append(logFields,
-			zap.Any("updated_at", arg.UpdatedAt),
-			zap.Int64("user_id", arg.UserID),
-			zap.String("first_name", arg.FirstName),
-			zapNullString("last_name", arg.LastName),
-			zapNullString("profile_photo", arg.ProfilePhoto),
-			zap.Int64("timezone", arg.Timezone),
+			zap.Dict("fields",
+				arg.UpdatedAt.ZapObject("updated_at"),
+				zap.Int64("user_id", arg.UserID),
+				zap.String("first_name", arg.FirstName),
+				zapNullString("last_name", arg.LastName),
+				zapNullString("profile_photo", arg.ProfilePhoto),
+				zap.Int64("timezone", arg.Timezone),
+			),
 		)
 	}
 	row := q.queryRow(ctx, q.createNewUserStmt, createNewUser,
@@ -113,10 +119,12 @@ func (q *Queries) getUserById(ctx context.Context, userID int64) (User, error) {
 	var logFields []zap.Field
 	var start time.Time
 	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 1+5)
+		logFields = make([]zap.Field, 0, 6)
 		start = time.Now()
 		logFields = append(logFields,
-			zap.Int64("user_id", userID),
+			zap.Dict("fields",
+				zap.Int64("user_id", userID),
+			),
 		)
 	}
 	row := q.queryRow(ctx, q.getUserByIdStmt, getUserById, userID)
@@ -148,13 +156,15 @@ func (q *Queries) updateUserBase(ctx context.Context, userID int64, updatedAt Un
 	var logFields []zap.Field
 	var start time.Time
 	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 4+5)
+		logFields = make([]zap.Field, 0, 6)
 		start = time.Now()
 		logFields = append(logFields,
-			zap.Int64("user_id", userID),
-			zap.Any("updated_at", updatedAt),
-			zap.String("first_name", firstName),
-			zapNullString("last_name", lastName),
+			zap.Dict("fields",
+				zap.Int64("user_id", userID),
+				updatedAt.ZapObject("updated_at"),
+				zap.String("first_name", firstName),
+				zapNullString("last_name", lastName),
+			),
 		)
 	}
 	row := q.queryRow(ctx, q.updateUserBaseStmt, updateUserBase,
@@ -180,12 +190,14 @@ func (q *Queries) updateUserProfilePhoto(ctx context.Context, userID int64, prof
 	var logFields []zap.Field
 	var start time.Time
 	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 3+5)
+		logFields = make([]zap.Field, 0, 6)
 		start = time.Now()
 		logFields = append(logFields,
-			zap.Int64("user_id", userID),
-			zap.Any("profile_update_at", profileUpdateAt),
-			zapNullString("profile_photo", profilePhoto),
+			zap.Dict("fields",
+				zap.Int64("user_id", userID),
+				profileUpdateAt.ZapObject("profile_update_at"),
+				zapNullString("profile_photo", profilePhoto),
+			),
 		)
 	}
 	_, err := q.exec(ctx, q.updateUserProfilePhotoStmt, updateUserProfilePhoto, userID, profileUpdateAt, profilePhoto)
@@ -205,12 +217,14 @@ func (q *Queries) updateUserTimeZone(ctx context.Context, userID int64, updatedA
 	var logFields []zap.Field
 	var start time.Time
 	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 3+5)
+		logFields = make([]zap.Field, 0, 6)
 		start = time.Now()
 		logFields = append(logFields,
-			zap.Int64("user_id", userID),
-			zap.Any("updated_at", updatedAt),
-			zap.Int64("timezone", timezone),
+			zap.Dict("fields",
+				zap.Int64("user_id", userID),
+				updatedAt.ZapObject("updated_at"),
+				zap.Int64("timezone", timezone),
+			),
 		)
 	}
 	_, err := q.exec(ctx, q.updateUserTimeZoneStmt, updateUserTimeZone, userID, updatedAt, timezone)

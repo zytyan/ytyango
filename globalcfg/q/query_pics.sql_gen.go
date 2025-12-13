@@ -22,10 +22,12 @@ func (q *Queries) GetNsfwPicByFileUid(ctx context.Context, fileUid string) (Save
 	var logFields []zap.Field
 	var start time.Time
 	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 1+5)
+		logFields = make([]zap.Field, 0, 6)
 		start = time.Now()
 		logFields = append(logFields,
-			zap.String("file_uid", fileUid),
+			zap.Dict("fields",
+				zap.String("file_uid", fileUid),
+			),
 		)
 	}
 	row := q.queryRow(ctx, q.getNsfwPicByFileUidStmt, getNsfwPicByFileUid, fileUid)
@@ -59,10 +61,12 @@ func (q *Queries) ListNsfwPicUserRatesByFileUid(ctx context.Context, fileUid str
 	var logFields []zap.Field
 	var start time.Time
 	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 1+5)
+		logFields = make([]zap.Field, 0, 6)
 		start = time.Now()
 		logFields = append(logFields,
-			zap.String("file_uid", fileUid),
+			zap.Dict("fields",
+				zap.String("file_uid", fileUid),
+			),
 		)
 	}
 	rows, err := q.query(ctx, q.listNsfwPicUserRatesByFileUidStmt, listNsfwPicUserRatesByFileUid, fileUid)
@@ -99,12 +103,14 @@ func (q *Queries) createNsfwPicUserRate(ctx context.Context, fileUid string, use
 	var logFields []zap.Field
 	var start time.Time
 	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 3+5)
+		logFields = make([]zap.Field, 0, 6)
 		start = time.Now()
 		logFields = append(logFields,
-			zap.String("file_uid", fileUid),
-			zap.Int64("user_id", userID),
-			zap.Int64("rating", rating),
+			zap.Dict("fields",
+				zap.String("file_uid", fileUid),
+				zap.Int64("user_id", userID),
+				zap.Int64("rating", rating),
+			),
 		)
 	}
 	_, err := q.exec(ctx, q.createNsfwPicUserRateStmt, createNsfwPicUserRate, fileUid, userID, rating)
@@ -124,13 +130,15 @@ func (q *Queries) createOrUpdateNsfwPic(ctx context.Context, fileUid string, fil
 	var logFields []zap.Field
 	var start time.Time
 	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 4+5)
+		logFields = make([]zap.Field, 0, 6)
 		start = time.Now()
 		logFields = append(logFields,
-			zap.String("file_uid", fileUid),
-			zap.String("file_id", fileID),
-			zap.Int64("bot_rate", botRate),
-			zap.Int64("rand_key", randKey),
+			zap.Dict("fields",
+				zap.String("file_uid", fileUid),
+				zap.String("file_id", fileID),
+				zap.Int64("bot_rate", botRate),
+				zap.Int64("rand_key", randKey),
+			),
 		)
 	}
 	row := q.queryRow(ctx, q.createOrUpdateNsfwPicStmt, createOrUpdateNsfwPic,
@@ -167,11 +175,13 @@ func (q *Queries) getNsfwPicByRateAndRandKey(ctx context.Context, userRate int64
 	var logFields []zap.Field
 	var start time.Time
 	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 2+5)
+		logFields = make([]zap.Field, 0, 6)
 		start = time.Now()
 		logFields = append(logFields,
-			zap.Int64("user_rate", userRate),
-			zap.Int64("rand_key", randKey),
+			zap.Dict("fields",
+				zap.Int64("user_rate", userRate),
+				zap.Int64("rand_key", randKey),
+			),
 		)
 	}
 	row := q.queryRow(ctx, q.getNsfwPicByRateAndRandKeyStmt, getNsfwPicByRateAndRandKey, userRate, randKey)
@@ -201,10 +211,12 @@ func (q *Queries) getNsfwPicByRateFirst(ctx context.Context, userRate int64) (Sa
 	var logFields []zap.Field
 	var start time.Time
 	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 1+5)
+		logFields = make([]zap.Field, 0, 6)
 		start = time.Now()
 		logFields = append(logFields,
-			zap.Int64("user_rate", userRate),
+			zap.Dict("fields",
+				zap.Int64("user_rate", userRate),
+			),
 		)
 	}
 	row := q.queryRow(ctx, q.getNsfwPicByRateFirstStmt, getNsfwPicByRateFirst, userRate)
@@ -233,11 +245,13 @@ func (q *Queries) getNsfwPicRateByUserId(ctx context.Context, fileUid string, us
 	var logFields []zap.Field
 	var start time.Time
 	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 2+5)
+		logFields = make([]zap.Field, 0, 6)
 		start = time.Now()
 		logFields = append(logFields,
-			zap.String("file_uid", fileUid),
-			zap.Int64("user_id", userID),
+			zap.Dict("fields",
+				zap.String("file_uid", fileUid),
+				zap.Int64("user_id", userID),
+			),
 		)
 	}
 	row := q.queryRow(ctx, q.getNsfwPicRateByUserIdStmt, getNsfwPicRateByUserId, fileUid, userID)
@@ -257,8 +271,9 @@ func (q *Queries) listNsfwPicRateCounter(ctx context.Context) ([]PicRateCounter,
 	var logFields []zap.Field
 	var start time.Time
 	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 0+5)
+		logFields = make([]zap.Field, 0, 6)
 		start = time.Now()
+		logFields = append(logFields, zap.Dict("fields"))
 	}
 	rows, err := q.query(ctx, q.listNsfwPicRateCounterStmt, listNsfwPicRateCounter)
 	defer func() {
@@ -296,12 +311,14 @@ func (q *Queries) updateNsfwPicUserRate(ctx context.Context, rating int64, fileU
 	var logFields []zap.Field
 	var start time.Time
 	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 3+5)
+		logFields = make([]zap.Field, 0, 6)
 		start = time.Now()
 		logFields = append(logFields,
-			zap.Int64("rating", rating),
-			zap.String("file_uid", fileUid),
-			zap.Int64("user_id", userID),
+			zap.Dict("fields",
+				zap.Int64("rating", rating),
+				zap.String("file_uid", fileUid),
+				zap.Int64("user_id", userID),
+			),
 		)
 	}
 	_, err := q.exec(ctx, q.updateNsfwPicUserRateStmt, updateNsfwPicUserRate, rating, fileUid, userID)

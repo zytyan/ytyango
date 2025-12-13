@@ -3,7 +3,7 @@ plugins:
 - name: mygen
   wasm:
     url: file://sql/plugins/sqlc-gen-go.wasm
-    sha256: "b0ef220e224ad7834c1b150ab9fe6d666c235a8b7ab6220cb0f005b77a196466"
+    sha256: "b747d0b40628f8461f4c5f1eae94c97a7994332fc4c3cff8f88e7e3d5bf2f20b"
 overrides:
   go:
     overrides:
@@ -59,6 +59,7 @@ sql:
         overrides:
         - db_type: "INT_UNIX_SEC"
           engine: "sqlite"
+          zap_field_method: true
           go_type:
             type: "UnixTime"
         - db_type: "INT_BOOL"
@@ -104,11 +105,13 @@ sql:
           overrides:
             - db_type: "INT_UNIX_SEC"
               engine: "sqlite"
+              zap_field_method: true
               go_type:
                 type: "UnixTime"
             - db_type: "INT_UNIX_SEC"
               engine: "sqlite"
               nullable: true
+              zap_field_method: true
               go_type:
                 type: "Null[UnixTime]"
                 import: "database/sql"

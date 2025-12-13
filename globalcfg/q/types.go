@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"strconv"
 	"time"
+
+	"go.uber.org/zap"
 )
 
 type UnixTime struct {
@@ -53,6 +55,10 @@ func (u *UnixTime) Scan(value any) error {
 
 func (u UnixTime) Value() (driver.Value, error) {
 	return u.Unix(), nil
+}
+
+func (u UnixTime) ZapObject(name string) zap.Field {
+	return zap.Time(name, u.Time)
 }
 
 type ChatCfg struct {
