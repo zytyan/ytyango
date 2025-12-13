@@ -223,7 +223,10 @@ func (q *Queries) SaveNewMsg(msg *gotgbot.Message) error {
 
 	c, cancel := context.WithTimeout(context.Background(), defaultDBTimeout)
 	defer cancel()
-
+	viaBot := sql.NullInt64{Valid: msg.ViaBot != nil}
+	if viaBot.Valid {
+		viaBot.Int64 = msg.ViaBot.Id
+	}
 	err := q.InsertSavedMessage(c, InsertSavedMessageParams{
 		MessageID:         msg.MessageId,
 		ChatID:            msg.Chat.Id,
@@ -235,7 +238,7 @@ func (q *Queries) SaveNewMsg(msg *gotgbot.Message) error {
 		MessageThreadID:   sql.NullInt64{Int64: msg.MessageThreadId, Valid: msg.MessageThreadId != 0},
 		ReplyToMessageID:  replyMsgID,
 		ReplyToChatID:     replyChatID,
-		ViaBotID:          sql.NullInt64{Int64: msg.ViaBot.Id, Valid: msg.ViaBot != nil},
+		ViaBotID:          viaBot,
 		EditDate:          sql.Null[UnixTime]{Valid: false},
 		MediaGroupID:      nullString(msg.MediaGroupId),
 		Text:              nullString(selectText(msg)),
