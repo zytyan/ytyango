@@ -1,11 +1,17 @@
 package g
 
 import (
+	"context"
 	"database/sql"
+	"main/globalcfg/msgs"
+	"main/globalcfg/q"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
+
+	"go.uber.org/zap/zapcore"
 )
 
 func mustGetProjectRootDir() string {
@@ -52,13 +58,15 @@ func initMainDatabaseInMemory(database *sql.DB) {
 	}
 }
 
-func init() {
+// initForTests prepares an in-memory database and schema for any go test run without loading production config.
+func initForTests() {
 	if !testing.Testing() {
 		return
 	}
 	if Q != nil {
 		return
 	}
+	var err error
 	config = &Config{
 		// 此处的Token已经废弃，可放心使用
 		BotToken:           "554277510:AAEKxRdcRfhEjtSIfxpaYtL19XFgdDcY23U",
@@ -75,8 +83,28 @@ func init() {
 		TmpPath:            "",
 		DatabasePath:       ":memory:",
 		GeminiKey:          "",
-		Msgs
+		MsgDbPath:          ":memory:",
 	}
 	gWriteSyncer = initWriteSyncer()
-	initByConfig()
+	logger := GetLogger("database")
+	loggers["database"].Level.SetLevel(zapcore.WarnLevel)
+	db = initDatabase(config.DatabasePath)
+	msgDb = db
+	initMainDatabaseInMemory(db)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	Q, err = q.PrepareWithLogger(ctx, db, logger.Desugar())
+	if err != nil {
+		panic(err)
+	}
+	Msgs, err = msgs.PrepareWithLogger(ctx, msgDb, logger.Desugar())
+	if err != nil {
+		panic(err)
+	}
+	logger.Infof("Database initialized in memory for tests")
+}
+
+func init() {
+	initForTests()
 }
