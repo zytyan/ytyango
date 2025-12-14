@@ -10,6 +10,7 @@ import (
 	"os/signal"
 	"runtime/debug"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -28,11 +29,51 @@ var compileTime = "unknown"
 type GroupedDispatcher struct {
 	*ext.Dispatcher
 	autoInc int
+	logger  *zap.Logger
 	mutex   sync.Mutex
 }
 
+type HookedHandler struct {
+	ext.Handler
+	logger     *zap.Logger
+	hitCounter atomic.Int64
+}
+
+func (h *HookedHandler) CheckUpdate(b *gotgbot.Bot, ctx *ext.Context) bool {
+	start := time.Now()
+	var check bool
+	defer func() {
+		dur := time.Since(start)
+		h.logger.Debug("check update",
+			zap.Duration("elapsed", dur),
+			zap.String("name", h.Name()),
+			zap.Int64("update_id", ctx.UpdateId),
+			zap.Bool("check", check))
+	}()
+	check = h.Handler.CheckUpdate(b, ctx)
+	return check
+}
+
+func (h *HookedHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error {
+	start := time.Now()
+	newCnt := h.hitCounter.Add(1)
+	defer func() {
+		dur := time.Since(start)
+		h.logger.Info("handle update",
+			zap.Duration("elapsed", dur),
+			zap.String("name", h.Name()),
+			zap.Int64("update_id", ctx.UpdateId),
+			zap.Int64("hit_count", newCnt))
+	}()
+	return h.Handler.HandleUpdate(b, ctx)
+}
 func (g *GroupedDispatcher) AddHandler(handler ext.Handler) {
-	g.Dispatcher.AddHandlerToGroup(handler, g.autoInc)
+	hdlr := &HookedHandler{
+		Handler:    handler,
+		logger:     g.logger,
+		hitCounter: atomic.Int64{},
+	}
+	g.Dispatcher.AddHandlerToGroup(hdlr, g.autoInc)
 	g.mutex.Lock()
 	g.autoInc++
 	g.mutex.Unlock()
@@ -128,7 +169,10 @@ func main() {
 			dLog.Error("recovered from panic, a panic occurred while handling update.", fields...)
 		},
 		MaxRoutines: ext.DefaultMaxRoutines,
-	}), autoInc: 0, mutex: sync.Mutex{}}
+	}),
+		autoInc: 0,
+		logger:  g.GetLogger("handler-midware", zap.WarnLevel).Desugar(),
+		mutex:   sync.Mutex{}}
 	updater := ext.NewUpdater(dispatcher.Dispatcher, &ext.UpdaterOpts{
 		UnhandledErrFunc: func(err error) {
 			log.Errorf("an error occurred while handling update: %s", err)

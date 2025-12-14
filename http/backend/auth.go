@@ -16,6 +16,8 @@ import (
 	jsoniter "github.com/json-iterator/go"
 )
 
+const authCtxKey = "auth"
+
 type webInitUser struct {
 	Id              int    `json:"id"`
 	FirstName       string `json:"first_name"`
@@ -100,6 +102,6 @@ func (h *Handler) verifyTgAuth(raw string) error {
 func (h *Handler) HandleTgAuth(ctx context.Context,
 	_ api.OperationName, t api.TgAuth) (context.Context, error) {
 	authData := t.GetAPIKey()
-	_, err := checkTelegramAuth(authData, h.verifyKey)
-	return ctx, err
+	auth, err := checkTelegramAuth(authData, h.verifyKey)
+	return context.WithValue(ctx, authCtxKey, auth), err
 }
