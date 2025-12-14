@@ -16,7 +16,9 @@ import (
 	jsoniter "github.com/json-iterator/go"
 )
 
-const authCtxKey = "auth"
+type CtxKeyType int
+
+const authCtxKey CtxKeyType = iota
 
 type webInitUser struct {
 	Id              int    `json:"id"`

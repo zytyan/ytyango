@@ -4,10 +4,12 @@ import (
 	"context"
 	g "main/globalcfg"
 	"main/http/backend"
-	"main/myhandlers"
+	hdrs "main/myhandlers"
 	"net/http"
 	"os"
 	"os/signal"
+	"reflect"
+	"runtime"
 	"runtime/debug"
 	"sync"
 	"sync/atomic"
@@ -17,6 +19,7 @@ import (
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers"
+	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers/filters"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers/filters/callbackquery"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers/filters/inlinequery"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers/filters/message"
@@ -35,8 +38,10 @@ type GroupedDispatcher struct {
 
 type HookedHandler struct {
 	ext.Handler
-	logger     *zap.Logger
-	hitCounter atomic.Int64
+	logger      *zap.Logger
+	hitCounter  atomic.Int64
+	funcName    string
+	checkerName string
 }
 
 func (h *HookedHandler) CheckUpdate(b *gotgbot.Bot, ctx *ext.Context) bool {
@@ -47,6 +52,8 @@ func (h *HookedHandler) CheckUpdate(b *gotgbot.Bot, ctx *ext.Context) bool {
 		h.logger.Debug("check update",
 			zap.Duration("elapsed", dur),
 			zap.String("name", h.Name()),
+			zap.String("func_name", h.funcName),
+			zap.String("check_name", h.checkerName),
 			zap.Int64("update_id", ctx.UpdateId),
 			zap.Bool("check", check))
 	}()
@@ -62,28 +69,74 @@ func (h *HookedHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error {
 		h.logger.Info("handle update",
 			zap.Duration("elapsed", dur),
 			zap.String("name", h.Name()),
+			zap.String("func_name", h.funcName),
+			zap.String("check_name", h.checkerName),
 			zap.Int64("update_id", ctx.UpdateId),
 			zap.Int64("hit_count", newCnt))
 	}()
 	return h.Handler.HandleUpdate(b, ctx)
 }
-func (g *GroupedDispatcher) AddHandler(handler ext.Handler) {
-	hdlr := &HookedHandler{
-		Handler:    handler,
-		logger:     g.logger,
-		hitCounter: atomic.Int64{},
-	}
-	g.Dispatcher.AddHandlerToGroup(hdlr, g.autoInc)
+
+func (g *GroupedDispatcher) inc() int {
 	g.mutex.Lock()
 	g.autoInc++
 	g.mutex.Unlock()
+	return g.autoInc
 }
 
-func (g *GroupedDispatcher) AddCommand(command string, handler handlers.Response) {
-	g.Dispatcher.AddHandlerToGroup(handlers.NewCommand(command, handler), g.autoInc)
-	g.mutex.Lock()
-	g.autoInc++
-	g.mutex.Unlock()
+func funcName(f any) (res string) {
+	defer func() {
+		if err := recover(); err != nil {
+			res = ""
+		}
+	}()
+	pc := reflect.ValueOf(f).Pointer()
+	fn := runtime.FuncForPC(pc)
+	return fn.Name()
+}
+
+func (g *GroupedDispatcher) Command(command string, handler handlers.Response) {
+	hdr := &HookedHandler{
+		Handler:     handlers.NewCommand(command, handler),
+		logger:      g.logger,
+		hitCounter:  atomic.Int64{},
+		funcName:    funcName(handler),
+		checkerName: "cmd(" + command + ")",
+	}
+	g.Dispatcher.AddHandlerToGroup(hdr, g.inc())
+}
+
+func (g *GroupedDispatcher) NewMessage(msg filters.Message, handler handlers.Response) {
+	hdr := &HookedHandler{
+		Handler:     handlers.NewMessage(msg, handler),
+		logger:      g.logger,
+		hitCounter:  atomic.Int64{},
+		funcName:    funcName(handler),
+		checkerName: funcName(msg),
+	}
+	g.Dispatcher.AddHandlerToGroup(hdr, g.inc())
+}
+
+func (g *GroupedDispatcher) NewCallback(filter filters.CallbackQuery, handler handlers.Response) {
+	hdr := &HookedHandler{
+		Handler:     handlers.NewCallback(filter, handler),
+		logger:      g.logger,
+		hitCounter:  atomic.Int64{},
+		funcName:    funcName(handler),
+		checkerName: funcName(filter),
+	}
+	g.Dispatcher.AddHandlerToGroup(hdr, g.inc())
+}
+
+func (g *GroupedDispatcher) NewInlineQuery(callback filters.InlineQuery, handler handlers.Response) {
+	hdr := &HookedHandler{
+		Handler:     handlers.NewInlineQuery(callback, handler),
+		logger:      g.logger,
+		hitCounter:  atomic.Int64{},
+		funcName:    funcName(handler),
+		checkerName: funcName(callback),
+	}
+	g.Dispatcher.AddHandlerToGroup(hdr, g.inc())
 }
 
 func newBot(token string) *gotgbot.Bot {
@@ -146,13 +199,13 @@ func main() {
 	}()
 	token := g.GetConfig().BotToken
 	b := newBot(token)
-	myhandlers.SetMainBot(b)
-	myhandlers.StartChatStatScheduler()
+	hdrs.SetMainBot(b)
+	hdrs.StartChatStatScheduler()
 	g.Q.StartChatStatAutoSave(ctx, time.Minute)
 	backend.GoListenAndServe("127.0.0.1:4021", b)
-	go myhandlers.HttpListen4019()
+	go hdrs.HttpListen4019()
 	dLog := log.Desugar()
-	dispatcher := GroupedDispatcher{Dispatcher: ext.NewDispatcher(&ext.DispatcherOpts{
+	dp := GroupedDispatcher{Dispatcher: ext.NewDispatcher(&ext.DispatcherOpts{
 		Error: func(b *gotgbot.Bot, ctx *ext.Context, err error) ext.DispatcherAction {
 			fields := zapLogFields(b, ctx)
 			fields = append(fields, zap.Error(err))
@@ -173,64 +226,72 @@ func main() {
 		autoInc: 0,
 		logger:  g.GetLogger("handler-midware", zap.WarnLevel).Desugar(),
 		mutex:   sync.Mutex{}}
-	updater := ext.NewUpdater(dispatcher.Dispatcher, &ext.UpdaterOpts{
+	updater := ext.NewUpdater(dp.Dispatcher, &ext.UpdaterOpts{
 		UnhandledErrFunc: func(err error) {
 			log.Errorf("an error occurred while handling update: %s", err)
 		},
 	},
 	)
-	hMsg := handlers.NewMessage(message.All, myhandlers.SaveMessage)
+	hMsg := handlers.NewMessage(message.All, hdrs.SaveMessage)
 	hMsg.AllowChannel = true
 	hMsg.AllowEdited = true
-	dispatcher.AddHandler(hMsg)
-	dispatcher.AddHandler(handlers.NewMessage(message.All, myhandlers.StatMessage))
-	dispatcher.AddHandler(handlers.NewInlineQuery(inlinequery.All, myhandlers.BiliMsgConverterInline))
-	dispatcher.AddHandler(handlers.NewMessage(myhandlers.BiliMsgFilter, myhandlers.BiliMsgConverter))
+	wrappedHMsg := &HookedHandler{
+		Handler:     hMsg,
+		logger:      dp.logger,
+		hitCounter:  atomic.Int64{},
+		funcName:    funcName(hdrs.SaveMessage),
+		checkerName: "any message",
+	}
+	dp.AddHandler(wrappedHMsg)
 
-	dispatcher.AddCommand("google", myhandlers.Google)
-	dispatcher.AddCommand("roll", myhandlers.Roll)
-	dispatcher.AddCommand("wiki", myhandlers.Wiki)
-	dispatcher.AddCommand("hhsh", myhandlers.Hhsh)
-	dispatcher.AddCommand("ocr", myhandlers.OcrMessage)
-	dispatcher.AddCommand("score", myhandlers.CmdScore)
-	dispatcher.AddCommand("prpr", myhandlers.GenPrpr)
-	dispatcher.AddCommand("calc", myhandlers.SolveMath)
-	dispatcher.AddCommand("downloadvideo", myhandlers.DownloadVideo)
-	dispatcher.AddCommand("downloadaudio", myhandlers.DownloadAudio)
-	dispatcher.AddCommand("getrank", myhandlers.GetRank)
-	dispatcher.AddCommand("diag_groupstat", myhandlers.GroupStatDiagnostic)
-	dispatcher.AddCommand("diag_sendstat", myhandlers.SendGroupStat)
-	dispatcher.AddCommand("diag_forcenewday", myhandlers.ForceNewDay)
-	dispatcher.AddCommand("diag_getcntbytime", myhandlers.GetCntByTime)
-	dispatcher.AddCommand("diag_msginfo", myhandlers.GetMsgInfo)
-	dispatcher.AddCommand("searchmsg", myhandlers.SearchMessage)
-	dispatcher.AddCommand("cochelp", myhandlers.CoCHelp)
-	dispatcher.AddCommand("list_attr", myhandlers.ListDndAttr)
-	dispatcher.AddCommand("del_attr", myhandlers.DelDndAttr)
-	dispatcher.AddCommand("new_battle", myhandlers.NewBattle)
-	dispatcher.AddCommand("webp2png", myhandlers.WebpToPng)
-	dispatcher.AddCommand("chat_config", myhandlers.ShowChatCfg)
+	dp.NewMessage(message.All, hdrs.StatMessage)
+	dp.NewInlineQuery(inlinequery.All, hdrs.BiliMsgConverterInline)
+	dp.NewMessage(hdrs.BiliMsgFilter, hdrs.BiliMsgConverter)
 
-	dispatcher.AddCommand("count_nsfw_pics", myhandlers.CountNsfwPics)
-	dispatcher.AddCommand("settimezone", myhandlers.SetUserTimeZone)
-	dispatcher.AddHandler(handlers.NewMessage(myhandlers.HasSinaGif, myhandlers.Gif2Mp4))
-	dispatcher.AddHandler(handlers.NewCallback(myhandlers.IsBilibiliBtn, myhandlers.DownloadVideoCallback))
-	dispatcher.AddHandler(handlers.NewMessage(myhandlers.DetectNsfwPhoto, myhandlers.NsfwDetect))
-	dispatcher.AddHandler(handlers.NewMessage(myhandlers.NeedSolve, myhandlers.SolveMath))
-	dispatcher.AddHandler(handlers.NewMessage(myhandlers.IsCalcExchangeRate, myhandlers.ExchangeRateCalc))
-	dispatcher.AddHandler(handlers.NewMessage(myhandlers.IsBilibiliInlineBtn2, myhandlers.SaveBiliMsgCallbackMsgId))
-	dispatcher.AddHandler(handlers.NewMessage(myhandlers.IsDndDice, myhandlers.DndDice))
-	dispatcher.AddHandler(handlers.NewMessage(myhandlers.IsSetDndAttr, myhandlers.SetDndAttr))
-	dispatcher.AddHandler(handlers.NewMessage(myhandlers.RequireNsfw, myhandlers.SendRandRacy))
-	dispatcher.AddHandler(handlers.NewMessage(myhandlers.IsSacabam, myhandlers.GenSacabam))
-	dispatcher.AddHandler(handlers.NewCallback(myhandlers.IsStopBattle, myhandlers.StopBattle))
-	dispatcher.AddHandler(handlers.NewCallback(myhandlers.IsNextRound, myhandlers.NextRound))
-	dispatcher.AddHandler(handlers.NewMessage(myhandlers.IsBattleCommand, myhandlers.ExecuteBattleCommand))
-	dispatcher.AddHandler(handlers.NewMessage(myhandlers.IsGeminiReq, myhandlers.GeminiReply))
-	dispatcher.AddHandler(handlers.NewCallback(myhandlers.IsBilibiliInlineBtn, myhandlers.DownloadInlinedBv))
-	dispatcher.AddHandler(handlers.NewCallback(myhandlers.IsNsfwPicRateBtn, myhandlers.RateNsfwPicByBtn))
+	dp.Command("google", hdrs.Google)
+	dp.Command("roll", hdrs.Roll)
+	dp.Command("wiki", hdrs.Wiki)
+	dp.Command("hhsh", hdrs.Hhsh)
+	dp.Command("ocr", hdrs.OcrMessage)
+	dp.Command("score", hdrs.CmdScore)
+	dp.Command("prpr", hdrs.GenPrpr)
+	dp.Command("calc", hdrs.SolveMath)
+	dp.Command("downloadvideo", hdrs.DownloadVideo)
+	dp.Command("downloadaudio", hdrs.DownloadAudio)
+	dp.Command("getrank", hdrs.GetRank)
+	dp.Command("diag_groupstat", hdrs.GroupStatDiagnostic)
+	dp.Command("diag_sendstat", hdrs.SendGroupStat)
+	dp.Command("diag_forcenewday", hdrs.ForceNewDay)
+	dp.Command("diag_getcntbytime", hdrs.GetCntByTime)
+	dp.Command("diag_msginfo", hdrs.GetMsgInfo)
+	dp.Command("searchmsg", hdrs.SearchMessage)
+	dp.Command("cochelp", hdrs.CoCHelp)
+	dp.Command("list_attr", hdrs.ListDndAttr)
+	dp.Command("del_attr", hdrs.DelDndAttr)
+	dp.Command("new_battle", hdrs.NewBattle)
+	dp.Command("webp2png", hdrs.WebpToPng)
+	dp.Command("chat_config", hdrs.ShowChatCfg)
 
-	dispatcher.AddHandler(handlers.NewCallback(callbackquery.Prefix(myhandlers.GroupConfigModifyPrefix), myhandlers.ModifyGroupConfigByButton))
+	dp.Command("count_nsfw_pics", hdrs.CountNsfwPics)
+	dp.Command("settimezone", hdrs.SetUserTimeZone)
+	dp.NewMessage(hdrs.HasSinaGif, hdrs.Gif2Mp4)
+	dp.NewCallback(hdrs.IsBilibiliBtn, hdrs.DownloadVideoCallback)
+	dp.NewMessage(hdrs.DetectNsfwPhoto, hdrs.NsfwDetect)
+	dp.NewMessage(hdrs.NeedSolve, hdrs.SolveMath)
+	dp.NewMessage(hdrs.IsCalcExchangeRate, hdrs.ExchangeRateCalc)
+	dp.NewMessage(hdrs.IsBilibiliInlineBtn2, hdrs.SaveBiliMsgCallbackMsgId)
+	dp.NewMessage(hdrs.IsDndDice, hdrs.DndDice)
+	dp.NewMessage(hdrs.IsSetDndAttr, hdrs.SetDndAttr)
+	dp.NewMessage(hdrs.RequireNsfw, hdrs.SendRandRacy)
+	dp.NewMessage(hdrs.IsSacabam, hdrs.GenSacabam)
+	dp.NewCallback(hdrs.IsStopBattle, hdrs.StopBattle)
+	dp.NewCallback(hdrs.IsNextRound, hdrs.NextRound)
+	dp.NewMessage(hdrs.IsBattleCommand, hdrs.ExecuteBattleCommand)
+	dp.NewMessage(hdrs.IsGeminiReq, hdrs.GeminiReply)
+	dp.NewCallback(hdrs.IsBilibiliInlineBtn, hdrs.DownloadInlinedBv)
+	dp.NewCallback(hdrs.IsNsfwPicRateBtn, hdrs.RateNsfwPicByBtn)
+
+	dp.NewCallback(callbackquery.Prefix(hdrs.GroupConfigModifyPrefix), hdrs.ModifyGroupConfigByButton)
 
 	err := updater.StartPolling(b, &ext.PollingOpts{
 		DropPendingUpdates:    g.GetConfig().DropPendingUpdates,
