@@ -113,3 +113,29 @@ MathParser 作为机器人基础算式解析器，承载 `/solve` 与自动计�
 | Day 1      | 补齐基准测试与现状基线数据，文档化基准命令 |
 | Day 2–3    | 词法/语法/求值路径优化，保证功能等价    |
 | Day 4      | 回归测试与 bench 对比，输出优化效果     |
+
+---
+
+## **11. 基准记录（2025-12-14）**
+
+- 环境：`go1.25.5 linux/amd64`，CPU `12th Gen Intel(R) Core(TM) i3-12300T`
+- 命令：`go test -bench=. -benchmem ./helpers/mathparser`
+
+| Benchmark                     | Before ns/op | Before B/op | Before allocs | After ns/op | After B/op | After allocs |
+| ----------------------------- | ------------ | ----------- | ------------- | ----------- | ---------- | ------------ |
+| BenchmarkFastCheck-8          | 292.1        | 0           | 0             | 32.11       | 0          | 0            |
+| BenchmarkEvaluateSimple-8     | 5211         | 4666        | 122           | 2020        | 761        | 33           |
+| BenchmarkEvaluatePowFloat-8   | 4919         | 3089        | 81            | 3269        | 1234       | 40           |
+| BenchmarkEvaluateFactorial-8  | 3802         | 3129        | 77            | 1745        | 472        | 22           |
+| BenchmarkEvaluatePermutation-8| 1548         | 1112        | 39            | 693.4       | 320        | 13           |
+| BenchmarkEvaluateParallelSimple-8 | 3076     | 4668        | 122           | 856.4       | 763        | 33           |
+
+- 现状：短算式延迟相比基线下降约 61%，allocs/op 下降约 73%；FastCheck 进入 0 分配水平。
+
+---
+
+## **12. 性能回归检查指引**
+
+- 日常校验：`go test -bench=. -benchmem ./helpers/mathparser`
+- 版本对比：`go test -bench=. -benchmem ./helpers/mathparser > /tmp/bench-new.txt` 后使用 `benchstat /tmp/bench-old.txt /tmp/bench-new.txt` 对比。
+- 关注指标：`BenchmarkEvaluateSimple` allocs/op 保持在 35 以内、ns/op 稳定在 2–3µs 区间；FastCheck 保持 0 分配。

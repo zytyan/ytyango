@@ -5,9 +5,11 @@ package mathparser
 import (
 	"math"
 	"math/big"
-	"regexp"
+	"strconv"
 	"strings"
+	"sync"
 	"unicode"
+	"unicode/utf8"
 )
 
 // Token types
@@ -62,40 +64,204 @@ var replacer = strings.NewReplacer(
 var e, _ = new(big.Rat).SetString(`2.718281828459`)
 var pi, _ = new(big.Rat).SetString(`3.141592653589793`)
 
+const (
+	maxPooledSliceCap = 256
+	maxFastIntDigits  = 18
+	maxFastFracDigits = 9
+)
+
+var (
+	tokenPool = sync.Pool{
+		New: func() any {
+			return make([]Token, 0, 16)
+		},
+	}
+	rpnPool = sync.Pool{
+		New: func() any {
+			return make([]Token, 0, 16)
+		},
+	}
+	ratPool = sync.Pool{
+		New: func() any {
+			return make([]big.Rat, 0, 16)
+		},
+	}
+	pow10Int64 = [...]int64{
+		1,
+		10,
+		100,
+		1000,
+		10000,
+		100000,
+		1000000,
+		10000000,
+		100000000,
+		1000000000,
+	}
+)
+
+func getTokenSlice(need int) []Token {
+	buf := tokenPool.Get().([]Token)
+	if cap(buf) < need {
+		return make([]Token, 0, need)
+	}
+	return buf[:0]
+}
+
+func putTokenSlice(buf []Token) {
+	if cap(buf) > maxPooledSliceCap {
+		return
+	}
+	tokenPool.Put(buf[:0])
+}
+
+func getRpnSlice(need int) []Token {
+	buf := rpnPool.Get().([]Token)
+	if cap(buf) < need {
+		return make([]Token, 0, need)
+	}
+	return buf[:0]
+}
+
+func putRpnSlice(buf []Token) {
+	if cap(buf) > maxPooledSliceCap {
+		return
+	}
+	rpnPool.Put(buf[:0])
+}
+
+func getRatSlice(need int) []big.Rat {
+	buf := ratPool.Get().([]big.Rat)
+	if cap(buf) < need {
+		return make([]big.Rat, need)
+	}
+	return buf[:need]
+}
+
+func putRatSlice(buf []big.Rat) {
+	if cap(buf) > maxPooledSliceCap {
+		return
+	}
+	for i := range buf {
+		buf[i].SetInt64(0)
+	}
+	ratPool.Put(buf[:0])
+}
+
+func fastParseRat(raw string, dst *big.Rat) bool {
+	if raw == "" {
+		return false
+	}
+	dot := strings.IndexByte(raw, '.')
+	if dot == -1 {
+		if len(raw) > maxFastIntDigits {
+			return false
+		}
+		if v, err := strconv.ParseInt(raw, 10, 64); err == nil {
+			dst.SetInt64(v)
+			return true
+		}
+		return false
+	}
+	intPart := raw[:dot]
+	fracPart := raw[dot+1:]
+	if fracPart == "" || len(fracPart) > maxFastFracDigits || len(intPart) > maxFastFracDigits {
+		return false
+	}
+	intVal := int64(0)
+	if intPart != "" {
+		v, err := strconv.ParseInt(intPart, 10, 64)
+		if err != nil {
+			return false
+		}
+		intVal = v
+	}
+	fracVal, err := strconv.ParseInt(fracPart, 10, 64)
+	if err != nil {
+		return false
+	}
+	denom := pow10Int64[len(fracPart)]
+	num := fracVal + intVal*denom
+	dst.SetFrac64(num, denom)
+	return true
+}
+
+func needsReplace(s string) bool {
+	for _, r := range s {
+		switch r {
+		case '（', '）', '＋', '－', '×', '＊', '÷', '／', '！', 'Ａ', 'ａ', 'Ｃ', 'ｃ', 'Ｐ', 'ｐ':
+			return true
+		}
+	}
+	return false
+}
+
 // tokenize converts input string to slice of Tokens
 
 func tokenize(input string) ([]Token, error) {
-	input = replacer.Replace(input)
-	runes := []rune(input)
-	i := 0
-	var tokens []Token
+	if needsReplace(input) {
+		input = replacer.Replace(input)
+	}
+	tokens := getTokenSlice(len(input) + 1)
+	bytePos := 0
+	runePos := 0
 
-	for i < len(runes) {
-		switch c := runes[i]; {
-		case unicode.IsSpace(c):
-			i++
-		case unicode.IsDigit(c) || c == '.':
-			start := i
-			for i < len(runes) && (unicode.IsDigit(runes[i]) || runes[i] == '.') {
-				i++
+	for bytePos < len(input) {
+		r, size := utf8.DecodeRuneInString(input[bytePos:])
+		switch {
+		case unicode.IsSpace(r):
+			bytePos += size
+			runePos++
+		case unicode.IsDigit(r) || r == '.':
+			startByte := bytePos
+			startRune := runePos
+			bytePos += size
+			runePos++
+			for bytePos < len(input) {
+				nextRune, nextSize := utf8.DecodeRuneInString(input[bytePos:])
+				if unicode.IsDigit(nextRune) || nextRune == '.' {
+					bytePos += nextSize
+					runePos++
+					continue
+				}
+				break
 			}
-			raw := string(runes[start:i])
-			r := new(big.Rat)
-			if _, ok := r.SetString(raw); !ok {
-				return nil, errorAt(start, ErrorInvalidNumber, "invalid number: %s", raw)
+			raw := input[startByte:bytePos]
+			idx := len(tokens)
+			var rat *big.Rat
+			if idx < cap(tokens) {
+				rat = tokens[:cap(tokens)][idx].num
 			}
-			tokens = append(tokens, Token{typ: NUMBER, num: r})
-		case unicode.IsLetter(c):
-			start := i
-			for i < len(runes) && unicode.IsLetter(runes[i]) {
-				i++
+			if rat == nil {
+				rat = new(big.Rat)
 			}
-			name := string(runes[start:i])
-			if len(name) == 1 {
-				switch strings.ToLower(name) {
-				case "a", "p":
+			if fastParseRat(raw, rat) {
+				tokens = append(tokens, Token{typ: NUMBER, num: rat})
+				continue
+			}
+			if _, ok := rat.SetString(raw); !ok {
+				return nil, errorAt(startRune, ErrorInvalidNumber, "invalid number: %s", raw)
+			}
+			tokens = append(tokens, Token{typ: NUMBER, num: rat})
+		case unicode.IsLetter(r):
+			startByte := bytePos
+			bytePos += size
+			runePos++
+			for bytePos < len(input) {
+				nextRune, nextSize := utf8.DecodeRuneInString(input[bytePos:])
+				if unicode.IsLetter(nextRune) {
+					bytePos += nextSize
+					runePos++
+					continue
+				}
+				break
+			}
+			name := input[startByte:bytePos]
+			if size == len(name) && r <= unicode.MaxASCII {
+				switch toLowerASCII(byte(r)) {
+				case 'a', 'p':
 					tokens = append(tokens, Token{typ: PERM, str: name})
-				case "c":
+				case 'c':
 					tokens = append(tokens, Token{typ: COMB, str: name})
 				default:
 					tokens = append(tokens, Token{typ: IDENT, str: name})
@@ -104,20 +270,19 @@ func tokenize(input string) ([]Token, error) {
 				tokens = append(tokens, Token{typ: IDENT, str: name})
 			}
 		default:
-			if i+1 < len(runes) {
-				two := string(runes[i : i+2])
-				switch two {
-				case "**":
-					tokens = append(tokens, Token{typ: POW, str: two})
-					i += 2
-					continue
-				case "//":
-					tokens = append(tokens, Token{typ: FLOORDIV, str: two})
-					i += 2
-					continue
-				}
+			if r == '*' && bytePos+1 < len(input) && input[bytePos+1] == '*' {
+				tokens = append(tokens, Token{typ: POW, str: "**"})
+				bytePos += 2
+				runePos += 2
+				continue
 			}
-			switch c {
+			if r == '/' && bytePos+1 < len(input) && input[bytePos+1] == '/' {
+				tokens = append(tokens, Token{typ: FLOORDIV, str: "//"})
+				bytePos += 2
+				runePos += 2
+				continue
+			}
+			switch r {
 			case '+':
 				tokens = append(tokens, Token{typ: PLUS, str: "+"})
 			case '-':
@@ -137,9 +302,10 @@ func tokenize(input string) ([]Token, error) {
 			case ')':
 				tokens = append(tokens, Token{typ: RPAREN, str: ")"})
 			default:
-				return nil, errorAt(i, ErrorUnknownCharacter, "unknown character: %q at %d", c, i)
+				return nil, errorAt(runePos, ErrorUnknownCharacter, "unknown character: %q at %d", r, runePos)
 			}
-			i++
+			bytePos += size
+			runePos++
 		}
 	}
 	tokens = append(tokens, Token{typ: EOF})
@@ -170,8 +336,13 @@ func isRightAssociative(tok Token) bool {
 // shuntingYard converts infix tokens to postfix (RPN)
 
 func shuntingYard(tokens []Token) ([]Token, error) {
-	var output []Token
-	var ops []Token
+	output := getRpnSlice(len(tokens))
+	ops := getTokenSlice(len(tokens))
+	defer putTokenSlice(ops)
+	fail := func(err error) ([]Token, error) {
+		putRpnSlice(output)
+		return nil, err
+	}
 
 	for _, tok := range tokens {
 		switch tok.typ {
@@ -202,80 +373,104 @@ func shuntingYard(tokens []Token) ([]Token, error) {
 				output = append(output, top)
 			}
 			if !found {
-				return nil, errorAt(-1, ErrorMismatchedParentheses, "mismatched parentheses")
+				return fail(errorAt(-1, ErrorMismatchedParentheses, "mismatched parentheses"))
 			}
 		case EOF:
 			break
 		default:
-			return nil, errorAt(-1, ErrorUnexpectedToken, "unexpected token in shunting yard: %v", tok)
+			return fail(errorAt(-1, ErrorUnexpectedToken, "unexpected token in shunting yard: %v", tok))
 		}
 	}
 	for len(ops) > 0 {
 		top := ops[len(ops)-1]
 		ops = ops[:len(ops)-1]
 		if top.typ == LPAREN || top.typ == RPAREN {
-			return nil, errorAt(-1, ErrorMismatchedParentheses, "mismatched parentheses")
+			return fail(errorAt(-1, ErrorMismatchedParentheses, "mismatched parentheses"))
 		}
 		output = append(output, top)
 	}
 	return output, nil
 }
 
+type ratStack struct {
+	data []big.Rat
+	top  int
+}
+
+func newRatStack(size int) ratStack {
+	return ratStack{
+		data: getRatSlice(size),
+	}
+}
+
+func (s *ratStack) push(src *big.Rat) {
+	s.data[s.top].Set(src)
+	s.top++
+}
+
+func (s *ratStack) pop() (*big.Rat, error) {
+	if s.top == 0 {
+		return nil, errorAt(-1, ErrorStackUnderflow, "stack underflow")
+	}
+	s.top--
+	return &s.data[s.top], nil
+}
+
+func (s *ratStack) popBinary() (*big.Rat, *big.Rat, error) {
+	if s.top < 2 {
+		return nil, nil, errorAt(-1, ErrorStackUnderflow, "stack underflow")
+	}
+	s.top--
+	right := &s.data[s.top]
+	s.top--
+	left := &s.data[s.top]
+	return left, right, nil
+}
+
+func (s *ratStack) release() {
+	putRatSlice(s.data)
+	s.data = nil
+	s.top = 0
+}
+
 // evalRPN evaluates a postfix token list and returns big.Rat result
 
 func evalRPN(rpn []Token) (*big.Rat, error) {
-	var stack []*big.Rat
-
-	push := func(r *big.Rat) {
-		stack = append(stack, r)
-	}
-	pop := func() (*big.Rat, error) {
-		if len(stack) < 1 {
-			return nil, errorAt(-1, ErrorStackUnderflow, "stack underflow")
-		}
-		r := stack[len(stack)-1]
-		stack = stack[:len(stack)-1]
-		return r, nil
-	}
+	stack := newRatStack(len(rpn))
+	defer stack.release()
+	var tmpInt1, tmpInt2, tmpInt3 big.Int
+	var tmpRat big.Rat
 
 	for _, tok := range rpn {
 		switch tok.typ {
 		case NUMBER:
-			push(new(big.Rat).Set(tok.num))
+			stack.push(tok.num)
 		case IDENT:
-			var r *big.Rat
-			switch strings.ToLower(tok.str) {
-			case "pi":
-				r = pi
-			case "e":
-				r = e
+			switch {
+			case equalFoldASCII(tok.str, "pi"):
+				stack.push(pi)
+			case equalFoldASCII(tok.str, "e"):
+				stack.push(e)
 			default:
 				return nil, errorAt(-1, ErrorUnknownIdentifier, "unknown identifier: %s", tok.str)
 			}
-			push(r)
 		case PLUS, MINUS, MUL, DIV, POW, FLOORDIV, MOD, PERM, COMB:
-			// binary ops: pop right then left
-			right, err := pop()
+			left, right, err := stack.popBinary()
 			if err != nil {
 				return nil, err
 			}
-			left, err := pop()
-			if err != nil {
-				return nil, err
-			}
-			var res *big.Rat
 			switch tok.typ {
 			case PLUS:
-				res = new(big.Rat).Add(left, right)
+				left.Add(left, right)
 			case MINUS:
-				res = new(big.Rat).Sub(left, right)
+				left.Sub(left, right)
 			case MUL:
-				res = new(big.Rat).Mul(left, right)
+				left.Mul(left, right)
 			case DIV:
-				if right.Cmp(new(big.Rat)) == 0 {
+				if right.Sign() == 0 {
 					return nil, errorAt(-1, ErrorDivisionByZero, "division by zero")
 				}
-				res = new(big.Rat).Quo(left, right)
+				left.Quo(left, right)
 			case POW:
 				// exponent must be integer
 				exp, _ := right.Float64()
@@ -291,33 +486,32 @@ func evalRPN(rpn []Token) (*big.Rat, error) {
 					if math.IsInf(floatRet, 0) || math.IsNaN(floatRet) {
 						return nil, errorAt(-1, ErrorInfiniteResult, "infinite float")
 					}
-					res = new(big.Rat).SetFloat64(floatRet)
+					left.SetFloat64(floatRet)
 					break
 				}
 				if math.Log10(base)*exp > 3000 {
 					return nil, errorAt(-1, ErrorResultTooBig, "result too big")
 				}
-				res = powRat(left, int(exp))
+				tmpRat.Set(left)
+				powRat(left, &tmpRat, int(exp))
 			case FLOORDIV:
 				// floor division: (a/b) // (c/d) = floor((a*d)/(b*c))
-				n := new(big.Int).Mul(left.Num(), right.Denom())
-				d := new(big.Int).Mul(left.Denom(), right.Num())
-				if d.Sign() == 0 {
+				tmpInt1.Mul(left.Num(), right.Denom())
+				tmpInt2.Mul(left.Denom(), right.Num())
+				if tmpInt2.Sign() == 0 {
 					return nil, errorAt(-1, ErrorDivisionByZero, "floor division by zero")
 				}
-				quo := new(big.Int).Div(n, d)
-				res = new(big.Rat).SetInt(quo)
+				tmpInt3.Quo(&tmpInt1, &tmpInt2)
+				left.SetInt(&tmpInt3)
 			case MOD:
 				if !left.IsInt() || !right.IsInt() {
 					return nil, errorAt(-1, ErrorModuloRequiresInt, "modulo requires integers")
 				}
-				a := left.Num()
-				b := right.Num()
-				if b.Sign() == 0 {
+				if right.Num().Sign() == 0 {
 					return nil, errorAt(-1, ErrorModByZero, "mod by zero")
 				}
-				m := new(big.Int).Mod(a, b)
-				res = new(big.Rat).SetInt(m)
+				tmpInt1.Mod(left.Num(), right.Num())
+				left.SetInt(&tmpInt1)
 			case PERM:
 				if !left.IsInt() || !right.IsInt() {
 					return nil, errorAt(-1, ErrorPermutationRequiresInt, "permutation requires integers")
@@ -330,8 +524,7 @@ func evalRPN(rpn []Token) (*big.Rat, error) {
 				if approxPermDigits(n, r) > 8000 {
 					return nil, errorAt(-1, ErrorResultTooBig, "result too big")
 				}
-				resInt := permInt(n, r)
-				res = new(big.Rat).SetInt(resInt)
+				left.SetInt(permInt(&tmpInt1, n, r))
 			case COMB:
 				if !left.IsInt() || !right.IsInt() {
 					return nil, errorAt(-1, ErrorCombinationRequiresInt, "combination requires integers")
@@ -344,14 +537,13 @@ func evalRPN(rpn []Token) (*big.Rat, error) {
 				if approxCombDigits(n, r) > 8000 {
 					return nil, errorAt(-1, ErrorResultTooBig, "result too big")
 				}
-				resInt := combInt(n, r)
-				res = new(big.Rat).SetInt(resInt)
+				left.SetInt(combInt(&tmpInt1, n, r))
 			default:
 				return nil, errorAt(-1, ErrorUnexpectedToken, "unexpected token in shunting yard: %v", tok)
 			}
-			push(res)
+			stack.top++
 		case FACT:
-			val, err := pop()
+			val, err := stack.pop()
 			if err != nil {
 				return nil, err
 			}
@@ -365,41 +557,45 @@ func evalRPN(rpn []Token) (*big.Rat, error) {
 			if approxFactorialDigits(n) > 8000 {
 				return nil, errorAt(-1, ErrorResultTooBig, "result too big")
 			}
-			resInt := factorialInt(n)
-			push(new(big.Rat).SetInt(resInt))
+			factorialInt(&tmpInt1, n)
+			val.SetInt(&tmpInt1)
+			stack.top++
 		case LPAREN, RPAREN, EOF:
-		// ignore
 		default:
 			return nil, errorAt(-1, ErrorUnexpectedToken, "unexpected token in eval: %v", tok)
 		}
 	}
-	if len(stack) != 1 {
-		return nil, errorAt(-1, ErrorInvalidExpression, "invalid expression, stack has %d elements", len(stack))
+	if stack.top != 1 {
+		return nil, errorAt(-1, ErrorInvalidExpression, "invalid expression, stack has %d elements", stack.top)
 	}
-	return stack[0], nil
+	result := new(big.Rat).Set(&stack.data[0])
+	return result, nil
 }
 
-// powRat computes integer power for *big.Rat base and int exponent
-
-func powRat(base *big.Rat, exp int) *big.Rat {
-	res := big.NewRat(1, 1)
-	tmp := new(big.Rat).Set(base)
+// powRat computes integer power for *big.Rat base and int exponent.
+// dst is used as accumulator to reduce allocations.
+func powRat(dst *big.Rat, base *big.Rat, exp int) *big.Rat {
+	dst.SetInt64(1)
+	var tmp big.Rat
+	tmp.Set(base)
 	for exp > 0 {
 		if exp&1 == 1 {
-			res.Mul(res, tmp)
+			dst.Mul(dst, &tmp)
 		}
-		tmp.Mul(tmp, tmp)
+		tmp.Mul(&tmp, &tmp)
 		exp >>= 1
 	}
-	return res
+	return dst
 }
 
-func factorialInt(n int64) *big.Int {
-	res := big.NewInt(1)
+func factorialInt(dst *big.Int, n int64) *big.Int {
+	dst.SetInt64(1)
+	var step big.Int
 	for i := int64(2); i <= n; i++ {
-		res.Mul(res, big.NewInt(i))
+		step.SetInt64(i)
+		dst.Mul(dst, &step)
 	}
-	return res
+	return dst
 }
 
 func approxFactorialDigits(n int64) float64 {
@@ -407,12 +603,14 @@ func approxFactorialDigits(n int64) float64 {
 	return lg / math.Ln10
 }
 
-func permInt(n, r int64) *big.Int {
-	res := big.NewInt(1)
+func permInt(dst *big.Int, n, r int64) *big.Int {
+	dst.SetInt64(1)
+	var step big.Int
 	for i := int64(0); i < r; i++ {
-		res.Mul(res, big.NewInt(n-i))
+		step.SetInt64(n - i)
+		dst.Mul(dst, &step)
 	}
-	return res
+	return dst
 }
 
 func approxPermDigits(n, r int64) float64 {
@@ -421,16 +619,19 @@ func approxPermDigits(n, r int64) float64 {
 	return (lg1 - lg2) / math.Ln10
 }
 
-func combInt(n, r int64) *big.Int {
+func combInt(dst *big.Int, n, r int64) *big.Int {
 	if r > n-r {
 		r = n - r
 	}
-	res := big.NewInt(1)
+	dst.SetInt64(1)
+	var step big.Int
 	for i := int64(1); i <= r; i++ {
-		res.Mul(res, big.NewInt(n-r+i))
-		res.Div(res, big.NewInt(i))
+		step.SetInt64(n - r + i)
+		dst.Mul(dst, &step)
+		step.SetInt64(i)
+		dst.Div(dst, &step)
 	}
-	return res
+	return dst
 }
 
 func approxCombDigits(n, r int64) float64 {
@@ -447,23 +648,61 @@ func Evaluate(expr string) (*big.Rat, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer putTokenSlice(tokens)
 	rpn, err := shuntingYard(tokens)
 	if err != nil {
 		return nil, err
 	}
+	defer putRpnSlice(rpn)
 	return evalRPN(rpn)
 }
 
-var reFastCheck = regexp.MustCompile(`(?i)^[ \depiac（(）)＋+－\-×*＊÷/／.!^]+$`)
+func toLowerASCII(b byte) byte {
+	if b >= 'A' && b <= 'Z' {
+		return b + ('a' - 'A')
+	}
+	return b
+}
 
-func FastCheck(expr string) bool {
-	for _, c := range expr {
-		if !unicode.IsNumber(c) {
-			goto check
+func equalFoldASCII(a, b string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := 0; i < len(a); i++ {
+		if toLowerASCII(a[i]) != toLowerASCII(b[i]) {
+			return false
 		}
+	}
+	return true
+}
 
+func isAllowedFastCheckRune(r rune) bool {
+	switch r {
+	case ' ', '(', ')', '（', '）', '+', '＋', '-', '－', '×', '*', '＊', '÷', '/', '／', '.', '!', '^':
+		return true
+	}
+	if unicode.IsNumber(r) {
+		return true
+	}
+	if r <= unicode.MaxASCII {
+		switch toLowerASCII(byte(r)) {
+		case 'e', 'p', 'i', 'a', 'c':
+			return true
+		}
 	}
 	return false
-check:
-	return reFastCheck.MatchString(expr)
+}
+
+func FastCheck(expr string) bool {
+	onlyDigits := true
+	for _, c := range expr {
+		if unicode.IsNumber(c) {
+			continue
+		}
+		onlyDigits = false
+		if !isAllowedFastCheckRune(c) {
+			return false
+		}
+	}
+	return !onlyDigits
 }
