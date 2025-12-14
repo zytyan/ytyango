@@ -35,7 +35,7 @@ func Hhsh(bot *gotgbot.Bot, ctx *ext.Context) error {
 		}
 		return err
 	}
-	hhshUrl := "https://lab.magiconch.com/nbnhhsh/guess"
+	hhshUrl := "https://lab.magiconch.com/api/nbnhhsh/guess"
 	queries := strings.Fields(query)
 	body := strings.Join(queries, ",")
 	body = `{"text":"` + body + `"}`
