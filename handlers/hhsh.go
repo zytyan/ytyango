@@ -5,7 +5,6 @@ import (
 	"io"
 	"main/globalcfg/h"
 	"net/http"
-	"net/url"
 	"regexp"
 	"strings"
 
@@ -37,11 +36,10 @@ func Hhsh(bot *gotgbot.Bot, ctx *ext.Context) error {
 		return err
 	}
 	hhshUrl := "https://lab.magiconch.com/nbnhhsh/guess/"
-	strings.Fields(query)
-	data := url.Values{
-		"text": {query},
-	}
-	resp, err := http.PostForm(hhshUrl, data)
+	queries := strings.Fields(query)
+	body := strings.Join(queries, ",")
+	body = `{"text":"` + query + `"}`
+	resp, err := http.Post(hhshUrl, "application/json; charset=utf-8", strings.NewReader(body))
 	if err != nil {
 		_, err := ctx.Message.Reply(bot, "出现了莫名的网络错误~", nil)
 		if err != nil {
@@ -52,7 +50,7 @@ func Hhsh(bot *gotgbot.Bot, ctx *ext.Context) error {
 		return err
 	}
 	defer resp.Body.Close()
-	res := make([]HhshResponse, 0)
+	res := make([]HhshResponse, 0, len(queries))
 	read, err := io.ReadAll(resp.Body)
 	if err != nil {
 		_, err := ctx.Message.Reply(bot, "出现了莫名的响应错误~ 和bot一点关系也没有哦", nil)
@@ -78,9 +76,6 @@ func Hhsh(bot *gotgbot.Bot, ctx *ext.Context) error {
 		}
 	}
 	_, err = ctx.Message.Reply(bot, builder.String(), nil)
-	if err != nil {
-		log.Warnf("hhsh reply failed: %s", err)
-	}
 	return err
 
 }
