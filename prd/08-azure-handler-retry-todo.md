@@ -6,6 +6,7 @@
 - [ ] 限流与配置整理
   - [x] 提取 OCR/Moderator 的 RPM、最小间隔等参数为集中常量或配置。
   - [x] 保留 RateLimited 判定与缓存路径不变。
+  - [x] 下载文件流程改用 `DownloadToMemoryCached`，降低重复下载。
 
 - [ ] 退避重试实现
   - [x] 为 OCR/Moderator 调用添加带抖动的指数退避，错误最多重试 3 次，返回值行为保持一致。

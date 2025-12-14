@@ -3,11 +3,16 @@ package h
 import (
 	"fmt"
 	"html"
+	"io"
+	"net/http"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
+	lru "github.com/hashicorp/golang-lru/v2"
+	"golang.org/x/sync/singleflight"
 )
 
 func GetAllTextIncludeReply(msg *gotgbot.Message) string {
@@ -58,4 +63,94 @@ func LocalFile(filename string) gotgbot.InputFileOrString {
 		}
 	}
 	return gotgbot.InputFileByURL("file://" + url.PathEscape(filename))
+}
+
+func isLocalFile(filename string) bool {
+	p := func(prefix string) bool { return strings.HasPrefix(filename, prefix) }
+	winPath := len(filename) > 2 && filename[1] == ':'
+	return p("/") || p(`\\`) || winPath
+}
+
+func DownloadToDisk(bot *gotgbot.Bot, fileId string) (string, error) {
+	f, err := bot.GetFile(fileId, nil)
+	if err != nil {
+		return "", err
+	}
+	path := f.FilePath
+	if isLocalFile(path) {
+		return path, nil
+	}
+	u := f.URL(bot, nil)
+	resp, err := http.Get(u)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("GET %s, bad status: %s", u, resp.Status)
+	}
+	tmp, err := os.CreateTemp("", "bot_file")
+	if err != nil {
+		return "", err
+	}
+	defer tmp.Close()
+	if _, err := io.Copy(tmp, resp.Body); err != nil {
+		return "", err
+	}
+	return tmp.Name(), nil
+}
+
+func DownloadToMemory(bot *gotgbot.Bot, fileId string) ([]byte, error) {
+	f, err := bot.GetFile(fileId, nil)
+	if err != nil {
+		return nil, err
+	}
+	path := f.FilePath
+	if isLocalFile(path) {
+		return os.ReadFile(path)
+	}
+	u := f.URL(bot, nil)
+	resp, err := http.Get(u)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("GET %s, bad status: %s", u, resp.Status)
+	}
+	return io.ReadAll(resp.Body)
+}
+
+var cache *lru.Cache[string, []byte]
+var single singleflight.Group
+
+func DownloadToMemoryCached(bot *gotgbot.Bot, fileId string) (data []byte, err error) {
+	var ok bool
+	if data, ok = cache.Get(fileId); ok {
+		return data, nil
+	}
+	r, err, _ := single.Do(fileId, func() (interface{}, error) {
+		d, e := DownloadToMemory(bot, fileId)
+		if e != nil {
+			return nil, e
+		}
+		cache.Add(fileId, d)
+		return d, e
+	})
+	if err != nil {
+		return nil, err
+	}
+	data, ok = r.([]byte)
+	if !ok {
+		return nil, fmt.Errorf("singleflight: unexpected type %T", r)
+	}
+	return data, err
+}
+
+func init() {
+	var err error
+	cache, err = lru.New[string, []byte](128)
+	if err != nil {
+		panic(err)
+	}
 }

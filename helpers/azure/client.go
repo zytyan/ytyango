@@ -140,8 +140,21 @@ func (o *Ocr) OcrFile(path string) (*OcrResult, error) {
 	if err != nil {
 		return nil, err
 	}
+	stat, err := file.Stat()
+	if err != nil {
+		return nil, err
+	}
+	return o.ocr(file, stat.Size())
+}
+
+func (o *Ocr) OcrData(data []byte) (*OcrResult, error) {
+	return o.ocr(io.NopCloser(bytes.NewReader(data)), int64(len(data)))
+}
+
+func (o *Ocr) ocr(body io.ReadCloser, contentLength int64) (*OcrResult, error) {
 	req := o.reqWithAuth(http.MethodPost, "image/jpeg")
-	req.Body = file
+	req.Body = body
+	req.ContentLength = contentLength
 	q := req.URL.Query()
 	q.Add("api-version", o.ApiVer)
 	if o.Features != "" {
@@ -151,11 +164,6 @@ func (o *Ocr) OcrFile(path string) (*OcrResult, error) {
 		q.Add("language", o.Language)
 	}
 	req.URL.RawQuery = q.Encode()
-	stat, err := file.Stat()
-	if err != nil {
-		return nil, err
-	}
-	req.ContentLength = stat.Size()
 	resp, err := o.client.Do(req)
 	if err != nil {
 		return nil, err
@@ -231,16 +239,15 @@ type ModeratorV2 struct {
 }
 
 func (m *ModeratorV2) EvalFile(path string) (*ModeratorV2Result, error) {
-	file, err := os.Open(path)
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
+	return m.EvalData(data)
+}
+
+func (m *ModeratorV2) EvalData(data []byte) (*ModeratorV2Result, error) {
 	req := m.reqWithAuth(http.MethodPost, "application/json")
-	data, err := io.ReadAll(file)
-	if err != nil {
-		return nil, err
-	}
 	b64Data := base64.StdEncoding.EncodeToString(data)
 	param := moderatorV2Param{
 		Categories: m.Categories,
@@ -252,6 +259,7 @@ func (m *ModeratorV2) EvalFile(path string) (*ModeratorV2Result, error) {
 		return nil, err
 	}
 	req.Body = io.NopCloser(bytes.NewReader(body))
+	req.ContentLength = int64(len(body))
 	resp, err := m.client.Do(req)
 	if err != nil {
 		return nil, err

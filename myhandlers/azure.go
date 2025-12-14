@@ -1,19 +1,19 @@
 package myhandlers
 
 import (
+	"bytes"
 	"errors"
 	"image"
 	"main/globalcfg"
+	"main/globalcfg/h"
 	"main/helpers/azure"
-	"math/rand"
-	"os"
+	"math/rand/v2"
 	"time"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"golang.org/x/time/rate"
 )
 
-var photoCache = mustNewLru[string, *gotgbot.File](500)
 var NoImage = errors.New("no image or image too small")
 var RateLimited = errors.New("rate limited")
 
@@ -32,10 +32,6 @@ var (
 	ocrLimiterConfig       = limiterConfig{rpm: 20, minInterval: 3 * time.Second}
 	moderatorLimiterConfig = limiterConfig{rpm: 20, minInterval: 3 * time.Second}
 )
-
-func init() {
-	rand.Seed(time.Now().UnixNano())
-}
 
 func newRateLimiter(cfg limiterConfig) *rate.Limiter {
 	if cfg.rpm <= 0 {
@@ -65,7 +61,7 @@ func jitteredBackoff(attempt int) time.Duration {
 	if delay <= 0 {
 		delay = backoffBaseDelay
 	}
-	jitter := time.Duration(rand.Int63n(int64(delay)/2 + 1))
+	jitter := time.Duration(rand.Int64N(int64(delay)/2 + 1))
 	return delay + jitter
 }
 
@@ -84,19 +80,13 @@ func withRetry[T any](op func() (T, error)) (T, error) {
 	return zero, nil
 }
 
-func getPhotoCache(bot *gotgbot.Bot, photo *gotgbot.PhotoSize) (*gotgbot.File, error) {
-	if res, found := photoCache.Get(photo.FileUniqueId); found {
-		log.Debugf("get image file %s from photoCache", photo.FileUniqueId)
-		return res, nil
-	}
-	file, err := bot.GetFile(photo.FileId, nil)
+func downloadPhoto(bot *gotgbot.Bot, photo *gotgbot.PhotoSize) ([]byte, error) {
+	data, err := h.DownloadToMemoryCached(bot, photo.FileId)
 	if err != nil {
-		log.Warnf("YtDownloadResult file %s error.", photo.FileUniqueId)
+		log.Warnf("download file %s error: %v", photo.FileUniqueId, err)
 		return nil, err
 	}
-	photoCache.Add(photo.FileUniqueId, file)
-	return file, nil
-
+	return data, nil
 }
 
 var ocrCache = mustNewLru[string, *azure.OcrResult](500)
@@ -112,14 +102,14 @@ func ocrMsg(bot *gotgbot.Bot, file *gotgbot.PhotoSize) (string, error) {
 		return res.Text(), nil
 	}
 
-	localFile, err := getPhotoCache(bot, file)
+	data, err := downloadPhoto(bot, file)
 	if err != nil {
 		log.Warnf("YtDownloadResult ocr file %s error.", file.FileUniqueId)
 		return "", err
 	}
-	log.Debugf("start remote ocr file %s", localFile.FilePath)
+	log.Debugf("start remote ocr file %s", file.FileUniqueId)
 	res, err := withRetry(func() (*azure.OcrResult, error) {
-		return g.Ocr.OcrFile(localFile.FilePath)
+		return g.Ocr.OcrData(data)
 	})
 	if err != nil {
 		log.Warnf("ocr file over, err = %s", err)
@@ -143,26 +133,22 @@ func moderatorMsg(bot *gotgbot.Bot, file *gotgbot.PhotoSize) (*azure.ModeratorV2
 			file.FileUniqueId, res.GetSeverityByCategory(azure.ModerateV2CatSexual))
 		return res, nil
 	}
-	localFile, err := getPhotoCache(bot, file)
+
+	data, err := downloadPhoto(bot, file)
 	if err != nil {
 		log.Warnf("YtDownloadResult ocr file %s error.", file.FileUniqueId)
 		return nil, err
 	}
-	fp, err := os.Open(localFile.FilePath)
-	if err != nil {
-		return nil, err
-	}
-	defer fp.Close()
-	cfg, _, err := image.DecodeConfig(fp)
+	cfg, _, err := image.DecodeConfig(bytes.NewReader(data))
 	if err != nil {
 		return nil, err
 	}
 	if cfg.Width < 128 || cfg.Height < 128 {
 		return nil, NoImage
 	}
-	log.Debugf("start ocr file %s", localFile.FilePath)
+	log.Debugf("start ocr file %s", file.FileUniqueId)
 	res, err := withRetry(func() (*azure.ModeratorV2Result, error) {
-		return g.Moderator.EvalFile(localFile.FilePath)
+		return g.Moderator.EvalData(data)
 	})
 	if err != nil {
 		return nil, err
