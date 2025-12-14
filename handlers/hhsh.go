@@ -38,7 +38,7 @@ func Hhsh(bot *gotgbot.Bot, ctx *ext.Context) error {
 	hhshUrl := "https://lab.magiconch.com/nbnhhsh/guess/"
 	queries := strings.Fields(query)
 	body := strings.Join(queries, ",")
-	body = `{"text":"` + query + `"}`
+	body = `{"text":"` + body + `"}`
 	resp, err := http.Post(hhshUrl, "application/json; charset=utf-8", strings.NewReader(body))
 	if err != nil {
 		_, err := ctx.Message.Reply(bot, "出现了莫名的网络错误~", nil)
