@@ -3,8 +3,8 @@ package main
 import (
 	"context"
 	g "main/globalcfg"
+	hdrs "main/handlers"
 	"main/http/backend"
-	hdrs "main/myhandlers"
 	"net/http"
 	"os"
 	"os/signal"

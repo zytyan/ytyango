@@ -1,4 +1,4 @@
-package myhandlers
+package handlers
 
 import (
 	"github.com/PaulSonOfLars/gotgbot/v2"

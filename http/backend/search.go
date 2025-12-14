@@ -11,8 +11,8 @@ import (
 	"strconv"
 
 	g "main/globalcfg"
+	"main/handlers"
 	api "main/http/backend/ogen"
-	"main/myhandlers"
 
 	jsoniter "github.com/json-iterator/go"
 	"go.uber.org/zap"
@@ -26,7 +26,7 @@ type searchQuery struct {
 }
 
 type searchResult struct {
-	Hits []myhandlers.MeiliMsg `json:"hits"`
+	Hits []handlers.MeiliMsg `json:"hits"`
 
 	Query              string `json:"query"`
 	ProcessingTimeMs   int    `json:"processingTimeMs"`
@@ -132,7 +132,7 @@ func (h *Handler) meiliSearch(ctx context.Context, query searchQuery) (*api.Sear
 	}, nil
 }
 
-func mapMeiliMsg(src myhandlers.MeiliMsg) api.MeiliMsg {
+func mapMeiliMsg(src handlers.MeiliMsg) api.MeiliMsg {
 	return api.MeiliMsg{
 		MongoID:   api.NewOptString(src.MongoId),
 		PeerID:    api.NewOptInt64(src.PeerId),

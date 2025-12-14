@@ -1,4 +1,4 @@
-package myhandlers
+package handlers
 
 import (
 	g "main/globalcfg"
