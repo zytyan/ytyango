@@ -72,32 +72,67 @@ func isLocalFile(filename string) bool {
 }
 
 func DownloadToDisk(bot *gotgbot.Bot, fileId string) (string, error) {
-	f, err := bot.GetFile(fileId, nil)
+	if entry, ok := diskCache.Get(fileId); ok {
+		return entry.path, nil
+	}
+	result, err, _ := diskSingle.Do(fileId, func() (interface{}, error) {
+		if entry, ok := diskCache.Get(fileId); ok {
+			return entry, nil
+		}
+		f, err := bot.GetFile(fileId, nil)
+		if err != nil {
+			return nil, err
+		}
+		if isLocalFile(f.FilePath) {
+			entry := diskCacheEntry{path: f.FilePath, removeOnEvict: false}
+			diskCache.Add(fileId, entry)
+			return entry, nil
+		}
+		target := cachedDiskPath(fileId)
+		if info, err := os.Stat(target); err == nil && info.Size() > 0 {
+			entry := diskCacheEntry{path: target, removeOnEvict: true}
+			diskCache.Add(fileId, entry)
+			return entry, nil
+		}
+		u := f.URL(bot, nil)
+		resp, err := http.Get(u)
+		if err != nil {
+			return nil, err
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			return nil, fmt.Errorf("GET %s, bad status: %s", u, resp.Status)
+		}
+		tmp, err := os.CreateTemp(filepath.Dir(target), filepath.Base(target)+".tmp")
+		if err != nil {
+			return nil, err
+		}
+		if _, err := io.Copy(tmp, resp.Body); err != nil {
+			tmp.Close()
+			os.Remove(tmp.Name())
+			return nil, err
+		}
+		if err := tmp.Close(); err != nil {
+			os.Remove(tmp.Name())
+			return nil, err
+		}
+		_ = os.Remove(target)
+		if err := os.Rename(tmp.Name(), target); err != nil {
+			os.Remove(tmp.Name())
+			return nil, err
+		}
+		entry := diskCacheEntry{path: target, removeOnEvict: true}
+		diskCache.Add(fileId, entry)
+		return entry, nil
+	})
 	if err != nil {
 		return "", err
 	}
-	path := f.FilePath
-	if isLocalFile(path) {
-		return path, nil
+	entry, ok := result.(diskCacheEntry)
+	if !ok {
+		return "", fmt.Errorf("singleflight: unexpected type %T", result)
 	}
-	u := f.URL(bot, nil)
-	resp, err := http.Get(u)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("GET %s, bad status: %s", u, resp.Status)
-	}
-	tmp, err := os.CreateTemp("", "bot_file")
-	if err != nil {
-		return "", err
-	}
-	defer tmp.Close()
-	if _, err := io.Copy(tmp, resp.Body); err != nil {
-		return "", err
-	}
-	return tmp.Name(), nil
+	return entry.path, nil
 }
 
 func DownloadToMemory(bot *gotgbot.Bot, fileId string) ([]byte, error) {
@@ -121,20 +156,29 @@ func DownloadToMemory(bot *gotgbot.Bot, fileId string) ([]byte, error) {
 	return io.ReadAll(resp.Body)
 }
 
-var cache *lru.Cache[string, []byte]
-var single singleflight.Group
+type diskCacheEntry struct {
+	path          string
+	removeOnEvict bool
+}
+
+var (
+	memCache   *lru.Cache[string, []byte]
+	memSingle  singleflight.Group
+	diskCache  *lru.Cache[string, diskCacheEntry]
+	diskSingle singleflight.Group
+)
 
 func DownloadToMemoryCached(bot *gotgbot.Bot, fileId string) (data []byte, err error) {
 	var ok bool
-	if data, ok = cache.Get(fileId); ok {
+	if data, ok = memCache.Get(fileId); ok {
 		return data, nil
 	}
-	r, err, _ := single.Do(fileId, func() (interface{}, error) {
+	r, err, _ := memSingle.Do(fileId, func() (interface{}, error) {
 		d, e := DownloadToMemory(bot, fileId)
 		if e != nil {
 			return nil, e
 		}
-		cache.Add(fileId, d)
+		memCache.Add(fileId, d)
 		return d, e
 	})
 	if err != nil {
@@ -149,8 +193,43 @@ func DownloadToMemoryCached(bot *gotgbot.Bot, fileId string) (data []byte, err e
 
 func init() {
 	var err error
-	cache, err = lru.New[string, []byte](128)
+	memCache, err = lru.New[string, []byte](128)
 	if err != nil {
 		panic(err)
 	}
+	diskCache, err = lru.NewWithEvict[string, diskCacheEntry](64, func(_ string, entry diskCacheEntry) {
+		if entry.removeOnEvict {
+			_ = os.Remove(entry.path)
+		}
+	})
+	if err != nil {
+		panic(err)
+	}
+}
+
+func cachedDiskPath(fileId string) string {
+	return filepath.Join(os.TempDir(), "bot_file_"+sanitizeFileID(fileId))
+}
+
+func sanitizeFileID(fileId string) string {
+	var b strings.Builder
+	b.Grow(len(fileId))
+	for _, r := range fileId {
+		switch {
+		case r >= 'a' && r <= 'z':
+			b.WriteRune(r)
+		case r >= 'A' && r <= 'Z':
+			b.WriteRune(r)
+		case r >= '0' && r <= '9':
+			b.WriteRune(r)
+		case r == '_' || r == '-':
+			b.WriteRune(r)
+		default:
+			b.WriteByte('_')
+		}
+	}
+	if b.Len() == 0 {
+		return "file"
+	}
+	return b.String()
 }
