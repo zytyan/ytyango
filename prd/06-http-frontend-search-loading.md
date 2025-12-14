@@ -79,6 +79,18 @@
 
 ---
 
+### **6.4 实施细节（Technical Details）**
+
+* **状态管理**：在 `+page.svelte` 中维护 `hits`、`query`、`page`、`limit`、`hasMore`、`isLoadingInitial`、`isLoadingMore`、`error`；新查询时重置分页与 `hasMore=true`。以请求时间戳或 `AbortController` 防止响应乱序覆盖。
+* **请求与分页**：复用既有搜索 API（`page`/`limit` 或偏移）取下一页，将返回项追加到 `hits`。`hasMore` 根据本次返回数量 `< limit` 或后端 `total` 计算；`hits.length==0` 或 `!hasMore` 时显示“没有更多了”。
+* **加载动画**：初次加载使用卡片骨架或局部 spinner；滚动加载时在列表底部显示小型 spinner。动画放置于列表区域，避免遮挡搜索框。
+* **滚动触发**：在列表底部放置 `sentinel` 元素，使用 `IntersectionObserver`（阈值 ~0.1）监听；满足 `hasMore && !isLoadingMore && !isLoadingInitial && query` 时触发 `loadMore()`。必要时保留 `on:scroll` 作为降级。
+* **空态与终止**：请求成功但无数据或数据耗尽时，在底部展示“没有更多了”；仍保留列表为空的引导文案。错误时在底部显示轻量提示与“重试”按钮，点击后重发当前页请求。
+* **样式与主题**：加载动画、空态提示使用 Telegram CSS 变量（如 `--tg-theme-hint-color`、`--tg-theme-secondary-bg-color`）确保暗色/主题一致；提示文本字号与行间距遵循现有列表样式。
+* **可测试性**：添加或更新页面级测试/说明：输入后出现加载动画、模拟滚动触发下一页、命中空结果显示“没有更多了”、错误时显示重试提示。
+
+---
+
 ## **7. 非功能需求（Non-functional Requirements）**
 
 * **可维护性**：新增逻辑保持在 `+page.svelte` 或相关组件内部，可读、可扩展；避免与其他路由耦合。
