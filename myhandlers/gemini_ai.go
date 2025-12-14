@@ -134,7 +134,7 @@ func (s *GeminiSession) AddTgMessage(bot *gotgbot.Bot, msg *gotgbot.Message) (er
 	}
 	var data []byte
 	if msg.Photo != nil {
-		data, err = h.GetFileBytes(bot, msg.Photo[len(msg.Photo)-1].FileId)
+		data, err = h.DownloadToMemoryCached(bot, msg.Photo[len(msg.Photo)-1].FileId)
 		if err != nil {
 			return err
 		}
@@ -143,7 +143,7 @@ func (s *GeminiSession) AddTgMessage(bot *gotgbot.Bot, msg *gotgbot.Message) (er
 		content.MimeType.Valid = true
 		content.MimeType.String = "image/jpeg"
 	} else if msg.Sticker != nil {
-		data, err = h.GetFileBytes(bot, msg.Sticker.FileId)
+		data, err = h.DownloadToMemoryCached(bot, msg.Sticker.FileId)
 		if err != nil {
 			return err
 		}

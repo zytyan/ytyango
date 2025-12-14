@@ -1,6 +1,7 @@
 package myhandlers
 
 import (
+	"bytes"
 	"main/globalcfg/h"
 	"os"
 
@@ -10,13 +11,8 @@ import (
 	"github.com/kolesa-team/go-webp/webp"
 )
 
-func webp2png(file string) (string, error) {
-	f, err := os.Open(file)
-	if err != nil {
-		return "", err
-	}
-	defer f.Close()
-	img, err := webp.Decode(f, nil)
+func webp2png(data []byte) (string, error) {
+	img, err := webp.Decode(bytes.NewReader(data), nil)
 	if err != nil {
 		return "", err
 	}
@@ -41,11 +37,11 @@ func WebpToPng(bot *gotgbot.Bot, ctx *ext.Context) error {
 		return err
 	}
 	sticker := ctx.Message.ReplyToMessage.Sticker
-	f, err := bot.GetFile(sticker.FileId, nil)
+	f, err := h.DownloadToMemoryCached(bot, sticker.FileId)
 	if err != nil {
 		return err
 	}
-	pngFile, err := webp2png(f.FilePath)
+	pngFile, err := webp2png(f)
 	if err != nil {
 		_, err = ctx.Message.Reply(bot, err.Error(), nil)
 		return err

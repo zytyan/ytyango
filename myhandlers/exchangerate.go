@@ -3,7 +3,6 @@ package myhandlers
 import (
 	"errors"
 	"fmt"
-	"main/globalcfg/h"
 	"main/helpers/exchange"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
@@ -11,7 +10,7 @@ import (
 )
 
 func IsCalcExchangeRate(msg *gotgbot.Message) bool {
-	if !h.ChatAutoExchange(msg.Chat.Id) {
+	if !chatCfg(msg.Chat.Id).AutoExchange {
 		return false
 	}
 	return exchange.IsExchangeRateCalc(getTextMsg(msg))

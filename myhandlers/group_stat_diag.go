@@ -40,7 +40,11 @@ func GetRank(bot *gotgbot.Bot, ctx *ext.Context) error {
 		if i >= 10 {
 			break
 		}
-		user := g.Q.GetUserById(context.Background(), v.user)
+		user, err := g.Q.GetUserById(context.Background(), v.user)
+		if err != nil {
+			res = append(res, "不知道是谁")
+			continue
+		}
 		res = append(res, fmt.Sprintf("%s: %d", user.Name(), v.count))
 	}
 	if len(tmp) > 10 {

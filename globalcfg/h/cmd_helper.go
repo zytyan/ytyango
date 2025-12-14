@@ -19,4 +19,3 @@ func TrimCmd(text string) string {
 	}
 	return strings.TrimLeft(text, " \t")
 }
-

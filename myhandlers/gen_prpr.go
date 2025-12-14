@@ -35,7 +35,7 @@ func GenPrpr(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
 		_, err = bot.SendSticker(ctx.EffectiveChat.Id, gotgbot.InputFileByID(prpr), nil)
 		return err
 	}
-	file, err := bot.GetFile(photo.FileId, nil)
+	file, err := h.DownloadToDisk(bot, photo.FileId)
 	if err != nil {
 		return err
 	}
@@ -45,7 +45,7 @@ func GenPrpr(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
 		return err
 	}
 	defer os.Remove(filePath)
-	err = imgproc.GenPrpr(file.FilePath, filePath)
+	err = imgproc.GenPrpr(file, filePath)
 	if err != nil {
 		return err
 	}

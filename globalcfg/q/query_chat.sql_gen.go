@@ -13,6 +13,66 @@ import (
 	"go.uber.org/zap"
 )
 
+const createChatCfg = `-- name: CreateChatCfg :exec
+INSERT INTO chat_cfg (id, web_id, auto_cvt_bili, auto_ocr, auto_calculate, auto_exchange, auto_check_adult,
+                      save_messages, enable_coc, resp_nsfw_msg, timezone)
+VALUES (?, ?, ?, ?, ?, ?,
+        ?, ?, ?, ?, ?)
+`
+
+type CreateChatCfgParams struct {
+	ID             int64         `json:"id"`
+	WebID          sql.NullInt64 `json:"web_id"`
+	AutoCvtBili    bool          `json:"auto_cvt_bili"`
+	AutoOcr        bool          `json:"auto_ocr"`
+	AutoCalculate  bool          `json:"auto_calculate"`
+	AutoExchange   bool          `json:"auto_exchange"`
+	AutoCheckAdult bool          `json:"auto_check_adult"`
+	SaveMessages   bool          `json:"save_messages"`
+	EnableCoc      bool          `json:"enable_coc"`
+	RespNsfwMsg    bool          `json:"resp_nsfw_msg"`
+	Timezone       int64         `json:"timezone"`
+}
+
+func (q *Queries) CreateChatCfg(ctx context.Context, arg CreateChatCfgParams) error {
+	var logFields []zap.Field
+	var start time.Time
+	if q.logger != nil {
+		logFields = make([]zap.Field, 0, 6)
+		start = time.Now()
+		logFields = append(logFields,
+			zap.Dict("fields",
+				zap.Int64("id", arg.ID),
+				zapNullInt64("web_id", arg.WebID),
+				zap.Bool("auto_cvt_bili", arg.AutoCvtBili),
+				zap.Bool("auto_ocr", arg.AutoOcr),
+				zap.Bool("auto_calculate", arg.AutoCalculate),
+				zap.Bool("auto_exchange", arg.AutoExchange),
+				zap.Bool("auto_check_adult", arg.AutoCheckAdult),
+				zap.Bool("save_messages", arg.SaveMessages),
+				zap.Bool("enable_coc", arg.EnableCoc),
+				zap.Bool("resp_nsfw_msg", arg.RespNsfwMsg),
+				zap.Int64("timezone", arg.Timezone),
+			),
+		)
+	}
+	_, err := q.exec(ctx, q.createChatCfgStmt, createChatCfg,
+		arg.ID,
+		arg.WebID,
+		arg.AutoCvtBili,
+		arg.AutoOcr,
+		arg.AutoCalculate,
+		arg.AutoExchange,
+		arg.AutoCheckAdult,
+		arg.SaveMessages,
+		arg.EnableCoc,
+		arg.RespNsfwMsg,
+		arg.Timezone,
+	)
+	q.logQuery(createChatCfg, logFields, err, start)
+	return err
+}
+
 const updateChatStatDaily = `-- name: UpdateChatStatDaily :exec
 UPDATE chat_stat_daily
 SET message_count        = ?,
@@ -109,70 +169,6 @@ func (q *Queries) UpdateChatStatDaily(ctx context.Context, arg UpdateChatStatDai
 	return err
 }
 
-const chatCfgById = `-- name: chatCfgById :one
-
-SELECT id, web_id, auto_cvt_bili, auto_ocr, auto_calculate, auto_exchange, auto_check_adult, save_messages, enable_coc, resp_nsfw_msg, timezone
-FROM chat_cfg
-WHERE id = ?
-`
-
-// encoding: utf-8
-func (q *Queries) chatCfgById(ctx context.Context, id int64) (chatCfg, error) {
-	var logFields []zap.Field
-	var start time.Time
-	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 6)
-		start = time.Now()
-		logFields = append(logFields,
-			zap.Dict("fields",
-				zap.Int64("id", id),
-			),
-		)
-	}
-	row := q.queryRow(ctx, q.chatCfgByIdStmt, chatCfgById, id)
-	var i chatCfg
-	err := row.Scan(
-		&i.ID,
-		&i.WebID,
-		&i.AutoCvtBili,
-		&i.AutoOcr,
-		&i.AutoCalculate,
-		&i.AutoExchange,
-		&i.AutoCheckAdult,
-		&i.SaveMessages,
-		&i.EnableCoc,
-		&i.RespNsfwMsg,
-		&i.Timezone,
-	)
-	q.logQuery(chatCfgById, logFields, err, start)
-	return i, err
-}
-
-const chatIdByWebId = `-- name: chatIdByWebId :one
-SELECT id
-FROM chat_cfg
-WHERE web_id = ?
-`
-
-func (q *Queries) chatIdByWebId(ctx context.Context, webID sql.NullInt64) (int64, error) {
-	var logFields []zap.Field
-	var start time.Time
-	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 6)
-		start = time.Now()
-		logFields = append(logFields,
-			zap.Dict("fields",
-				zapNullInt64("web_id", webID),
-			),
-		)
-	}
-	row := q.queryRow(ctx, q.chatIdByWebIdStmt, chatIdByWebId, webID)
-	var id int64
-	err := row.Scan(&id)
-	q.logQuery(chatIdByWebId, logFields, err, start)
-	return id, err
-}
-
 const createChatStatDaily = `-- name: createChatStatDaily :one
 INSERT INTO chat_stat_daily (chat_id, stat_date)
 VALUES (?, ?)
@@ -218,24 +214,15 @@ func (q *Queries) createChatStatDaily(ctx context.Context, chatID int64, statDat
 	return i, err
 }
 
-const createNewChatCfgDefault = `-- name: createNewChatCfgDefault :one
-INSERT INTO chat_cfg (id, web_id, auto_cvt_bili, auto_ocr, auto_calculate, auto_exchange, auto_check_adult,
-                      save_messages, enable_coc, resp_nsfw_msg, timezone)
-VALUES (?,
-        NULL,
-        FALSE,
-        FALSE,
-        FALSE,
-        FALSE,
-        FALSE,
-        TRUE,
-        FALSE,
-        FALSE,
-        28800)
-RETURNING id, web_id, auto_cvt_bili, auto_ocr, auto_calculate, auto_exchange, auto_check_adult, save_messages, enable_coc, resp_nsfw_msg, timezone
+const getChatCfgById = `-- name: getChatCfgById :one
+
+SELECT id, web_id, auto_cvt_bili, auto_ocr, auto_calculate, auto_exchange, auto_check_adult, save_messages, enable_coc, resp_nsfw_msg, timezone
+FROM chat_cfg
+WHERE id = ?
 `
 
-func (q *Queries) createNewChatCfgDefault(ctx context.Context, id int64) (chatCfg, error) {
+// encoding: utf-8
+func (q *Queries) getChatCfgById(ctx context.Context, id int64) (chatCfg, error) {
 	var logFields []zap.Field
 	var start time.Time
 	if q.logger != nil {
@@ -247,7 +234,7 @@ func (q *Queries) createNewChatCfgDefault(ctx context.Context, id int64) (chatCf
 			),
 		)
 	}
-	row := q.queryRow(ctx, q.createNewChatCfgDefaultStmt, createNewChatCfgDefault, id)
+	row := q.queryRow(ctx, q.getChatCfgByIdStmt, getChatCfgById, id)
 	var i chatCfg
 	err := row.Scan(
 		&i.ID,
@@ -262,8 +249,33 @@ func (q *Queries) createNewChatCfgDefault(ctx context.Context, id int64) (chatCf
 		&i.RespNsfwMsg,
 		&i.Timezone,
 	)
-	q.logQuery(createNewChatCfgDefault, logFields, err, start)
+	q.logQuery(getChatCfgById, logFields, err, start)
 	return i, err
+}
+
+const getChatIdByWebId = `-- name: getChatIdByWebId :one
+SELECT id
+FROM chat_cfg
+WHERE web_id = ?
+`
+
+func (q *Queries) getChatIdByWebId(ctx context.Context, webID sql.NullInt64) (int64, error) {
+	var logFields []zap.Field
+	var start time.Time
+	if q.logger != nil {
+		logFields = make([]zap.Field, 0, 6)
+		start = time.Now()
+		logFields = append(logFields,
+			zap.Dict("fields",
+				zapNullInt64("web_id", webID),
+			),
+		)
+	}
+	row := q.queryRow(ctx, q.getChatIdByWebIdStmt, getChatIdByWebId, webID)
+	var id int64
+	err := row.Scan(&id)
+	q.logQuery(getChatIdByWebId, logFields, err, start)
+	return id, err
 }
 
 const getChatStat = `-- name: getChatStat :one

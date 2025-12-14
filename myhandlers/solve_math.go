@@ -60,7 +60,7 @@ var mathReplacer = func() *strings.Replacer {
 }()
 
 func NeedSolve(msg *gotgbot.Message) bool {
-	if !h.ChatAutoCalculate(msg.Chat.Id) {
+	if !chatCfg(msg.Chat.Id).AutoCalculate {
 		return false
 	}
 	text := msg.Text

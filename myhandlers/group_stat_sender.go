@@ -80,7 +80,10 @@ func formatStatMessage(chatId int64, stat *q.ChatStatDaily, timezone int64) stri
 		actMaxCnt = count[0]
 	}
 	for i := 0; i < 3 && i < len(actUser); i++ {
-		user := g.Q.GetUserById(context.Background(), actUser[i])
+		user, err := g.Q.GetUserById(context.Background(), actUser[i])
+		if err != nil {
+			continue
+		}
 		act3Users = append(act3Users, user.Name())
 	}
 	if len(act3Users) == 0 {

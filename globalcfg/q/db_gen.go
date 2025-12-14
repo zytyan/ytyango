@@ -31,6 +31,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.addGeminiMessageStmt, err = db.PrepareContext(ctx, addGeminiMessage); err != nil {
 		return nil, fmt.Errorf("error preparing query AddGeminiMessage: %w", err)
 	}
+	if q.createChatCfgStmt, err = db.PrepareContext(ctx, createChatCfg); err != nil {
+		return nil, fmt.Errorf("error preparing query CreateChatCfg: %w", err)
+	}
 	if q.createNewGeminiSessionStmt, err = db.PrepareContext(ctx, createNewGeminiSession); err != nil {
 		return nil, fmt.Errorf("error preparing query CreateNewGeminiSession: %w", err)
 	}
@@ -85,17 +88,8 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.updateYtDlpCacheStmt, err = db.PrepareContext(ctx, updateYtDlpCache); err != nil {
 		return nil, fmt.Errorf("error preparing query UpdateYtDlpCache: %w", err)
 	}
-	if q.chatCfgByIdStmt, err = db.PrepareContext(ctx, chatCfgById); err != nil {
-		return nil, fmt.Errorf("error preparing query chatCfgById: %w", err)
-	}
-	if q.chatIdByWebIdStmt, err = db.PrepareContext(ctx, chatIdByWebId); err != nil {
-		return nil, fmt.Errorf("error preparing query chatIdByWebId: %w", err)
-	}
 	if q.createChatStatDailyStmt, err = db.PrepareContext(ctx, createChatStatDaily); err != nil {
 		return nil, fmt.Errorf("error preparing query createChatStatDaily: %w", err)
-	}
-	if q.createNewChatCfgDefaultStmt, err = db.PrepareContext(ctx, createNewChatCfgDefault); err != nil {
-		return nil, fmt.Errorf("error preparing query createNewChatCfgDefault: %w", err)
 	}
 	if q.createNewUserStmt, err = db.PrepareContext(ctx, createNewUser); err != nil {
 		return nil, fmt.Errorf("error preparing query createNewUser: %w", err)
@@ -108,6 +102,12 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	}
 	if q.getAllMsgInSessionReversedStmt, err = db.PrepareContext(ctx, getAllMsgInSessionReversed); err != nil {
 		return nil, fmt.Errorf("error preparing query getAllMsgInSessionReversed: %w", err)
+	}
+	if q.getChatCfgByIdStmt, err = db.PrepareContext(ctx, getChatCfgById); err != nil {
+		return nil, fmt.Errorf("error preparing query getChatCfgById: %w", err)
+	}
+	if q.getChatIdByWebIdStmt, err = db.PrepareContext(ctx, getChatIdByWebId); err != nil {
+		return nil, fmt.Errorf("error preparing query getChatIdByWebId: %w", err)
 	}
 	if q.getChatStatStmt, err = db.PrepareContext(ctx, getChatStat); err != nil {
 		return nil, fmt.Errorf("error preparing query getChatStat: %w", err)
@@ -150,6 +150,11 @@ func (q *Queries) Close() error {
 	if q.addGeminiMessageStmt != nil {
 		if cerr := q.addGeminiMessageStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing addGeminiMessageStmt: %w", cerr)
+		}
+	}
+	if q.createChatCfgStmt != nil {
+		if cerr := q.createChatCfgStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing createChatCfgStmt: %w", cerr)
 		}
 	}
 	if q.createNewGeminiSessionStmt != nil {
@@ -242,24 +247,9 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing updateYtDlpCacheStmt: %w", cerr)
 		}
 	}
-	if q.chatCfgByIdStmt != nil {
-		if cerr := q.chatCfgByIdStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing chatCfgByIdStmt: %w", cerr)
-		}
-	}
-	if q.chatIdByWebIdStmt != nil {
-		if cerr := q.chatIdByWebIdStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing chatIdByWebIdStmt: %w", cerr)
-		}
-	}
 	if q.createChatStatDailyStmt != nil {
 		if cerr := q.createChatStatDailyStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing createChatStatDailyStmt: %w", cerr)
-		}
-	}
-	if q.createNewChatCfgDefaultStmt != nil {
-		if cerr := q.createNewChatCfgDefaultStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing createNewChatCfgDefaultStmt: %w", cerr)
 		}
 	}
 	if q.createNewUserStmt != nil {
@@ -280,6 +270,16 @@ func (q *Queries) Close() error {
 	if q.getAllMsgInSessionReversedStmt != nil {
 		if cerr := q.getAllMsgInSessionReversedStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing getAllMsgInSessionReversedStmt: %w", cerr)
+		}
+	}
+	if q.getChatCfgByIdStmt != nil {
+		if cerr := q.getChatCfgByIdStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getChatCfgByIdStmt: %w", cerr)
+		}
+	}
+	if q.getChatIdByWebIdStmt != nil {
+		if cerr := q.getChatIdByWebIdStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getChatIdByWebIdStmt: %w", cerr)
 		}
 	}
 	if q.getChatStatStmt != nil {
@@ -380,6 +380,7 @@ type Queries struct {
 	txID                              string
 	tx                                *sql.Tx
 	addGeminiMessageStmt              *sql.Stmt
+	createChatCfgStmt                 *sql.Stmt
 	createNewGeminiSessionStmt        *sql.Stmt
 	delCocCharAttrStmt                *sql.Stmt
 	getBiliInlineDataStmt             *sql.Stmt
@@ -398,14 +399,13 @@ type Queries struct {
 	updateBiliInlineMsgIdStmt         *sql.Stmt
 	updateChatStatDailyStmt           *sql.Stmt
 	updateYtDlpCacheStmt              *sql.Stmt
-	chatCfgByIdStmt                   *sql.Stmt
-	chatIdByWebIdStmt                 *sql.Stmt
 	createChatStatDailyStmt           *sql.Stmt
-	createNewChatCfgDefaultStmt       *sql.Stmt
 	createNewUserStmt                 *sql.Stmt
 	createNsfwPicUserRateStmt         *sql.Stmt
 	createOrUpdateNsfwPicStmt         *sql.Stmt
 	getAllMsgInSessionReversedStmt    *sql.Stmt
+	getChatCfgByIdStmt                *sql.Stmt
+	getChatIdByWebIdStmt              *sql.Stmt
 	getChatStatStmt                   *sql.Stmt
 	getNsfwPicByRateAndRandKeyStmt    *sql.Stmt
 	getNsfwPicByRateFirstStmt         *sql.Stmt
@@ -427,6 +427,7 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		txID:                              fmt.Sprintf("%p", tx),
 		tx:                                tx,
 		addGeminiMessageStmt:              q.addGeminiMessageStmt,
+		createChatCfgStmt:                 q.createChatCfgStmt,
 		createNewGeminiSessionStmt:        q.createNewGeminiSessionStmt,
 		delCocCharAttrStmt:                q.delCocCharAttrStmt,
 		getBiliInlineDataStmt:             q.getBiliInlineDataStmt,
@@ -445,14 +446,13 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		updateBiliInlineMsgIdStmt:         q.updateBiliInlineMsgIdStmt,
 		updateChatStatDailyStmt:           q.updateChatStatDailyStmt,
 		updateYtDlpCacheStmt:              q.updateYtDlpCacheStmt,
-		chatCfgByIdStmt:                   q.chatCfgByIdStmt,
-		chatIdByWebIdStmt:                 q.chatIdByWebIdStmt,
 		createChatStatDailyStmt:           q.createChatStatDailyStmt,
-		createNewChatCfgDefaultStmt:       q.createNewChatCfgDefaultStmt,
 		createNewUserStmt:                 q.createNewUserStmt,
 		createNsfwPicUserRateStmt:         q.createNsfwPicUserRateStmt,
 		createOrUpdateNsfwPicStmt:         q.createOrUpdateNsfwPicStmt,
 		getAllMsgInSessionReversedStmt:    q.getAllMsgInSessionReversedStmt,
+		getChatCfgByIdStmt:                q.getChatCfgByIdStmt,
+		getChatIdByWebIdStmt:              q.getChatIdByWebIdStmt,
 		getChatStatStmt:                   q.getChatStatStmt,
 		getNsfwPicByRateAndRandKeyStmt:    q.getNsfwPicByRateAndRandKeyStmt,
 		getNsfwPicByRateFirstStmt:         q.getNsfwPicByRateFirstStmt,

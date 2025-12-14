@@ -13,12 +13,13 @@ func (h *Handler) GetUsersInfo(ctx context.Context, req *api.UserInfoRequest) (a
 	for _, userID := range req.UserIds {
 		apiUser := api.UserInfo{ID: userID}
 		var user *q.User
+		var err error
 		if userID <= 0 {
 			apiUser.Error = api.NewOptNilString("user id invalid")
 			goto addUser
 		}
-		user = g.Q.GetUserById(ctx, userID)
-		if user == nil {
+		user, err = g.Q.GetUserById(ctx, userID)
+		if err != nil {
 			apiUser.Error = api.NewOptNilString("user not found")
 			goto addUser
 		}

@@ -4,89 +4,30 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"main/helpers/lrusf"
 	"time"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
-	"github.com/puzpuzpuz/xsync/v3"
 )
 
-// TODO: 将这里的xsync.MapOf替换为WeakMap(若可能）或LRU Map，避免内存泄漏的问题
-var userCache = xsync.NewMapOf[int64, *User]()
+var userCache *lrusf.Cache[int64, *User]
+
+func (q *Queries) GetUserById(ctx context.Context, id int64) (*User, error) {
+	initCaches(q)
+	return userCache.Get(id, func() (*User, error) {
+		user, err := q.getUserById(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		return &user, nil
+	})
+}
 
 func (q *Queries) GetUserByTg(ctx context.Context, tgUser *gotgbot.User) (*User, error) {
-	var err error
-	userId := tgUser.Id
-	user, _ := userCache.LoadOrCompute(userId, func() *User {
-		user, erri := q.getUserById(ctx, userId)
-		if errors.Is(erri, sql.ErrNoRows) {
-			u := &User{
-				UpdatedAt:       UnixTime{time.Now()},
-				UserID:          tgUser.Id,
-				FirstName:       tgUser.FirstName,
-				LastName:        sql.NullString{String: tgUser.LastName, Valid: tgUser.LastName != ""},
-				ProfileUpdateAt: UnixTime{time.Unix(0, 0)},
-				ProfilePhoto:    sql.NullString{},
-			}
-			param := createNewUserParams{
-				UpdatedAt: UnixTime{time.Now()},
-				UserID:    userId,
-				FirstName: tgUser.FirstName,
-				LastName:  sql.NullString{String: tgUser.LastName, Valid: tgUser.LastName != ""},
-				Timezone:  480,
-			}
-			u.ID, err = q.createNewUser(ctx, param)
-			return u
-		}
-		if erri != nil {
-			err = erri
-			return nil
-		}
-		return &user
-	})
-	return user, err
-}
-
-func (q *Queries) GetUserById(ctx context.Context, id int64) *User {
-	user, _ := q.getUserById(ctx, id)
-	return &user
-}
-
-// TODO: 将这里的xsync.MapOf替换为WeakMap(若可能）或LRU Map，避免内存泄漏的问题
-var chatCache = xsync.NewMapOf[int64, *ChatCfg]()
-
-func (q *Queries) ChatCfgById(ctx context.Context, id int64) (*ChatCfg, error) {
-	var err error
-	c, _ := chatCache.LoadOrCompute(id, func() *ChatCfg {
-		chat, erri := q.chatCfgById(ctx, id)
-		if errors.Is(erri, sql.ErrNoRows) {
-			chat, err = q.createNewChatCfgDefault(ctx, id)
-			return fromInnerCfg(&chat)
-		} else if erri != nil {
-			err = erri
-			return nil
-		}
-		return fromInnerCfg(&chat)
-	})
-	return c, err
-}
-
-func (q *Queries) ChatCfgByTg(ctx context.Context, tgChat *gotgbot.Chat) (*ChatCfg, error) {
-	if tgChat == nil {
-		return nil, errors.New("tgChat is nil")
+	if tgUser == nil {
+		return nil, errors.New("tgUser is nil")
 	}
-	return q.ChatCfgById(ctx, tgChat.Id)
-}
-
-func (q *Queries) GetChatByWebId(ctx context.Context, webId int64) (*ChatCfg, error) {
-	var err error
-	webIdQ := sql.NullInt64{
-		Int64: webId,
-		Valid: true,
-	}
-	chatId, _ := q.chatIdByWebId(ctx, webIdQ)
-	// 这里不能直接用数据库把查找合并为一个，因为对每个群组都需要单例
-	chat, err := q.ChatCfgById(ctx, chatId)
-	return chat, err
+	return q.GetUserById(ctx, tgUser.Id)
 }
 
 func (u *User) TryUpdate(q *Queries, tgUser *gotgbot.User) error {
@@ -130,17 +71,17 @@ func (q *Queries) UpdateUserTimeZone(ctx context.Context, user *User, zone int64
 	return q.updateUserTimeZone(ctx, user.ID, now, zone)
 }
 
-func (c *ChatCfg) Save(q *Queries) error {
-	return q.updateChatCfg(context.Background(), updateChatCfgParams{
-		AutoCvtBili:    c.AutoCvtBili,
-		AutoOcr:        c.AutoOcr,
-		AutoCalculate:  c.AutoCalculate,
-		AutoExchange:   c.AutoExchange,
-		AutoCheckAdult: c.AutoCheckAdult,
-		SaveMessages:   c.SaveMessages,
-		EnableCoc:      c.EnableCoc,
-		RespNsfwMsg:    c.RespNsfwMsg,
-		ID:             c.ID,
-	})
-
+// DownloadProfilePhoto downloads the user's profile photo using provided bot and returns the local file path.
+func (u *User) DownloadProfilePhoto(bot *gotgbot.Bot) (string, error) {
+	if bot == nil {
+		return "", errors.New("bot is nil")
+	}
+	if !u.ProfilePhoto.Valid || u.ProfilePhoto.String == "" {
+		return "", errors.New("no profile photo")
+	}
+	file, err := bot.GetFile(u.ProfilePhoto.String, nil)
+	if err != nil {
+		return "", err
+	}
+	return file.FilePath, nil
 }

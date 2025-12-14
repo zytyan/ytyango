@@ -7,7 +7,7 @@ import (
 	"hash/fnv"
 	"html"
 	g "main/globalcfg"
-	"main/globalcfg/h"
+	"main/globalcfg/q"
 	"main/helpers/bili"
 	"strconv"
 	"strings"
@@ -20,8 +20,11 @@ import (
 var log = g.GetLogger("handlers", zap.InfoLevel)
 var logD = log.Desugar()
 
+func chatCfg(id int64) *q.ChatCfg {
+	return g.Q.GetChatCfgByIdOrDefault(id)
+}
 func BiliMsgFilter(msg *gotgbot.Message) bool {
-	if !h.ChatAutoCvtBili(msg.Chat.Id) {
+	if chatCfg(msg.Chat.Id).AutoCvtBili {
 		return false
 	}
 	if msg.ViaBot != nil || strings.HasPrefix(msg.Text, "/") {

@@ -2,6 +2,7 @@ package backend
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"image"
@@ -43,8 +44,11 @@ func (h *Handler) GetUserAvatar(ctx context.Context, params api.GetUserAvatarPar
 }
 
 func (h *Handler) getUserProfilePhotoWebp(ctx context.Context, userId int64) (string, error) {
-	user := g.Q.GetUserById(ctx, userId)
-	if user == nil {
+	user, err := g.Q.GetUserById(ctx, userId)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", errUserNoPhoto
+		}
 		return "", errUserNotFound
 	}
 	if !user.ProfilePhoto.Valid || user.ProfilePhoto.String == "" {

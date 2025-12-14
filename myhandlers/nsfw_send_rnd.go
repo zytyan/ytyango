@@ -3,7 +3,6 @@ package myhandlers
 import (
 	"context"
 	g "main/globalcfg"
-	"main/globalcfg/h"
 	"regexp"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
@@ -48,7 +47,7 @@ func RequireNsfw(msg *gotgbot.Message) bool {
 	if len(msg.Text) == 0 {
 		return false
 	}
-	if !h.ChatRespNsfwMsg(msg.Chat.Id) {
+	if !chatCfg(msg.Chat.Id).RespNsfwMsg {
 		return false
 	}
 	return reRacyPattern.MatchString(msg.Text)

@@ -1,6 +1,9 @@
 package h
 
 import (
+	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"html"
 	"io"
@@ -10,9 +13,9 @@ import (
 	"path/filepath"
 	"strings"
 
+	"main/helpers/lrusf"
+
 	"github.com/PaulSonOfLars/gotgbot/v2"
-	lru "github.com/hashicorp/golang-lru/v2"
-	"golang.org/x/sync/singleflight"
 )
 
 func GetAllTextIncludeReply(msg *gotgbot.Message) string {
@@ -71,89 +74,90 @@ func isLocalFile(filename string) bool {
 	return p("/") || p(`\\`) || winPath
 }
 
-func DownloadToDisk(bot *gotgbot.Bot, fileId string) (string, error) {
-	if entry, ok := diskCache.Get(fileId); ok {
-		return entry.path, nil
+// downloadToWriter streams a telegram file into the provided writer.
+func downloadToWriter(bot *gotgbot.Bot, fileId string, w io.Writer) error {
+	f, err := bot.GetFile(fileId, nil)
+	if err != nil {
+		return err
 	}
-	result, err, _ := diskSingle.Do(fileId, func() (interface{}, error) {
-		if entry, ok := diskCache.Get(fileId); ok {
-			return entry, nil
-		}
-		f, err := bot.GetFile(fileId, nil)
+	return downloadWithFile(bot, f, w)
+}
+
+func downloadWithFile(bot *gotgbot.Bot, f *gotgbot.File, w io.Writer) error {
+	if isLocalFile(f.FilePath) {
+		fp, err := os.Open(f.FilePath)
 		if err != nil {
-			return nil, err
+			return err
 		}
-		if isLocalFile(f.FilePath) {
-			entry := diskCacheEntry{path: f.FilePath, removeOnEvict: false}
-			diskCache.Add(fileId, entry)
-			return entry, nil
-		}
+		defer fp.Close()
+		_, err = io.Copy(w, fp)
+		return err
+	}
+	u := f.URL(bot, nil)
+	resp, err := http.Get(u)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("GET %s, bad status: %s", u, resp.Status)
+	}
+	_, err = io.Copy(w, resp.Body)
+	return err
+}
+
+func DownloadToDisk(bot *gotgbot.Bot, fileId string) (string, error) {
+	entry, err := diskCache.Get(fileId, func() (diskCacheEntry, error) {
 		target := cachedDiskPath(fileId)
 		if info, err := os.Stat(target); err == nil && info.Size() > 0 {
-			entry := diskCacheEntry{path: target, removeOnEvict: true}
-			diskCache.Add(fileId, entry)
-			return entry, nil
+			return diskCacheEntry{path: target, removeOnEvict: true}, nil
 		}
-		u := f.URL(bot, nil)
-		resp, err := http.Get(u)
+
+		f, err := bot.GetFile(fileId, nil)
 		if err != nil {
-			return nil, err
+			var zero diskCacheEntry
+			return zero, err
 		}
-		defer resp.Body.Close()
-		if resp.StatusCode != http.StatusOK {
-			return nil, fmt.Errorf("GET %s, bad status: %s", u, resp.Status)
+		if isLocalFile(f.FilePath) {
+			return diskCacheEntry{path: f.FilePath, removeOnEvict: false}, nil
 		}
-		tmp, err := os.CreateTemp(filepath.Dir(target), filepath.Base(target)+".tmp")
-		if err != nil {
-			return nil, err
+
+		if data, ok := memCache.TryGet(fileId); ok {
+			if err := writeBytesToPath(target, data); err == nil {
+				return diskCacheEntry{path: target, removeOnEvict: true}, nil
+			}
 		}
-		if _, err := io.Copy(tmp, resp.Body); err != nil {
-			tmp.Close()
-			os.Remove(tmp.Name())
-			return nil, err
+
+		data, err := DownloadToMemoryCached(bot, fileId)
+		if err == nil {
+			if err := writeBytesToPath(target, data); err != nil {
+				var zero diskCacheEntry
+				return zero, err
+			}
+			return diskCacheEntry{path: target, removeOnEvict: true}, nil
 		}
-		if err := tmp.Close(); err != nil {
-			os.Remove(tmp.Name())
-			return nil, err
+
+		if err := writeToPath(target, func(w io.Writer) error {
+			return downloadWithFile(bot, f, w)
+		}); err != nil {
+			var zero diskCacheEntry
+			return zero, err
 		}
-		_ = os.Remove(target)
-		if err := os.Rename(tmp.Name(), target); err != nil {
-			os.Remove(tmp.Name())
-			return nil, err
-		}
-		entry := diskCacheEntry{path: target, removeOnEvict: true}
-		diskCache.Add(fileId, entry)
-		return entry, nil
+
+		return diskCacheEntry{path: target, removeOnEvict: true}, nil
 	})
 	if err != nil {
 		return "", err
-	}
-	entry, ok := result.(diskCacheEntry)
-	if !ok {
-		return "", fmt.Errorf("singleflight: unexpected type %T", result)
 	}
 	return entry.path, nil
 }
 
 func DownloadToMemory(bot *gotgbot.Bot, fileId string) ([]byte, error) {
-	f, err := bot.GetFile(fileId, nil)
-	if err != nil {
+	var buf bytes.Buffer
+	if err := downloadToWriter(bot, fileId, &buf); err != nil {
 		return nil, err
 	}
-	path := f.FilePath
-	if isLocalFile(path) {
-		return os.ReadFile(path)
-	}
-	u := f.URL(bot, nil)
-	resp, err := http.Get(u)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("GET %s, bad status: %s", u, resp.Status)
-	}
-	return io.ReadAll(resp.Body)
+	return buf.Bytes(), nil
 }
 
 type diskCacheEntry struct {
@@ -162,58 +166,67 @@ type diskCacheEntry struct {
 }
 
 var (
-	memCache   *lru.Cache[string, []byte]
-	memSingle  singleflight.Group
-	diskCache  *lru.Cache[string, diskCacheEntry]
-	diskSingle singleflight.Group
+	memCache  *lrusf.Cache[string, []byte]
+	diskCache *lrusf.Cache[string, diskCacheEntry]
 )
 
 func DownloadToMemoryCached(bot *gotgbot.Bot, fileId string) (data []byte, err error) {
-	var ok bool
-	if data, ok = memCache.Get(fileId); ok {
-		return data, nil
-	}
-	r, err, _ := memSingle.Do(fileId, func() (interface{}, error) {
-		d, e := DownloadToMemory(bot, fileId)
-		if e != nil {
-			return nil, e
-		}
-		memCache.Add(fileId, d)
-		return d, e
+	return memCache.Get(fileId, func() ([]byte, error) {
+		return DownloadToMemory(bot, fileId)
 	})
-	if err != nil {
-		return nil, err
-	}
-	data, ok = r.([]byte)
-	if !ok {
-		return nil, fmt.Errorf("singleflight: unexpected type %T", r)
-	}
-	return data, err
 }
 
 func init() {
-	var err error
-	memCache, err = lru.New[string, []byte](128)
-	if err != nil {
-		panic(err)
-	}
-	diskCache, err = lru.NewWithEvict[string, diskCacheEntry](64, func(_ string, entry diskCacheEntry) {
+	memCache = lrusf.New[string, []byte](128, idToKey, nil)
+	diskCache = lrusf.New[string, diskCacheEntry](2048, idToKey, func(_ string, entry diskCacheEntry) {
 		if entry.removeOnEvict {
 			_ = os.Remove(entry.path)
 		}
 	})
+}
+
+func writeBytesToPath(target string, data []byte) error {
+	return writeToPath(target, func(w io.Writer) error {
+		_, err := w.Write(data)
+		return err
+	})
+}
+
+func writeToPath(target string, fill func(io.Writer) error) error {
+	tmp, err := os.CreateTemp(filepath.Dir(target), filepath.Base(target)+".tmp")
 	if err != nil {
-		panic(err)
+		return err
 	}
+	if err := fill(tmp); err != nil {
+		tmp.Close()
+		_ = os.Remove(tmp.Name())
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		_ = os.Remove(tmp.Name())
+		return err
+	}
+	_ = os.Remove(target)
+	if err := os.Rename(tmp.Name(), target); err != nil {
+		_ = os.Remove(tmp.Name())
+		return err
+	}
+	return nil
 }
 
 func cachedDiskPath(fileId string) string {
 	return filepath.Join(os.TempDir(), "bot_file_"+sanitizeFileID(fileId))
 }
 
+func idToKey(k string) string { return k }
+
 func sanitizeFileID(fileId string) string {
 	var b strings.Builder
 	b.Grow(len(fileId))
+	if len(fileId) > 200 {
+		hash := sha256.Sum224([]byte(fileId))
+		return "sha256_" + hex.EncodeToString(hash[:])
+	}
 	for _, r := range fileId {
 		switch {
 		case r >= 'a' && r <= 'z':

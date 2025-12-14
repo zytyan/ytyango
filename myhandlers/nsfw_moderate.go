@@ -204,7 +204,7 @@ func DetectNsfwPhoto(msg *gotgbot.Message) bool {
 	if !HasImage(msg) {
 		return false
 	}
-	if !h.ChatAutoCheckAdult(msg.Chat.Id) {
+	if !chatCfg(msg.Chat.Id).AutoCheckAdult {
 		return false
 	}
 	return true

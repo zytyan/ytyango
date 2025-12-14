@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"main/globalcfg"
-	"main/globalcfg/h"
 	"main/helpers/cocdice"
 	"regexp"
 	"strconv"
@@ -37,7 +36,7 @@ func defaultAtoi(s string, d int) int {
 }
 
 func IsDndDice(msg *gotgbot.Message) bool {
-	if msg.Chat.Type != "private" && !h.ChatEnableCoc(msg.Chat.Id) {
+	if msg.Chat.Type != "private" && !chatCfg(msg.Chat.Id).EnableCoc {
 		return false
 	}
 	text := width.Narrow.String(msg.Text)
@@ -45,7 +44,7 @@ func IsDndDice(msg *gotgbot.Message) bool {
 }
 
 func IsSetDndAttr(msg *gotgbot.Message) bool {
-	if msg.Chat.Type != "private" && !h.ChatEnableCoc(msg.Chat.Id) {
+	if msg.Chat.Type != "private" && !chatCfg(msg.Chat.Id).EnableCoc {
 		return false
 	}
 	text := width.Narrow.String(msg.Text)

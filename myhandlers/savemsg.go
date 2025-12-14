@@ -7,7 +7,6 @@ import (
 	"errors"
 	"io"
 	g "main/globalcfg"
-	"main/globalcfg/h"
 	"main/globalcfg/msgs"
 	"net/http"
 	"runtime/debug"
@@ -110,23 +109,30 @@ func saveMessageToMeilisearch(bot *gotgbot.Bot, ctx *ext.Context, msg *gotgbot.M
 		ImageText: "",
 		QrResult:  "",
 	}
-	if cfg, err := g.Q.ChatCfgById(context.Background(), ctx.EffectiveChat.Id); err == nil && cfg.AutoOcr {
+	logger := logD.With(
+		zap.Int64("update_id", ctx.UpdateId),
+		zap.Int64("message_id", ctx.Message.MessageId),
+		zap.Int64("chat_id", ctx.EffectiveChat.Id),
+		zap.String("mongo_id", mongoId),
+	)
+
+	if chatCfg(ctx.EffectiveChat.Id).AutoOcr {
 		err = setImageText(bot, msg, meiliMsg)
 		if err != nil {
-			log.Warnf("set image text error %s, update id %d", err, ctx.Update.UpdateId)
+			logger.Warn("set image text", zap.Error(err))
 		}
 	}
 	if meiliMsg.Message == "" && meiliMsg.ImageText == "" && meiliMsg.QrResult == "" {
-		log.Debugf("skip save to meilisearch, update id %d", ctx.Update.UpdateId)
+		logger.Debug("skip save message to meilisearch, no text")
 		return nil
 	}
 
 	j, err := json.Marshal(meiliMsg)
 	if err != nil {
-		log.Errorf("marshal meili msg error %s, update id %d", err, ctx.Update.UpdateId)
+		logger.Error("marshal meili msg", zap.Error(err))
 		return err
 	}
-	log.Debugf("save to meili %s, update id %d", j, ctx.Update.UpdateId)
+	logger.Debug("save to meili", zap.ByteString("json", j))
 	preparedPost, _ := http.NewRequest("POST", meili.GetSaveUrl(), bytes.NewReader(j))
 	if meili.MasterKey != "" {
 		preparedPost.Header.Set("Authorization", "Bearer "+meili.MasterKey)
@@ -134,19 +140,24 @@ func saveMessageToMeilisearch(bot *gotgbot.Bot, ctx *ext.Context, msg *gotgbot.M
 	preparedPost.Header.Set("Content-Type", "application/json")
 	post, err := saveMsgMeili.Do(preparedPost)
 	if err != nil {
-		log.Infof("post to meili err, update id %d", ctx.Update.UpdateId)
+		logger.Warn("post to meili", zap.Error(err))
 		return err
 	}
 	defer post.Body.Close()
 	var data []byte
-	if !(200 <= post.StatusCode && post.StatusCode < 300) {
+	logFn := logger.Debug
+	if !(200 <= post.StatusCode && post.StatusCode < 300) || logger.Level().Enabled(zapcore.DebugLevel) {
+		if !(200 <= post.StatusCode && post.StatusCode < 300) {
+			logFn = logger.Error
+		}
 		data, err = io.ReadAll(post.Body)
-		log.Errorf("post to meili err, update id %d, status code %d, response body %s", ctx.Update.UpdateId, post.StatusCode, data)
+		logFn("post to meili",
+			zap.Int("status_code", post.StatusCode),
+			zap.ByteString("response", data),
+			zap.NamedError("read_body_error", err),
+		)
 	}
-	if log.Level().Enabled(zapcore.DebugLevel) {
-		data, err = io.ReadAll(post.Body)
-		log.Debugf("post to meili %s, update id %d", data, ctx.Update.UpdateId)
-	}
+
 	return err
 }
 
@@ -158,7 +169,7 @@ func shouldPersistMessages(ctx *ext.Context) bool {
 	if ctx.EffectiveChat == nil {
 		return false
 	}
-	return h.ChatSaveMessages(ctx.EffectiveChat.Id)
+	return chatCfg(ctx.EffectiveChat.Id).SaveMessages
 }
 
 func persistSavedMessage(ctx *ext.Context, msg *gotgbot.Message) error {
@@ -188,6 +199,6 @@ func persistRawUpdate(ctx *ext.Context, mdb *msgs.Queries) {
 		return
 	}
 	if err := mdb.SaveRawUpdate(ctx); err != nil {
-		log.Warnf("save raw update failed: %s", err)
+		logD.Warn("save raw update failed", zap.Error(err))
 	}
 }
