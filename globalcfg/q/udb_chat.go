@@ -96,7 +96,6 @@ func id2str(id int64) string {
 var chatCache *lrusf.Cache[int64, *ChatCfg]
 
 func (q *Queries) GetChatCfgById(ctx context.Context, id int64) (*ChatCfg, error) {
-	initCaches(q)
 	return chatCache.Get(id, func() (*ChatCfg, error) {
 		cfg, err := q.getChatCfgById(ctx, id)
 		return fromInnerCfg(&cfg), err

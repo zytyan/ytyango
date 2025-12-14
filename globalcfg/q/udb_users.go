@@ -13,7 +13,6 @@ import (
 var userCache *lrusf.Cache[int64, *User]
 
 func (q *Queries) GetUserById(ctx context.Context, id int64) (*User, error) {
-	initCaches(q)
 	return userCache.Get(id, func() (*User, error) {
 		user, err := q.getUserById(ctx, id)
 		if err != nil {

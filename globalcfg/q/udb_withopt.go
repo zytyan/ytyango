@@ -15,6 +15,7 @@ func PrepareWithLogger(ctx context.Context, db DBTX, logger *zap.Logger) (*Queri
 		return nil, err
 	}
 	query.logger = logger
+	InitCache(query)
 	return query, nil
 }
 
