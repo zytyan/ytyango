@@ -169,4 +169,49 @@ func TestEvaluateErrors(t *testing.T) {
 	ce, ok = err.(*CalcError)
 	as.True(ok)
 	as.Equal(ErrorModuloRequiresInt, ce.Typ)
+
+	_, err = Evaluate("5 // 0")
+	as.Error(err)
+	ce, ok = err.(*CalcError)
+	as.True(ok)
+	as.Equal(ErrorDivisionByZero, ce.Typ)
+
+	_, err = Evaluate("3 % 0")
+	as.Error(err)
+	ce, ok = err.(*CalcError)
+	as.True(ok)
+	as.Equal(ErrorModByZero, ce.Typ)
+
+	_, err = Evaluate("3.5!")
+	as.Error(err)
+	ce, ok = err.(*CalcError)
+	as.True(ok)
+	as.Equal(ErrorFactorialRequiresInt, ce.Typ)
+
+	_, err = Evaluate("10P12")
+	as.Error(err)
+	ce, ok = err.(*CalcError)
+	as.True(ok)
+	as.Equal(ErrorInvalidPermutation, ce.Typ)
+
+	_, err = Evaluate("10C11")
+	as.Error(err)
+	ce, ok = err.(*CalcError)
+	as.True(ok)
+	as.Equal(ErrorInvalidCombination, ce.Typ)
+
+	_, err = Evaluate("10 ^ 5000")
+	as.Error(err)
+	ce, ok = err.(*CalcError)
+	as.True(ok)
+	as.Equal(ErrorResultTooBig, ce.Typ)
+}
+
+func TestFastCheck(t *testing.T) {
+	as := require.New(t)
+
+	as.False(FastCheck("1234567890"))
+	as.True(FastCheck("1 + 2 * 3"))
+	as.False(FastCheck("hello=1+2"))
+	as.True(FastCheck("3.14 ×（2＋1）"))
 }
