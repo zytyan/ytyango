@@ -68,9 +68,9 @@ func (h *HookedHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error {
 		dur := time.Since(start)
 		h.logger.Info("handle update",
 			zap.Duration("elapsed", dur),
-			zap.String("name", h.Name()),
 			zap.String("func_name", h.funcName),
 			zap.String("check_name", h.checkerName),
+			zap.String("name", h.Name()),
 			zap.Int64("update_id", ctx.UpdateId),
 			zap.Int64("hit_count", newCnt))
 	}()
