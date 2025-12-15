@@ -2,6 +2,7 @@ package lrusf
 
 import (
 	"container/list"
+	"iter"
 	"sync"
 
 	"golang.org/x/sync/singleflight"
@@ -87,6 +88,16 @@ func (c *Cache[K, V]) Len() int {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return len(c.items)
+}
+
+func (c *Cache[K, V]) Range() iter.Seq2[K, V] {
+	return func(yield func(K, V) bool) {
+		c.mu.Lock()
+		defer c.mu.Unlock()
+		for k, v := range c.items {
+			yield(k, v.Value.(V))
+		}
+	}
 }
 
 // --- internal ---

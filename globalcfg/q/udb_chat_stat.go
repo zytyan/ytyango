@@ -8,10 +8,9 @@ import (
 	"encoding/gob"
 	"errors"
 	"fmt"
+	"main/helpers/lrusf"
 	"sync"
 	"time"
-
-	"github.com/puzpuzpuz/xsync/v3"
 )
 
 const (
@@ -216,21 +215,25 @@ func (s *ChatStat) Save(ctx context.Context, q *Queries) error {
 	})
 }
 
-var m = xsync.NewMapOf[int64, *ChatStat]()
+type ChatStatKey struct {
+	Day int64
+	Id  int64
+}
+
+var chatStatCache *lrusf.Cache[ChatStatKey, *ChatStat]
 
 // FlushChatStats saves all in-memory chat statistics to the database.
 // It is safe to call concurrently with other stat operations.
 func (q *Queries) FlushChatStats(ctx context.Context) error {
 	var firstErr error
-	m.Range(func(_ int64, stat *ChatStat) bool {
+	for _, stat := range chatStatCache.Range() {
 		if stat == nil {
-			return true
+			continue
 		}
 		if err := stat.Save(ctx, q); err != nil && firstErr == nil {
 			firstErr = err
 		}
-		return true
-	})
+	}
 	return firstErr
 }
 
@@ -248,26 +251,21 @@ func (q *Queries) getOrCreateChatStat(ctx context.Context, chatId int64, day int
 
 func (q *Queries) chatStatAtWithTimezone(ctx context.Context, chatId, unixTime, timezone int64) (*ChatStat, error) {
 	day := (unixTime + timezone) / daySeconds
-	stat, _ := m.Compute(chatId, func(oldValue *ChatStat, loaded bool) (newValue *ChatStat, delete bool) {
-		if !loaded || oldValue == nil || oldValue.StatDate != day {
-			if oldValue != nil {
-				// 这里除了忽略错误，还有什么办法呢？
-				_ = oldValue.Save(ctx, q)
-			}
-			daily, err := q.getOrCreateChatStat(ctx, chatId, day)
-			if err != nil {
-				return nil, true
-			}
-			return &ChatStat{
-				mu:            sync.Mutex{},
-				timezone:      timezone,
-				ChatStatDaily: daily,
-			}, false
+	key := ChatStatKey{
+		Day: day,
+		Id:  chatId,
+	}
+	return chatStatCache.Get(key, func() (*ChatStat, error) {
+		daily, err := q.getOrCreateChatStat(ctx, chatId, unixTime)
+		if err != nil {
+			return nil, err
 		}
-		oldValue.timezone = timezone
-		return oldValue, false
+		stat := &ChatStat{
+			mu:            sync.Mutex{},
+			timezone:      timezone,
+			ChatStatDaily: daily}
+		return stat, nil
 	})
-	return stat, nil
 }
 
 func (q *Queries) ChatStatAt(chatId, unixTime int64) *ChatStat {

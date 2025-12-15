@@ -41,7 +41,7 @@ func (q *Queries) GetNsfwPicByFileUid(ctx context.Context, fileUid string) (Save
 		&i.UserRatingSum,
 		&i.RateUserCount,
 	)
-	q.logQuery(getNsfwPicByFileUid, logFields, err, start)
+	q.logQuery("GetNsfwPicByFileUid", logFields, err, start)
 	return i, err
 }
 
@@ -71,7 +71,7 @@ func (q *Queries) ListNsfwPicUserRatesByFileUid(ctx context.Context, fileUid str
 	}
 	rows, err := q.query(ctx, q.listNsfwPicUserRatesByFileUidStmt, listNsfwPicUserRatesByFileUid, fileUid)
 	defer func() {
-		q.logQuery(listNsfwPicUserRatesByFileUid, logFields, err, start)
+		q.logQuery("ListNsfwPicUserRatesByFileUid", logFields, err, start)
 	}()
 	if err != nil {
 		return nil, err
@@ -114,7 +114,7 @@ func (q *Queries) createNsfwPicUserRate(ctx context.Context, fileUid string, use
 		)
 	}
 	_, err := q.exec(ctx, q.createNsfwPicUserRateStmt, createNsfwPicUserRate, fileUid, userID, rating)
-	q.logQuery(createNsfwPicUserRate, logFields, err, start)
+	q.logQuery("createNsfwPicUserRate", logFields, err, start)
 	return err
 }
 
@@ -157,7 +157,7 @@ func (q *Queries) createOrUpdateNsfwPic(ctx context.Context, fileUid string, fil
 		&i.UserRatingSum,
 		&i.RateUserCount,
 	)
-	q.logQuery(createOrUpdateNsfwPic, logFields, err, start)
+	q.logQuery("createOrUpdateNsfwPic", logFields, err, start)
 	return i, err
 }
 
@@ -195,7 +195,7 @@ func (q *Queries) getNsfwPicByRateAndRandKey(ctx context.Context, userRate int64
 		&i.UserRatingSum,
 		&i.RateUserCount,
 	)
-	q.logQuery(getNsfwPicByRateAndRandKey, logFields, err, start)
+	q.logQuery("getNsfwPicByRateAndRandKey", logFields, err, start)
 	return i, err
 }
 
@@ -230,7 +230,7 @@ func (q *Queries) getNsfwPicByRateFirst(ctx context.Context, userRate int64) (Sa
 		&i.UserRatingSum,
 		&i.RateUserCount,
 	)
-	q.logQuery(getNsfwPicByRateFirst, logFields, err, start)
+	q.logQuery("getNsfwPicByRateFirst", logFields, err, start)
 	return i, err
 }
 
@@ -257,7 +257,7 @@ func (q *Queries) getNsfwPicRateByUserId(ctx context.Context, fileUid string, us
 	row := q.queryRow(ctx, q.getNsfwPicRateByUserIdStmt, getNsfwPicRateByUserId, fileUid, userID)
 	var rating int64
 	err := row.Scan(&rating)
-	q.logQuery(getNsfwPicRateByUserId, logFields, err, start)
+	q.logQuery("getNsfwPicRateByUserId", logFields, err, start)
 	return rating, err
 }
 
@@ -277,7 +277,7 @@ func (q *Queries) listNsfwPicRateCounter(ctx context.Context) ([]PicRateCounter,
 	}
 	rows, err := q.query(ctx, q.listNsfwPicRateCounterStmt, listNsfwPicRateCounter)
 	defer func() {
-		q.logQuery(listNsfwPicRateCounter, logFields, err, start)
+		q.logQuery("listNsfwPicRateCounter", logFields, err, start)
 	}()
 	if err != nil {
 		return nil, err
@@ -322,6 +322,6 @@ func (q *Queries) updateNsfwPicUserRate(ctx context.Context, rating int64, fileU
 		)
 	}
 	_, err := q.exec(ctx, q.updateNsfwPicUserRateStmt, updateNsfwPicUserRate, rating, fileUid, userID)
-	q.logQuery(updateNsfwPicUserRate, logFields, err, start)
+	q.logQuery("updateNsfwPicUserRate", logFields, err, start)
 	return err
 }

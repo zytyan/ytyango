@@ -69,7 +69,7 @@ func (q *Queries) CreateChatCfg(ctx context.Context, arg CreateChatCfgParams) er
 		arg.RespNsfwMsg,
 		arg.Timezone,
 	)
-	q.logQuery(createChatCfg, logFields, err, start)
+	q.logQuery("CreateChatCfg", logFields, err, start)
 	return err
 }
 
@@ -165,7 +165,7 @@ func (q *Queries) UpdateChatStatDaily(ctx context.Context, arg UpdateChatStatDai
 		arg.ChatID,
 		arg.StatDate,
 	)
-	q.logQuery(updateChatStatDaily, logFields, err, start)
+	q.logQuery("UpdateChatStatDaily", logFields, err, start)
 	return err
 }
 
@@ -210,7 +210,7 @@ func (q *Queries) createChatStatDaily(ctx context.Context, chatID int64, statDat
 		&i.MsgCountByTime,
 		&i.MsgIDAtTimeStart,
 	)
-	q.logQuery(createChatStatDaily, logFields, err, start)
+	q.logQuery("createChatStatDaily", logFields, err, start)
 	return i, err
 }
 
@@ -249,7 +249,7 @@ func (q *Queries) getChatCfgById(ctx context.Context, id int64) (chatCfg, error)
 		&i.RespNsfwMsg,
 		&i.Timezone,
 	)
-	q.logQuery(getChatCfgById, logFields, err, start)
+	q.logQuery("getChatCfgById", logFields, err, start)
 	return i, err
 }
 
@@ -274,7 +274,7 @@ func (q *Queries) getChatIdByWebId(ctx context.Context, webID sql.NullInt64) (in
 	row := q.queryRow(ctx, q.getChatIdByWebIdStmt, getChatIdByWebId, webID)
 	var id int64
 	err := row.Scan(&id)
-	q.logQuery(getChatIdByWebId, logFields, err, start)
+	q.logQuery("getChatIdByWebId", logFields, err, start)
 	return id, err
 }
 
@@ -320,7 +320,7 @@ func (q *Queries) getChatStat(ctx context.Context, chatID int64, statDate int64)
 		&i.MsgCountByTime,
 		&i.MsgIDAtTimeStart,
 	)
-	q.logQuery(getChatStat, logFields, err, start)
+	q.logQuery("getChatStat", logFields, err, start)
 	return i, err
 }
 
@@ -380,6 +380,6 @@ func (q *Queries) updateChatCfg(ctx context.Context, arg updateChatCfgParams) er
 		arg.RespNsfwMsg,
 		arg.ID,
 	)
-	q.logQuery(updateChatCfg, logFields, err, start)
+	q.logQuery("updateChatCfg", logFields, err, start)
 	return err
 }

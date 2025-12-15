@@ -146,7 +146,7 @@ func (q *Queries) logQuery(query string, params []zap.Field, err error, start ti
 	fields := make([]zap.Field, 0, len(params)+4)
 	fields = append(fields,
 		zap.Time("ts", start),
-		zap.String("sql", query),
+		zap.String("query_name", query),
 	)
 	if q.txID != "" {
 		fields = append(fields, zap.String("txID", q.txID))

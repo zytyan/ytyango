@@ -3,7 +3,7 @@ plugins:
 - name: mygen
   wasm:
     url: file://sql/plugins/sqlc-gen-go.wasm
-    sha256: "b747d0b40628f8461f4c5f1eae94c97a7994332fc4c3cff8f88e7e3d5bf2f20b"
+    sha256: "7ec40f16562d703ca4d63f32232972127251262015b5245c3d00f829d4c7458f"
 overrides:
   go:
     overrides:

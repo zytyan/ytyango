@@ -77,7 +77,7 @@ func (q *Queries) AddGeminiMessage(ctx context.Context, arg AddGeminiMessagePara
 		arg.Blob,
 		arg.MimeType,
 	)
-	q.logQuery(addGeminiMessage, logFields, err, start)
+	q.logQuery("AddGeminiMessage", logFields, err, start)
 	return err
 }
 
@@ -111,7 +111,7 @@ func (q *Queries) CreateNewGeminiSession(ctx context.Context, chatID int64, chat
 		&i.ChatName,
 		&i.ChatType,
 	)
-	q.logQuery(createNewGeminiSession, logFields, err, start)
+	q.logQuery("CreateNewGeminiSession", logFields, err, start)
 	return i, err
 }
 
@@ -141,7 +141,7 @@ func (q *Queries) GetSessionById(ctx context.Context, id int64) (GeminiSession, 
 		&i.ChatName,
 		&i.ChatType,
 	)
-	q.logQuery(getSessionById, logFields, err, start)
+	q.logQuery("GetSessionById", logFields, err, start)
 	return i, err
 }
 
@@ -168,7 +168,7 @@ func (q *Queries) GetSessionIdByMessage(ctx context.Context, chatID int64, msgID
 	row := q.queryRow(ctx, q.getSessionIdByMessageStmt, getSessionIdByMessage, chatID, msgID)
 	var session_id int64
 	err := row.Scan(&session_id)
-	q.logQuery(getSessionIdByMessage, logFields, err, start)
+	q.logQuery("GetSessionIdByMessage", logFields, err, start)
 	return session_id, err
 }
 
@@ -195,7 +195,7 @@ func (q *Queries) getAllMsgInSessionReversed(ctx context.Context, sessionID int6
 	}
 	rows, err := q.query(ctx, q.getAllMsgInSessionReversedStmt, getAllMsgInSessionReversed, sessionID, limit)
 	defer func() {
-		q.logQuery(getAllMsgInSessionReversed, logFields, err, start)
+		q.logQuery("getAllMsgInSessionReversed", logFields, err, start)
 	}()
 	if err != nil {
 		return nil, err

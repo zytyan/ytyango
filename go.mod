@@ -15,7 +15,6 @@ require (
 	github.com/kolesa-team/go-webp v1.0.5
 	github.com/mattn/go-sqlite3 v1.14.32
 	github.com/ogen-go/ogen v1.18.0
-	github.com/puzpuzpuz/xsync/v3 v3.5.1
 	github.com/rivo/uniseg v0.4.7
 	github.com/stretchr/testify v1.11.1
 	github.com/tidwall/gjson v1.18.0

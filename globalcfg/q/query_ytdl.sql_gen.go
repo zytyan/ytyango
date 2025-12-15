@@ -48,7 +48,7 @@ func (q *Queries) GetYtDlpDbCache(ctx context.Context, url string, audioOnly boo
 		&i.Uploader,
 		&i.UploadCount,
 	)
-	q.logQuery(getYtDlpDbCache, logFields, err, start)
+	q.logQuery("GetYtDlpDbCache", logFields, err, start)
 	return i, err
 }
 
@@ -71,7 +71,7 @@ func (q *Queries) IncYtDlUploadCount(ctx context.Context, fileID string) error {
 		)
 	}
 	_, err := q.exec(ctx, q.incYtDlUploadCountStmt, incYtDlUploadCount, fileID)
-	q.logQuery(incYtDlUploadCount, logFields, err, start)
+	q.logQuery("IncYtDlUploadCount", logFields, err, start)
 	return err
 }
 
@@ -123,6 +123,6 @@ func (q *Queries) UpdateYtDlpCache(ctx context.Context, arg UpdateYtDlpCachePara
 		arg.Description,
 		arg.Uploader,
 	)
-	q.logQuery(updateYtDlpCache, logFields, err, start)
+	q.logQuery("UpdateYtDlpCache", logFields, err, start)
 	return err
 }

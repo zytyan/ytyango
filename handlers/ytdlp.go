@@ -9,18 +9,20 @@ import (
 	g "main/globalcfg"
 	"main/globalcfg/h"
 	"main/globalcfg/q"
+	"main/helpers/bili"
 	"main/helpers/ytdlp"
 	"regexp"
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 	"unicode/utf8"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
-	"github.com/puzpuzpuz/xsync/v3"
 	"go.uber.org/zap"
+	"golang.org/x/sync/singleflight"
 )
 
 func initReDownload() *regexp.Regexp {
@@ -51,69 +53,58 @@ type dlKey struct {
 	Resolution int64
 	AudioOnly  bool
 }
+
+func (d *dlKey) String() string {
+	return fmt.Sprintf("%t:%d:%s", d.AudioOnly, d.Resolution, d.Url)
+}
+
 type DlResult struct {
 	uploadFileOnce sync.Once
 	cleanup        func()
 
-	wg   sync.WaitGroup
 	file string
-	err  error
 	q.YtDlResult
 }
 
-var downloading = xsync.NewMapOf[dlKey, *DlResult]()
+var downloading = singleflight.Group{}
+var downloadingCount = atomic.Int64{}
 
-func (d *dlKey) downloadToFile() *DlResult {
+func (d *dlKey) downloadToFile() (*DlResult, error) {
 	const maxConcurrentDownloads = 5
-	result, loaded := downloading.LoadOrCompute(*d, func() *DlResult {
-		dl := &DlResult{
-			YtDlResult: q.YtDlResult{
-				Url:        d.Url,
-				AudioOnly:  d.AudioOnly,
-				Resolution: d.Resolution,
-			},
+	v, err, _ := downloading.Do(d.String(), func() (interface{}, error) {
+		newCnt := downloadingCount.Add(1)
+		defer downloadingCount.Add(-1)
+		if newCnt > maxConcurrentDownloads {
+			return nil, fmt.Errorf("当前正在同时下载的数量过多(%d>%d)，请稍后再试", newCnt, maxConcurrentDownloads)
 		}
-		if downloading.Size() >= maxConcurrentDownloads {
-			dl.err = fmt.Errorf("当前正在进行的下载过多(%d >= %d)，请稍后再试", downloading.Size(), maxConcurrentDownloads)
-			return dl
+		result := &DlResult{}
+		req := ytdlp.Req{
+			Url:             d.Url,
+			AudioOnly:       d.AudioOnly,
+			Resolution:      d.Resolution,
+			EmbedMetadata:   true,
+			PriorityFormats: []string{"h264", "h265", "av01"},
 		}
-		dl.wg.Add(1)
-		return dl
+		resp, err := req.RunWithTimeout(30 * time.Minute)
+		if err != nil {
+			return nil, err
+		}
+		result.file = resp.FilePath
+		result.Title = resp.Info.Title
+		result.Uploader = resp.Info.Uploader
+		result.Description = resp.Info.Desc
+		result.cleanup = func() {
+			err1 := req.Clean()
+			if err1 != nil {
+				logD.Warn("cleanup function error", zap.Error(err1))
+			}
+		}
+		return result, nil
 	})
-	if loaded {
-		// 其他人无需下载，只需等待第一个下载完，然后等待第一个上传完，就可以直接用现成的file id
-		// 这里仅等待第一个下载完
-		result.wg.Wait() // 等待，直到下载完成。
-		return result
-	}
-	if result.err != nil {
-		return result
-	}
-	defer result.wg.Done()
-	req := ytdlp.Req{
-		Url:             d.Url,
-		AudioOnly:       d.AudioOnly,
-		Resolution:      d.Resolution,
-		EmbedMetadata:   true,
-		PriorityFormats: []string{"h264", "h265", "av01"},
-	}
-	resp, err := req.RunWithTimeout(20 * time.Minute)
 	if err != nil {
-		result.err = err
-		downloading.Delete(*d)
-		return result
+		return nil, err
 	}
-	result.file = resp.FilePath
-	result.Title = resp.Info.Title
-	result.Uploader = resp.Info.Uploader
-	result.Description = resp.Info.Desc
-	result.cleanup = func() {
-		err1 := req.Clean()
-		if err1 != nil {
-			log.Desugar().Warn("cleanup function error", zap.Error(err1))
-		}
-	}
-	return result
+	return v.(*DlResult), nil
 }
 
 func (d *dlKey) findInDb() *DlResult {
@@ -188,6 +179,13 @@ func buildYtDlKey(text string, audioOnly bool) (*dlKey, error) {
 	resolutionPattern := strings.TrimRight(reResolution.FindString(text), "pP")
 	resolution := int64(parseIntDefault(resolutionPattern, 720))
 	url = "https://" + url
+	if strings.Contains(url, "b23.tv") {
+		r, err := bili.ConvertBilibiliLinks(url)
+		if err != nil {
+			return nil, err
+		}
+		url = r.BvText
+	}
 	return &dlKey{
 		Url:        url,
 		Resolution: resolution,
@@ -255,10 +253,9 @@ func downloadMedia(bot *gotgbot.Bot, key *dlKey, user *gotgbot.User, msgId, chat
 		}
 		return err
 	}
-	result := key.downloadToFile()
-	defer downloading.Delete(*key)
-	if result.err != nil {
-		_, err = bot.SendMessage(chatId, "下载过程中遇到错误: "+result.err.Error(), msgOpt)
+	result, err := key.downloadToFile()
+	if err != nil {
+		_, err = bot.SendMessage(chatId, "下载过程中遇到错误: "+err.Error(), msgOpt)
 		return err
 	}
 	result.uploadFileOnce.Do(func() {
@@ -276,18 +273,16 @@ func downloadMedia(bot *gotgbot.Bot, key *dlKey, user *gotgbot.User, msgId, chat
 			}
 		}
 		if err != nil {
-			result.err = err
 			log.Warnf("download send media error: %v", err)
-			downloading.Delete(*key)
 			return
 		}
 		if saveErr := result.Save(context.Background(), g.Q); saveErr != nil {
 			log.Warnf("save download result to database error: %v", saveErr)
 		}
 	})
-	if result.err != nil {
-		_, _ = bot.SendMessage(chatId, "下载失败，遇到错误: "+result.err.Error(), msgOpt)
-		return result.err
+	if err != nil {
+		_, _ = bot.SendMessage(chatId, "下载失败，遇到错误: "+err.Error(), msgOpt)
+		return err
 	}
 	return nil
 }

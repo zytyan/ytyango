@@ -34,7 +34,7 @@ func (q *Queries) GetPrprCache(ctx context.Context, profilePhotoUid string) (str
 	row := q.queryRow(ctx, q.getPrprCacheStmt, getPrprCache, profilePhotoUid)
 	var prpr_file_id string
 	err := row.Scan(&prpr_file_id)
-	q.logQuery(getPrprCache, logFields, err, start)
+	q.logQuery("GetPrprCache", logFields, err, start)
 	return prpr_file_id, err
 }
 
@@ -57,7 +57,7 @@ func (q *Queries) SetPrprCache(ctx context.Context, profilePhotoUid string, prpr
 		)
 	}
 	_, err := q.exec(ctx, q.setPrprCacheStmt, setPrprCache, profilePhotoUid, prprFileID)
-	q.logQuery(setPrprCache, logFields, err, start)
+	q.logQuery("SetPrprCache", logFields, err, start)
 	return err
 }
 
@@ -103,7 +103,7 @@ func (q *Queries) createNewUser(ctx context.Context, arg createNewUserParams) (i
 	)
 	var id int64
 	err := row.Scan(&id)
-	q.logQuery(createNewUser, logFields, err, start)
+	q.logQuery("createNewUser", logFields, err, start)
 	return id, err
 }
 
@@ -139,7 +139,7 @@ func (q *Queries) getUserById(ctx context.Context, userID int64) (User, error) {
 		&i.ProfilePhoto,
 		&i.Timezone,
 	)
-	q.logQuery(getUserById, logFields, err, start)
+	q.logQuery("getUserById", logFields, err, start)
 	return i, err
 }
 
@@ -175,7 +175,7 @@ func (q *Queries) updateUserBase(ctx context.Context, userID int64, updatedAt Un
 	)
 	var id int64
 	err := row.Scan(&id)
-	q.logQuery(updateUserBase, logFields, err, start)
+	q.logQuery("updateUserBase", logFields, err, start)
 	return id, err
 }
 
@@ -201,7 +201,7 @@ func (q *Queries) updateUserProfilePhoto(ctx context.Context, userID int64, prof
 		)
 	}
 	_, err := q.exec(ctx, q.updateUserProfilePhotoStmt, updateUserProfilePhoto, userID, profileUpdateAt, profilePhoto)
-	q.logQuery(updateUserProfilePhoto, logFields, err, start)
+	q.logQuery("updateUserProfilePhoto", logFields, err, start)
 	return err
 }
 
@@ -228,6 +228,6 @@ func (q *Queries) updateUserTimeZone(ctx context.Context, userID int64, updatedA
 		)
 	}
 	_, err := q.exec(ctx, q.updateUserTimeZoneStmt, updateUserTimeZone, userID, updatedAt, timezone)
-	q.logQuery(updateUserTimeZone, logFields, err, start)
+	q.logQuery("updateUserTimeZone", logFields, err, start)
 	return err
 }

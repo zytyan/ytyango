@@ -33,7 +33,7 @@ func (q *Queries) DelCocCharAttr(ctx context.Context, userID int64, attrName str
 		)
 	}
 	_, err := q.exec(ctx, q.delCocCharAttrStmt, delCocCharAttr, userID, attrName)
-	q.logQuery(delCocCharAttr, logFields, err, start)
+	q.logQuery("DelCocCharAttr", logFields, err, start)
 	return err
 }
 
@@ -62,7 +62,7 @@ func (q *Queries) GetCocCharAllAttr(ctx context.Context, userID int64) ([]GetCoc
 	}
 	rows, err := q.query(ctx, q.getCocCharAllAttrStmt, getCocCharAllAttr, userID)
 	defer func() {
-		q.logQuery(getCocCharAllAttr, logFields, err, start)
+		q.logQuery("GetCocCharAllAttr", logFields, err, start)
 	}()
 	if err != nil {
 		return nil, err
@@ -110,7 +110,7 @@ func (q *Queries) GetCocCharAttr(ctx context.Context, userID int64, attrName str
 	row := q.queryRow(ctx, q.getCocCharAttrStmt, getCocCharAttr, userID, attrName)
 	var attr_value string
 	err := row.Scan(&attr_value)
-	q.logQuery(getCocCharAttr, logFields, err, start)
+	q.logQuery("GetCocCharAttr", logFields, err, start)
 	return attr_value, err
 }
 
@@ -136,6 +136,6 @@ func (q *Queries) SetCocCharAttr(ctx context.Context, userID int64, attrName str
 		)
 	}
 	_, err := q.exec(ctx, q.setCocCharAttrStmt, setCocCharAttr, userID, attrName, attrValue)
-	q.logQuery(setCocCharAttr, logFields, err, start)
+	q.logQuery("SetCocCharAttr", logFields, err, start)
 	return err
 }

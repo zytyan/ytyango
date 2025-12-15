@@ -76,7 +76,7 @@ func (q *Queries) GetSavedMessageById(ctx context.Context, chatID int64, message
 		&i.ExtraData,
 		&i.ExtraType,
 	)
-	q.logQuery(getSavedMessageById, logFields, err, start)
+	q.logQuery("GetSavedMessageById", logFields, err, start)
 	return i, err
 }
 
@@ -100,7 +100,7 @@ func (q *Queries) InsertRawUpdate(ctx context.Context, chatID sql.NullInt64, mes
 		)
 	}
 	_, err := q.exec(ctx, q.insertRawUpdateStmt, insertRawUpdate, chatID, messageID, rawUpdate)
-	q.logQuery(insertRawUpdate, logFields, err, start)
+	q.logQuery("InsertRawUpdate", logFields, err, start)
 	return err
 }
 
@@ -193,7 +193,7 @@ func (q *Queries) InsertSavedMessage(ctx context.Context, arg InsertSavedMessage
 		arg.ExtraData,
 		arg.ExtraType,
 	)
-	q.logQuery(insertSavedMessage, logFields, err, start)
+	q.logQuery("InsertSavedMessage", logFields, err, start)
 	return err
 }
 
@@ -223,7 +223,7 @@ func (q *Queries) ListEditHistoryByMessage(ctx context.Context, chatID int64, me
 	}
 	rows, err := q.query(ctx, q.listEditHistoryByMessageStmt, listEditHistoryByMessage, chatID, messageID)
 	defer func() {
-		q.logQuery(listEditHistoryByMessage, logFields, err, start)
+		q.logQuery("ListEditHistoryByMessage", logFields, err, start)
 	}()
 	if err != nil {
 		return nil, err
@@ -291,6 +291,6 @@ func (q *Queries) UpdateMessageText(ctx context.Context, arg UpdateMessageTextPa
 		arg.ChatID,
 		arg.MessageID,
 	)
-	q.logQuery(updateMessageText, logFields, err, start)
+	q.logQuery("UpdateMessageText", logFields, err, start)
 	return err
 }

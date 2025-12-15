@@ -30,7 +30,7 @@ func (q *Queries) CreateBiliInlineData(ctx context.Context) (int64, error) {
 	row := q.queryRow(ctx, q.createBiliInlineDataStmt, createBiliInlineData)
 	var uid int64
 	err := row.Scan(&uid)
-	q.logQuery(createBiliInlineData, logFields, err, start)
+	q.logQuery("CreateBiliInlineData", logFields, err, start)
 	return uid, err
 }
 
@@ -63,7 +63,7 @@ func (q *Queries) GetBiliInlineData(ctx context.Context, uid int64) (GetBiliInli
 	row := q.queryRow(ctx, q.getBiliInlineDataStmt, getBiliInlineData, uid)
 	var i GetBiliInlineDataRow
 	err := row.Scan(&i.Text, &i.ChatID, &i.MsgID)
-	q.logQuery(getBiliInlineData, logFields, err, start)
+	q.logQuery("GetBiliInlineData", logFields, err, start)
 	return i, err
 }
 
@@ -96,6 +96,6 @@ func (q *Queries) UpdateBiliInlineMsgId(ctx context.Context, text string, chatID
 		msgID,
 		uid,
 	)
-	q.logQuery(updateBiliInlineMsgId, logFields, err, start)
+	q.logQuery("UpdateBiliInlineMsgId", logFields, err, start)
 	return err
 }
