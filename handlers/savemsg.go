@@ -9,7 +9,6 @@ import (
 	g "main/globalcfg"
 	"main/globalcfg/msgs"
 	"net/http"
-	"runtime/debug"
 	"strings"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
@@ -46,7 +45,7 @@ func saveMessage(bot *gotgbot.Bot, ctx *ext.Context) {
 		if r := recover(); r != nil {
 			logD.Error("save message panic",
 				zap.Any("panic", r),
-				zap.ByteString("stack", debug.Stack()),
+				zap.Stack("stack"),
 				updateId)
 		}
 	}()

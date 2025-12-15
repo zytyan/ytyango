@@ -10,7 +10,6 @@ import (
 	"os/signal"
 	"reflect"
 	"runtime"
-	"runtime/debug"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -214,10 +213,9 @@ func main() {
 		},
 		Panic: func(b *gotgbot.Bot, ctx *ext.Context, r interface{}) {
 			fields := zapLogFields(b, ctx)
-			stackBytes := debug.Stack()
 			fields = append(fields,
 				zap.Any("panic", r),
-				zap.ByteString("stack", stackBytes),
+				zap.Stack("stack"),
 			)
 			dLog.Error("recovered from panic, a panic occurred while handling update.", fields...)
 		},
@@ -246,7 +244,6 @@ func main() {
 
 	dp.NewMessage(message.All, hdrs.StatMessage)
 	dp.NewInlineQuery(inlinequery.All, hdrs.BiliMsgConverterInline)
-	dp.NewMessage(hdrs.BiliMsgFilter, hdrs.BiliMsgConverter)
 
 	dp.Command("google", hdrs.Google)
 	dp.Command("roll", hdrs.Roll)
@@ -272,6 +269,7 @@ func main() {
 	dp.Command("webp2png", hdrs.WebpToPng)
 	dp.Command("chat_config", hdrs.ShowChatCfg)
 
+	dp.NewMessage(hdrs.BiliMsgFilter, hdrs.BiliMsgConverter)
 	dp.Command("count_nsfw_pics", hdrs.CountNsfwPics)
 	dp.Command("settimezone", hdrs.SetUserTimeZone)
 	dp.NewMessage(hdrs.HasSinaGif, hdrs.Gif2Mp4)

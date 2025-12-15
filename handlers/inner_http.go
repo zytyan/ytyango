@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"net/http/pprof"
 	"os"
-	"runtime/debug"
 	"strconv"
 	"strings"
 	"time"
@@ -178,7 +177,7 @@ func withLoggingAndRecovery(logger *zap.Logger, next http.Handler) http.Handler 
 				}
 				logger.Error("inner http panic",
 					zap.Any("panic", rec),
-					zap.ByteString("stack", debug.Stack()),
+					zap.Stack("stack"),
 				)
 			}
 

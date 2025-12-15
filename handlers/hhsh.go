@@ -11,6 +11,7 @@ import (
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 	jsoniter "github.com/json-iterator/go"
+	"go.uber.org/zap"
 )
 
 type HhshResponse struct {
@@ -31,7 +32,7 @@ func Hhsh(bot *gotgbot.Bot, ctx *ext.Context) error {
 	if !hhshRe.MatchString(query) {
 		_, err := ctx.Message.Reply(bot, "需要是英文缩写才可以猜测~", nil)
 		if err != nil {
-			log.Warnf("hhsh reply failed: %s", err)
+			logD.Warn("hhsh reply failed", zap.Error(err))
 		}
 		return err
 	}
@@ -43,10 +44,10 @@ func Hhsh(bot *gotgbot.Bot, ctx *ext.Context) error {
 	if err != nil {
 		_, err := ctx.Message.Reply(bot, "出现了莫名的网络错误~", nil)
 		if err != nil {
-			log.Warnf("hhsh reply message failed: %s", err)
+			logD.Warn("hhsh reply message failed", zap.Error(err))
 			return err
 		}
-		log.Warnf("post to nbnhhsh website failed: %s", err)
+		logD.Warn("post to nbnhhsh website failed", zap.Error(err))
 		return err
 	}
 	defer resp.Body.Close()
@@ -58,7 +59,7 @@ func Hhsh(bot *gotgbot.Bot, ctx *ext.Context) error {
 	}
 	err = jsoniter.Unmarshal(read, &res)
 	if err != nil {
-		log.Warnf("hhsh unmarshal failed: %s, data is %s", err, read)
+		logD.Warn("hhsh unmarshal failed", zap.Error(err), zap.ByteString("data", read))
 	}
 	if len(res) == 0 {
 		_, _ = ctx.Message.Reply(bot, "什么也没有猜到~", nil)
