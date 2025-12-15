@@ -255,7 +255,7 @@ func (q *Queries) chatStatAtWithTimezone(ctx context.Context, chatId, unixTime, 
 		Id:  chatId,
 	}
 	return chatStatCache.Get(key, func() (*ChatStat, error) {
-		daily, err := q.getOrCreateChatStat(ctx, chatId, unixTime)
+		daily, err := q.getOrCreateChatStat(ctx, chatId, day)
 		if err != nil {
 			return nil, err
 		}
