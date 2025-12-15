@@ -89,9 +89,9 @@ func replyNsfw(bot *gotgbot.Bot, msg *gotgbot.Message, result *azure.ModeratorV2
 
 	go saveNsfw(photo.FileUniqueId, photo.FileId, severity)
 	if severity >= 6 {
-		g.Q.ChatStatToday(msg.Chat.Id).IncAdultCount()
+		g.Q.ChatStatNow(msg.Chat.Id).IncAdultCount()
 	} else {
-		g.Q.ChatStatToday(msg.Chat.Id).IncRacyCount()
+		g.Q.ChatStatNow(msg.Chat.Id).IncRacyCount()
 	}
 	var spoiler = 0
 	if msg.HasMediaSpoiler {

@@ -32,9 +32,9 @@ func TestMarsCounterSuccess(t *testing.T) {
 		t.Fatalf("unexpected status: %d", resp.StatusCode)
 	}
 
-	stat := g.Q.ChatStatToday(groupID)
+	stat := g.Q.ChatStatNow(groupID)
 	if stat == nil {
-		t.Fatalf("Q.ChatStatToday(groupID) is nil")
+		t.Fatalf("Q.ChatStatNow(groupID) is nil")
 	}
 	if stat.MarsCount != 1 {
 		t.Fatalf("expected MarsCount=1 got %d", stat.MarsCount)
@@ -77,7 +77,7 @@ func TestDioBanActions(t *testing.T) {
 	}
 	resp.Body.Close()
 
-	stat := g.Q.ChatStatToday(groupID)
+	stat := g.Q.ChatStatNow(groupID)
 	if stat == nil {
 		t.Fatalf("expected stat != nil, got nil")
 	}

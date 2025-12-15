@@ -191,6 +191,7 @@ func main() {
 	}()
 	go func() {
 		<-ctx.Done()
+		log.Infof("save chat stats")
 		if err := g.Q.FlushChatStats(context.Background()); err != nil {
 			log.Errorf("flush chat stats: %s", err)
 		}

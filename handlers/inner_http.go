@@ -80,7 +80,7 @@ func marsCounter(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	g.Q.ChatStatToday(marsInfo.GroupID).IncMarsCount(marsInfo.MarsCount)
+	g.Q.ChatStatNow(marsInfo.GroupID).IncMarsCount(marsInfo.MarsCount)
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -96,9 +96,9 @@ func dioBan(w http.ResponseWriter, r *http.Request) {
 	}
 	switch dioBanUser.Action {
 	case DioBanActionAdd:
-		g.Q.ChatStatToday(dioBanUser.GroupId).IncDioAddUserCount()
+		g.Q.ChatStatNow(dioBanUser.GroupId).IncDioAddUserCount()
 	case DioBanActionBanByWrongButton, DioBanActionBanByNoButton, DioBanActionBanByNoMsg:
-		g.Q.ChatStatToday(dioBanUser.GroupId).IncDioBanUserCount()
+		g.Q.ChatStatNow(dioBanUser.GroupId).IncDioBanUserCount()
 	}
 	w.WriteHeader(http.StatusOK)
 }

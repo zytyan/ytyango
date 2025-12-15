@@ -3,10 +3,8 @@ package q
 import (
 	"bytes"
 	"context"
-	"database/sql"
 	"database/sql/driver"
 	"encoding/gob"
-	"errors"
 	"fmt"
 	"main/helpers/lrusf"
 	"sync"
@@ -239,11 +237,8 @@ func (q *Queries) FlushChatStats(ctx context.Context) error {
 
 func (q *Queries) getOrCreateChatStat(ctx context.Context, chatId int64, day int64) (ChatStatDaily, error) {
 	daily, err := q.getChatStat(ctx, chatId, day)
-	if errors.Is(err, sql.ErrNoRows) {
-		return q.createChatStatDaily(ctx, chatId, day)
-	}
 	if err != nil {
-		return ChatStatDaily{}, err
+		return q.createChatStatDaily(ctx, chatId, day)
 	}
 	return daily, err
 
@@ -276,7 +271,7 @@ func (q *Queries) ChatStatAt(chatId, unixTime int64) *ChatStat {
 	return stat
 }
 
-func (q *Queries) ChatStatToday(chatId int64) (stat *ChatStat) {
+func (q *Queries) ChatStatNow(chatId int64) (stat *ChatStat) {
 	return q.ChatStatAt(chatId, time.Now().Unix())
 }
 
@@ -286,7 +281,9 @@ func (q *Queries) ChatStatOfDay(ctx context.Context, chatId, unixTime int64) (Ch
 	if err != nil {
 		return ChatStatDaily{}, 0, err
 	}
-	day := (unixTime + cfg.Timezone) / daySeconds
-	daily, err := q.getChatStat(ctx, chatId, day)
-	return daily, cfg.Timezone, err
+	daily, err := q.chatStatAtWithTimezone(ctx, chatId, unixTime, cfg.Timezone)
+	if err != nil {
+		return ChatStatDaily{}, 0, err
+	}
+	return daily.ChatStatDaily, cfg.Timezone, err
 }
