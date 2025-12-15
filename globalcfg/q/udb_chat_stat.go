@@ -9,6 +9,8 @@ import (
 	"main/helpers/lrusf"
 	"sync"
 	"time"
+
+	"go.uber.org/zap"
 )
 
 const (
@@ -224,7 +226,9 @@ var chatStatCache *lrusf.Cache[ChatStatKey, *ChatStat]
 // It is safe to call concurrently with other stat operations.
 func (q *Queries) FlushChatStats(ctx context.Context) error {
 	var firstErr error
+	q.logger.Info("flushing chat_stats")
 	for _, stat := range chatStatCache.Range() {
+		q.logger.Info("flushing", zap.Any("stat", stat))
 		if stat == nil {
 			continue
 		}
