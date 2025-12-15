@@ -40,7 +40,7 @@ func initCaches(q *Queries) {
 			defer cancel()
 			_ = cfg.Save(ctx, q)
 		})
-		chatStatCache = lrusf.New[ChatStatKey, *ChatStat](2048, chatStatCacheKey, func(key ChatStatKey, daily *ChatStat) {
+		chatStatCache = lrusf.New[ChatStatKey, *ChatStat](64, chatStatCacheKey, func(key ChatStatKey, daily *ChatStat) {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
 			defer cancel()
 			_ = daily.Save(ctx, q)
