@@ -12,6 +12,28 @@ import (
 	"go.uber.org/zap"
 )
 
+const createBiliInlineData = `-- name: CreateBiliInlineData :one
+INSERT INTO bili_inline_results
+    DEFAULT
+VALUES
+RETURNING uid
+`
+
+func (q *Queries) CreateBiliInlineData(ctx context.Context) (int64, error) {
+	var logFields []zap.Field
+	var start time.Time
+	if q.logger != nil {
+		logFields = make([]zap.Field, 0, 6)
+		start = time.Now()
+		logFields = append(logFields, zap.Dict("fields"))
+	}
+	row := q.queryRow(ctx, q.createBiliInlineDataStmt, createBiliInlineData)
+	var uid int64
+	err := row.Scan(&uid)
+	q.logQuery(createBiliInlineData, logFields, err, start)
+	return uid, err
+}
+
 const getBiliInlineData = `-- name: GetBiliInlineData :one
 
 SELECT text, chat_id, msg_id
@@ -43,28 +65,6 @@ func (q *Queries) GetBiliInlineData(ctx context.Context, uid int64) (GetBiliInli
 	err := row.Scan(&i.Text, &i.ChatID, &i.MsgID)
 	q.logQuery(getBiliInlineData, logFields, err, start)
 	return i, err
-}
-
-const insertBiliInlineData = `-- name: InsertBiliInlineData :one
-INSERT INTO bili_inline_results
-    DEFAULT
-VALUES
-RETURNING uid
-`
-
-func (q *Queries) InsertBiliInlineData(ctx context.Context) (int64, error) {
-	var logFields []zap.Field
-	var start time.Time
-	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 6)
-		start = time.Now()
-		logFields = append(logFields, zap.Dict("fields"))
-	}
-	row := q.queryRow(ctx, q.insertBiliInlineDataStmt, insertBiliInlineData)
-	var uid int64
-	err := row.Scan(&uid)
-	q.logQuery(insertBiliInlineData, logFields, err, start)
-	return uid, err
 }
 
 const updateBiliInlineMsgId = `-- name: UpdateBiliInlineMsgId :exec

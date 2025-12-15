@@ -31,6 +31,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.addGeminiMessageStmt, err = db.PrepareContext(ctx, addGeminiMessage); err != nil {
 		return nil, fmt.Errorf("error preparing query AddGeminiMessage: %w", err)
 	}
+	if q.createBiliInlineDataStmt, err = db.PrepareContext(ctx, createBiliInlineData); err != nil {
+		return nil, fmt.Errorf("error preparing query CreateBiliInlineData: %w", err)
+	}
 	if q.createChatCfgStmt, err = db.PrepareContext(ctx, createChatCfg); err != nil {
 		return nil, fmt.Errorf("error preparing query CreateChatCfg: %w", err)
 	}
@@ -66,9 +69,6 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	}
 	if q.incYtDlUploadCountStmt, err = db.PrepareContext(ctx, incYtDlUploadCount); err != nil {
 		return nil, fmt.Errorf("error preparing query IncYtDlUploadCount: %w", err)
-	}
-	if q.insertBiliInlineDataStmt, err = db.PrepareContext(ctx, insertBiliInlineData); err != nil {
-		return nil, fmt.Errorf("error preparing query InsertBiliInlineData: %w", err)
 	}
 	if q.listNsfwPicUserRatesByFileUidStmt, err = db.PrepareContext(ctx, listNsfwPicUserRatesByFileUid); err != nil {
 		return nil, fmt.Errorf("error preparing query ListNsfwPicUserRatesByFileUid: %w", err)
@@ -152,6 +152,11 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing addGeminiMessageStmt: %w", cerr)
 		}
 	}
+	if q.createBiliInlineDataStmt != nil {
+		if cerr := q.createBiliInlineDataStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing createBiliInlineDataStmt: %w", cerr)
+		}
+	}
 	if q.createChatCfgStmt != nil {
 		if cerr := q.createChatCfgStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing createChatCfgStmt: %w", cerr)
@@ -210,11 +215,6 @@ func (q *Queries) Close() error {
 	if q.incYtDlUploadCountStmt != nil {
 		if cerr := q.incYtDlUploadCountStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing incYtDlUploadCountStmt: %w", cerr)
-		}
-	}
-	if q.insertBiliInlineDataStmt != nil {
-		if cerr := q.insertBiliInlineDataStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing insertBiliInlineDataStmt: %w", cerr)
 		}
 	}
 	if q.listNsfwPicUserRatesByFileUidStmt != nil {
@@ -380,6 +380,7 @@ type Queries struct {
 	txID                              string
 	tx                                *sql.Tx
 	addGeminiMessageStmt              *sql.Stmt
+	createBiliInlineDataStmt          *sql.Stmt
 	createChatCfgStmt                 *sql.Stmt
 	createNewGeminiSessionStmt        *sql.Stmt
 	delCocCharAttrStmt                *sql.Stmt
@@ -392,7 +393,6 @@ type Queries struct {
 	getSessionIdByMessageStmt         *sql.Stmt
 	getYtDlpDbCacheStmt               *sql.Stmt
 	incYtDlUploadCountStmt            *sql.Stmt
-	insertBiliInlineDataStmt          *sql.Stmt
 	listNsfwPicUserRatesByFileUidStmt *sql.Stmt
 	setCocCharAttrStmt                *sql.Stmt
 	setPrprCacheStmt                  *sql.Stmt
@@ -427,6 +427,7 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		txID:                              fmt.Sprintf("%p", tx),
 		tx:                                tx,
 		addGeminiMessageStmt:              q.addGeminiMessageStmt,
+		createBiliInlineDataStmt:          q.createBiliInlineDataStmt,
 		createChatCfgStmt:                 q.createChatCfgStmt,
 		createNewGeminiSessionStmt:        q.createNewGeminiSessionStmt,
 		delCocCharAttrStmt:                q.delCocCharAttrStmt,
@@ -439,7 +440,6 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		getSessionIdByMessageStmt:         q.getSessionIdByMessageStmt,
 		getYtDlpDbCacheStmt:               q.getYtDlpDbCacheStmt,
 		incYtDlUploadCountStmt:            q.incYtDlUploadCountStmt,
-		insertBiliInlineDataStmt:          q.insertBiliInlineDataStmt,
 		listNsfwPicUserRatesByFileUidStmt: q.listNsfwPicUserRatesByFileUidStmt,
 		setCocCharAttrStmt:                q.setCocCharAttrStmt,
 		setPrprCacheStmt:                  q.setPrprCacheStmt,

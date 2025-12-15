@@ -200,7 +200,6 @@ func main() {
 	b := newBot(token)
 	hdrs.SetMainBot(b)
 	hdrs.StartChatStatScheduler()
-	g.Q.StartChatStatAutoSave(ctx, time.Minute)
 	backend.GoListenAndServe("127.0.0.1:4021", b)
 	go hdrs.HttpListen4019()
 	dLog := log.Desugar()
@@ -268,12 +267,11 @@ func main() {
 	dp.Command("new_battle", hdrs.NewBattle)
 	dp.Command("webp2png", hdrs.WebpToPng)
 	dp.Command("chat_config", hdrs.ShowChatCfg)
-
-	dp.NewMessage(hdrs.BiliMsgFilter, hdrs.BiliMsgConverter)
 	dp.Command("count_nsfw_pics", hdrs.CountNsfwPics)
 	dp.Command("settimezone", hdrs.SetUserTimeZone)
+
+	dp.NewMessage(hdrs.BiliMsgFilter, hdrs.BiliMsgConverter)
 	dp.NewMessage(hdrs.HasSinaGif, hdrs.Gif2Mp4)
-	dp.NewCallback(hdrs.IsBilibiliBtn, hdrs.DownloadVideoCallback)
 	dp.NewMessage(hdrs.DetectNsfwPhoto, hdrs.NsfwDetect)
 	dp.NewMessage(hdrs.NeedSolve, hdrs.SolveMath)
 	dp.NewMessage(hdrs.IsCalcExchangeRate, hdrs.ExchangeRateCalc)
@@ -282,10 +280,12 @@ func main() {
 	dp.NewMessage(hdrs.IsSetDndAttr, hdrs.SetDndAttr)
 	dp.NewMessage(hdrs.RequireNsfw, hdrs.SendRandRacy)
 	dp.NewMessage(hdrs.IsSacabam, hdrs.GenSacabam)
-	dp.NewCallback(hdrs.IsStopBattle, hdrs.StopBattle)
-	dp.NewCallback(hdrs.IsNextRound, hdrs.NextRound)
 	dp.NewMessage(hdrs.IsBattleCommand, hdrs.ExecuteBattleCommand)
 	dp.NewMessage(hdrs.IsGeminiReq, hdrs.GeminiReply)
+
+	dp.NewCallback(hdrs.IsStopBattle, hdrs.StopBattle)
+	dp.NewCallback(hdrs.IsNextRound, hdrs.NextRound)
+	dp.NewCallback(hdrs.IsBilibiliBtn, hdrs.DownloadVideoCallback)
 	dp.NewCallback(hdrs.IsBilibiliInlineBtn, hdrs.DownloadInlinedBv)
 	dp.NewCallback(hdrs.IsNsfwPicRateBtn, hdrs.RateNsfwPicByBtn)
 

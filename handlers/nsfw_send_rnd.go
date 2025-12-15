@@ -12,7 +12,7 @@ import (
 var reRank = regexp.MustCompile(`(\d)(.*\b(\d))?`)
 
 func SendRandRacy(bot *gotgbot.Bot, ctx *ext.Context) error {
-	submatch := reRank.FindStringSubmatch(ctx.Message.Text)
+	submatch := reRank.FindStringSubmatch(ctx.Message.GetText())
 	start, end := 2, 4
 	if submatch != nil {
 		start = defaultAtoi(submatch[1], 2)

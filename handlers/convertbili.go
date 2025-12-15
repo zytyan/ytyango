@@ -11,6 +11,7 @@ import (
 	"main/helpers/bili"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
@@ -114,7 +115,7 @@ func BiliMsgConverterInline(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
 		return err
 	}
 
-	uid, err := g.Q.InsertBiliInlineData(context.Background())
+	uid, err := g.Q.CreateBiliInlineData(context.Background())
 	if err != nil {
 		logD.Warn("insert to bilibili error", zap.Error(err))
 		return err
@@ -152,8 +153,11 @@ func getBiliCallbackDataInMsg(ctx *ext.Context) (uid int64) {
 func SaveBiliMsgCallbackMsgId(_ *gotgbot.Bot, ctx *ext.Context) (err error) {
 	uid := getBiliCallbackDataInMsg(ctx)
 	msg := ctx.EffectiveMessage
-	return g.Q.UpdateBiliInlineMsgId(context.Background(), msg.Text, msg.Chat.Id, msg.MessageId, uid)
+	c, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+	return g.Q.UpdateBiliInlineMsgId(c, msg.Text, msg.Chat.Id, msg.MessageId, uid)
 }
+
 func IsBilibiliBtn(cq *gotgbot.CallbackQuery) bool {
 	return cq.Data == biliCallbackData
 }
@@ -167,7 +171,6 @@ func IsBilibiliInlineBtn2(msg *gotgbot.Message) bool {
 	if msg.ReplyMarkup == nil || len(msg.ReplyMarkup.InlineKeyboard) == 0 {
 		return false
 	}
-	log.Infoln(msg.ReplyMarkup.InlineKeyboard)
 	for _, row := range msg.ReplyMarkup.InlineKeyboard {
 		for _, btn := range row {
 			if strings.HasPrefix(btn.CallbackData, biliInlineCallbackPrefix) {

@@ -234,29 +234,6 @@ func (q *Queries) FlushChatStats(ctx context.Context) error {
 	return firstErr
 }
 
-// StartChatStatAutoSave periodically flushes in-memory statistics to the database
-// until the context is canceled.
-func (q *Queries) StartChatStatAutoSave(ctx context.Context, interval time.Duration) {
-	if interval <= 0 {
-		return
-	}
-	go func() {
-		ticker := time.NewTicker(interval)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ctx.Done():
-				_ = q.FlushChatStats(ctx)
-				return
-			case <-ticker.C:
-				saveCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
-				_ = q.FlushChatStats(saveCtx)
-				cancel()
-			}
-		}
-	}()
-}
-
 func (q *Queries) getOrCreateChatStat(ctx context.Context, chatId int64, day int64) (ChatStatDaily, error) {
 	daily, err := q.getChatStat(ctx, chatId, day)
 	if errors.Is(err, sql.ErrNoRows) {

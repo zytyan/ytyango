@@ -61,7 +61,8 @@ func defaultChagCfg(id int64) *ChatCfg {
 }
 
 func (c *ChatCfg) Save(ctx context.Context, q *Queries) error {
-	if c.InDatabase {
+	if !c.InDatabase {
+		c.InDatabase = true
 		return q.CreateChatCfg(ctx, CreateChatCfgParams{
 			ID:             c.ID,
 			WebID:          c.WebID,

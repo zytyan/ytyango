@@ -6,7 +6,7 @@ FROM bili_inline_results
 WHERE uid = ?;
 
 
--- name: InsertBiliInlineData :one
+-- name: CreateBiliInlineData :one
 INSERT INTO bili_inline_results
     DEFAULT
 VALUES
