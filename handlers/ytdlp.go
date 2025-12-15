@@ -77,7 +77,13 @@ func (d *dlKey) downloadToFile() (*DlResult, error) {
 		if newCnt > maxConcurrentDownloads {
 			return nil, fmt.Errorf("当前正在同时下载的数量过多(%d>%d)，请稍后再试", newCnt, maxConcurrentDownloads)
 		}
-		result := &DlResult{}
+		result := &DlResult{
+			YtDlResult: q.YtDlResult{
+				Url:        d.Url,
+				AudioOnly:  d.AudioOnly,
+				Resolution: d.Resolution,
+			},
+		}
 		req := ytdlp.Req{
 			Url:             d.Url,
 			AudioOnly:       d.AudioOnly,
