@@ -8,6 +8,7 @@ import (
 	g "main/globalcfg"
 	"main/globalcfg/h"
 	"main/globalcfg/q"
+	"main/mdnormalizer"
 	"slices"
 	"strings"
 	"sync"
@@ -278,8 +279,7 @@ func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 消息类型有 text, photo, sticker三种，对应文本消息、图片消息及表情消息。
 若用户明确回复了某条消息，则有回复的消息的ID(reply)字段。
 这些元数据由代码自动生成，不要在模型的输出中加入该数据。
-请使用中文回复消息。
-不要使用markdown语法。`,
+请使用中文回复消息。`,
 		time.Now().Format("2006-01-02 15:04:05 -07:00"),
 		session.ChatType,
 		session.ChatName,
@@ -289,7 +289,6 @@ func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 		SystemInstruction: genai.NewContentFromText(sysInst, genai.RoleModel),
 		Tools: []*genai.Tool{
 			{GoogleSearch: &genai.GoogleSearch{}},
-			//{URLContext: &genai.URLContext{}},
 		},
 	}
 	if err := session.AddTgMessage(bot, ctx.EffectiveMessage.ReplyToMessage); err != nil {
@@ -309,12 +308,27 @@ func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 	if err != nil {
 		_, _ = ctx.EffectiveMessage.SetReaction(bot, &gotgbot.SetMessageReactionOpts{
 			Reaction: []gotgbot.ReactionType{gotgbot.ReactionTypeEmoji{Emoji: "😭"}},
-			IsBig:    false,
 		})
 		_, _ = ctx.EffectiveMessage.Reply(bot, fmt.Sprintf("error:%s", err), nil)
 		return err
 	}
-	respMsg, err := ctx.EffectiveMessage.Reply(bot, res.Text(), nil)
+	text := res.Text()
+	if text == "" {
+		text = "模型没有返回任何信息"
+		if res.PromptFeedback != nil {
+			text += "，原因: " + res.PromptFeedback.BlockReasonMessage
+		}
+		_, _ = ctx.EffectiveMessage.SetReaction(bot, &gotgbot.SetMessageReactionOpts{
+			Reaction: []gotgbot.ReactionType{gotgbot.ReactionTypeEmoji{Emoji: "😭"}},
+		})
+	}
+	normTxt, err := mdnormalizer.Normalize(text)
+	var respMsg *gotgbot.Message
+	if err != nil {
+		respMsg, err = ctx.EffectiveMessage.Reply(bot, text, nil)
+	} else {
+		respMsg, err = ctx.EffectiveMessage.Reply(bot, normTxt.Text, &gotgbot.SendMessageOpts{Entities: normTxt.Entities})
+	}
 	if err != nil {
 		j, err2 := res.MarshalJSON()
 		log.Warnf("genemi response: %s, error: %s", j, err2)

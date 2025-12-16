@@ -18,6 +18,7 @@ require (
 	github.com/rivo/uniseg v0.4.7
 	github.com/stretchr/testify v1.11.1
 	github.com/tidwall/gjson v1.18.0
+	github.com/yuin/goldmark v1.7.13
 	go.opentelemetry.io/otel v1.39.0
 	go.opentelemetry.io/otel/metric v1.39.0
 	go.opentelemetry.io/otel/trace v1.39.0
