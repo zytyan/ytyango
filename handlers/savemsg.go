@@ -110,7 +110,7 @@ func saveMessageToMeilisearch(bot *gotgbot.Bot, ctx *ext.Context, msg *gotgbot.M
 	}
 	logger := logD.With(
 		zap.Int64("update_id", ctx.UpdateId),
-		zap.Int64("message_id", ctx.Message.MessageId),
+		zap.Int64("message_id", msg.MessageId),
 		zap.Int64("chat_id", ctx.EffectiveChat.Id),
 		zap.String("mongo_id", mongoId),
 	)
