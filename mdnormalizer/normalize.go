@@ -317,10 +317,8 @@ func (b *builder) handleList(list *ast.List) error {
 		lines = append(lines, line)
 	}
 
-	start := b.offset
-	b.appendText(strings.Join(lines, "\n"), escapeCode)
-	b.addEntity("pre", start, b.offset-start, "")
-	return b.fallback("list converted to code block")
+	b.appendText(strings.Join(lines, "\n"), escapeText)
+	return nil
 }
 
 func (b *builder) handleTable(table *extast.Table) error {
@@ -382,13 +380,6 @@ func (b *builder) appendNewline() {
 func (b *builder) appendText(text string, mode escapeMode) {
 	if text == "" {
 		return
-	}
-
-	switch mode {
-	case escapeText:
-		text = escapeTelegramText(text)
-	case escapeCode:
-		text = escapeCodeText(text)
 	}
 
 	b.sb.WriteString(text)

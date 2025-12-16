@@ -1,7 +1,6 @@
 package mdnormalizer
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -35,19 +34,15 @@ func TestNormalizeListFallback(t *testing.T) {
 	msg, err := Normalize("- a\n- b")
 	require.NoError(t, err)
 	require.Equal(t, "• a\n• b\n", msg.Text)
-	require.Len(t, msg.Entities, 1)
-
-	ent := msg.Entities[0]
-	require.Equal(t, "pre", ent.Type)
-	require.EqualValues(t, utf16Length("• a\n• b"), ent.Length)
-	require.Contains(t, msg.Warnings, "list converted to code block")
+	require.Empty(t, msg.Entities)
+	require.Empty(t, msg.Warnings)
 }
 
 func TestNormalizeMathFallback(t *testing.T) {
 	msg, err := Normalize("Equation $E=mc^2$ done.")
 	require.NoError(t, err)
 
-	require.Equal(t, "Equation E=mc^2 done\\.\n", msg.Text)
+	require.Equal(t, "Equation E=mc^2 done.\n", msg.Text)
 	require.Len(t, msg.Entities, 1)
 	ent := msg.Entities[0]
 	require.Equal(t, "code", ent.Type)
@@ -99,7 +94,7 @@ func TestMarkdownText(t *testing.T) {
 		"\n\n希望这段文案对你的测试有用！"
 	msg, err := Normalize(text)
 	require.NoError(t, err)
-	require.Equal(t, `这里有一段Markdown文案，你可以拿去测试：
+	expected := `这里有一段Markdown文案，你可以拿去测试：
 这是一个一级标题
 这是一个二级标题
 粗体文字 和 斜体文字。
@@ -115,5 +110,14 @@ function test() {
   console.log("Hello Markdown!");
 }
 
-希望这段文案对你的测试有用！`, strings.TrimSpace(msg.Text)) //TODO: 这里应该不能输出带回车的字符，需要之后测试
+希望这段文案对你的测试有用！`
+	require.Equal(t, expected+"\n", msg.Text)
+}
+
+func TestEscape(t *testing.T) {
+	r := require.New(t)
+	msg, err := Normalize(`\.`)
+	r.NoError(err)
+	r.Equal("\\.\n", msg.Text)
+	r.Empty(msg.Entities)
 }
