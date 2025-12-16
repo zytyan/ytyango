@@ -23,18 +23,20 @@ func (q *Queries) GetPrprCache(ctx context.Context, profilePhotoUid string) (str
 	var logFields []zap.Field
 	var start time.Time
 	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 6)
+		logFields = make([]zap.Field, 0, 8)
 		start = time.Now()
-		logFields = append(logFields,
-			zap.Dict("fields",
-				zap.String("profile_photo_uid", profilePhotoUid),
-			),
-		)
+		if q.LogArgument {
+			logFields = append(logFields,
+				zap.Dict("fields",
+					zap.String("profile_photo_uid", profilePhotoUid),
+				),
+			)
+		}
 	}
 	row := q.queryRow(ctx, q.getPrprCacheStmt, getPrprCache, profilePhotoUid)
 	var prpr_file_id string
 	err := row.Scan(&prpr_file_id)
-	q.logQuery("GetPrprCache", logFields, err, start)
+	q.logQuery(getPrprCache, "GetPrprCache", logFields, err, start)
 	return prpr_file_id, err
 }
 
@@ -47,17 +49,19 @@ func (q *Queries) SetPrprCache(ctx context.Context, profilePhotoUid string, prpr
 	var logFields []zap.Field
 	var start time.Time
 	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 6)
+		logFields = make([]zap.Field, 0, 8)
 		start = time.Now()
-		logFields = append(logFields,
-			zap.Dict("fields",
-				zap.String("profile_photo_uid", profilePhotoUid),
-				zap.String("prpr_file_id", prprFileID),
-			),
-		)
+		if q.LogArgument {
+			logFields = append(logFields,
+				zap.Dict("fields",
+					zap.String("profile_photo_uid", profilePhotoUid),
+					zap.String("prpr_file_id", prprFileID),
+				),
+			)
+		}
 	}
 	_, err := q.exec(ctx, q.setPrprCacheStmt, setPrprCache, profilePhotoUid, prprFileID)
-	q.logQuery("SetPrprCache", logFields, err, start)
+	q.logQuery(setPrprCache, "SetPrprCache", logFields, err, start)
 	return err
 }
 
@@ -80,18 +84,20 @@ func (q *Queries) createNewUser(ctx context.Context, arg createNewUserParams) (i
 	var logFields []zap.Field
 	var start time.Time
 	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 6)
+		logFields = make([]zap.Field, 0, 8)
 		start = time.Now()
-		logFields = append(logFields,
-			zap.Dict("fields",
-				arg.UpdatedAt.ZapObject("updated_at"),
-				zap.Int64("user_id", arg.UserID),
-				zap.String("first_name", arg.FirstName),
-				zapNullString("last_name", arg.LastName),
-				zapNullString("profile_photo", arg.ProfilePhoto),
-				zap.Int64("timezone", arg.Timezone),
-			),
-		)
+		if q.LogArgument {
+			logFields = append(logFields,
+				zap.Dict("fields",
+					arg.UpdatedAt.ZapObject("updated_at"),
+					zap.Int64("user_id", arg.UserID),
+					zap.String("first_name", arg.FirstName),
+					zapNullString("last_name", arg.LastName),
+					zapNullString("profile_photo", arg.ProfilePhoto),
+					zap.Int64("timezone", arg.Timezone),
+				),
+			)
+		}
 	}
 	row := q.queryRow(ctx, q.createNewUserStmt, createNewUser,
 		arg.UpdatedAt,
@@ -103,7 +109,7 @@ func (q *Queries) createNewUser(ctx context.Context, arg createNewUserParams) (i
 	)
 	var id int64
 	err := row.Scan(&id)
-	q.logQuery("createNewUser", logFields, err, start)
+	q.logQuery(createNewUser, "createNewUser", logFields, err, start)
 	return id, err
 }
 
@@ -119,13 +125,15 @@ func (q *Queries) getUserById(ctx context.Context, userID int64) (User, error) {
 	var logFields []zap.Field
 	var start time.Time
 	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 6)
+		logFields = make([]zap.Field, 0, 8)
 		start = time.Now()
-		logFields = append(logFields,
-			zap.Dict("fields",
-				zap.Int64("user_id", userID),
-			),
-		)
+		if q.LogArgument {
+			logFields = append(logFields,
+				zap.Dict("fields",
+					zap.Int64("user_id", userID),
+				),
+			)
+		}
 	}
 	row := q.queryRow(ctx, q.getUserByIdStmt, getUserById, userID)
 	var i User
@@ -139,7 +147,7 @@ func (q *Queries) getUserById(ctx context.Context, userID int64) (User, error) {
 		&i.ProfilePhoto,
 		&i.Timezone,
 	)
-	q.logQuery("getUserById", logFields, err, start)
+	q.logQuery(getUserById, "getUserById", logFields, err, start)
 	return i, err
 }
 
@@ -156,16 +164,18 @@ func (q *Queries) updateUserBase(ctx context.Context, userID int64, updatedAt Un
 	var logFields []zap.Field
 	var start time.Time
 	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 6)
+		logFields = make([]zap.Field, 0, 8)
 		start = time.Now()
-		logFields = append(logFields,
-			zap.Dict("fields",
-				zap.Int64("user_id", userID),
-				updatedAt.ZapObject("updated_at"),
-				zap.String("first_name", firstName),
-				zapNullString("last_name", lastName),
-			),
-		)
+		if q.LogArgument {
+			logFields = append(logFields,
+				zap.Dict("fields",
+					zap.Int64("user_id", userID),
+					updatedAt.ZapObject("updated_at"),
+					zap.String("first_name", firstName),
+					zapNullString("last_name", lastName),
+				),
+			)
+		}
 	}
 	row := q.queryRow(ctx, q.updateUserBaseStmt, updateUserBase,
 		userID,
@@ -175,7 +185,7 @@ func (q *Queries) updateUserBase(ctx context.Context, userID int64, updatedAt Un
 	)
 	var id int64
 	err := row.Scan(&id)
-	q.logQuery("updateUserBase", logFields, err, start)
+	q.logQuery(updateUserBase, "updateUserBase", logFields, err, start)
 	return id, err
 }
 
@@ -190,18 +200,20 @@ func (q *Queries) updateUserProfilePhoto(ctx context.Context, userID int64, prof
 	var logFields []zap.Field
 	var start time.Time
 	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 6)
+		logFields = make([]zap.Field, 0, 8)
 		start = time.Now()
-		logFields = append(logFields,
-			zap.Dict("fields",
-				zap.Int64("user_id", userID),
-				profileUpdateAt.ZapObject("profile_update_at"),
-				zapNullString("profile_photo", profilePhoto),
-			),
-		)
+		if q.LogArgument {
+			logFields = append(logFields,
+				zap.Dict("fields",
+					zap.Int64("user_id", userID),
+					profileUpdateAt.ZapObject("profile_update_at"),
+					zapNullString("profile_photo", profilePhoto),
+				),
+			)
+		}
 	}
 	_, err := q.exec(ctx, q.updateUserProfilePhotoStmt, updateUserProfilePhoto, userID, profileUpdateAt, profilePhoto)
-	q.logQuery("updateUserProfilePhoto", logFields, err, start)
+	q.logQuery(updateUserProfilePhoto, "updateUserProfilePhoto", logFields, err, start)
 	return err
 }
 
@@ -217,17 +229,19 @@ func (q *Queries) updateUserTimeZone(ctx context.Context, userID int64, updatedA
 	var logFields []zap.Field
 	var start time.Time
 	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 6)
+		logFields = make([]zap.Field, 0, 8)
 		start = time.Now()
-		logFields = append(logFields,
-			zap.Dict("fields",
-				zap.Int64("user_id", userID),
-				updatedAt.ZapObject("updated_at"),
-				zap.Int64("timezone", timezone),
-			),
-		)
+		if q.LogArgument {
+			logFields = append(logFields,
+				zap.Dict("fields",
+					zap.Int64("user_id", userID),
+					updatedAt.ZapObject("updated_at"),
+					zap.Int64("timezone", timezone),
+				),
+			)
+		}
 	}
 	_, err := q.exec(ctx, q.updateUserTimeZoneStmt, updateUserTimeZone, userID, updatedAt, timezone)
-	q.logQuery("updateUserTimeZone", logFields, err, start)
+	q.logQuery(updateUserTimeZone, "updateUserTimeZone", logFields, err, start)
 	return err
 }

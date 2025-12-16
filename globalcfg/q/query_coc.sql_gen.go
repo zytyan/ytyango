@@ -23,17 +23,19 @@ func (q *Queries) DelCocCharAttr(ctx context.Context, userID int64, attrName str
 	var logFields []zap.Field
 	var start time.Time
 	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 6)
+		logFields = make([]zap.Field, 0, 8)
 		start = time.Now()
-		logFields = append(logFields,
-			zap.Dict("fields",
-				zap.Int64("user_id", userID),
-				zap.String("attr_name", attrName),
-			),
-		)
+		if q.LogArgument {
+			logFields = append(logFields,
+				zap.Dict("fields",
+					zap.Int64("user_id", userID),
+					zap.String("attr_name", attrName),
+				),
+			)
+		}
 	}
 	_, err := q.exec(ctx, q.delCocCharAttrStmt, delCocCharAttr, userID, attrName)
-	q.logQuery("DelCocCharAttr", logFields, err, start)
+	q.logQuery(delCocCharAttr, "DelCocCharAttr", logFields, err, start)
 	return err
 }
 
@@ -52,17 +54,19 @@ func (q *Queries) GetCocCharAllAttr(ctx context.Context, userID int64) ([]GetCoc
 	var logFields []zap.Field
 	var start time.Time
 	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 6)
+		logFields = make([]zap.Field, 0, 8)
 		start = time.Now()
-		logFields = append(logFields,
-			zap.Dict("fields",
-				zap.Int64("user_id", userID),
-			),
-		)
+		if q.LogArgument {
+			logFields = append(logFields,
+				zap.Dict("fields",
+					zap.Int64("user_id", userID),
+				),
+			)
+		}
 	}
 	rows, err := q.query(ctx, q.getCocCharAllAttrStmt, getCocCharAllAttr, userID)
 	defer func() {
-		q.logQuery("GetCocCharAllAttr", logFields, err, start)
+		q.logQuery(getCocCharAllAttr, "GetCocCharAllAttr", logFields, err, start)
 	}()
 	if err != nil {
 		return nil, err
@@ -98,19 +102,21 @@ func (q *Queries) GetCocCharAttr(ctx context.Context, userID int64, attrName str
 	var logFields []zap.Field
 	var start time.Time
 	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 6)
+		logFields = make([]zap.Field, 0, 8)
 		start = time.Now()
-		logFields = append(logFields,
-			zap.Dict("fields",
-				zap.Int64("user_id", userID),
-				zap.String("attr_name", attrName),
-			),
-		)
+		if q.LogArgument {
+			logFields = append(logFields,
+				zap.Dict("fields",
+					zap.Int64("user_id", userID),
+					zap.String("attr_name", attrName),
+				),
+			)
+		}
 	}
 	row := q.queryRow(ctx, q.getCocCharAttrStmt, getCocCharAttr, userID, attrName)
 	var attr_value string
 	err := row.Scan(&attr_value)
-	q.logQuery("GetCocCharAttr", logFields, err, start)
+	q.logQuery(getCocCharAttr, "GetCocCharAttr", logFields, err, start)
 	return attr_value, err
 }
 
@@ -125,17 +131,19 @@ func (q *Queries) SetCocCharAttr(ctx context.Context, userID int64, attrName str
 	var logFields []zap.Field
 	var start time.Time
 	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 6)
+		logFields = make([]zap.Field, 0, 8)
 		start = time.Now()
-		logFields = append(logFields,
-			zap.Dict("fields",
-				zap.Int64("user_id", userID),
-				zap.String("attr_name", attrName),
-				zap.String("attr_value", attrValue),
-			),
-		)
+		if q.LogArgument {
+			logFields = append(logFields,
+				zap.Dict("fields",
+					zap.Int64("user_id", userID),
+					zap.String("attr_name", attrName),
+					zap.String("attr_value", attrValue),
+				),
+			)
+		}
 	}
 	_, err := q.exec(ctx, q.setCocCharAttrStmt, setCocCharAttr, userID, attrName, attrValue)
-	q.logQuery("SetCocCharAttr", logFields, err, start)
+	q.logQuery(setCocCharAttr, "SetCocCharAttr", logFields, err, start)
 	return err
 }

@@ -114,6 +114,8 @@ type Queries struct {
 	logger                       *zap.Logger
 	SlowQueryThreshold           time.Duration
 	txID                         string
+	LogRawSqlString              bool
+	LogArgument                  bool
 	tx                           *sql.Tx
 	getSavedMessageByIdStmt      *sql.Stmt
 	insertRawUpdateStmt          *sql.Stmt
@@ -128,6 +130,8 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		logger:                       q.logger,
 		SlowQueryThreshold:           q.SlowQueryThreshold,
 		txID:                         fmt.Sprintf("%p", tx),
+		LogRawSqlString:              q.LogRawSqlString,
+		LogArgument:                  q.LogArgument,
 		tx:                           tx,
 		getSavedMessageByIdStmt:      q.getSavedMessageByIdStmt,
 		insertRawUpdateStmt:          q.insertRawUpdateStmt,
@@ -137,7 +141,7 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 	}
 }
 
-func (q *Queries) logQuery(query string, params []zap.Field, err error, start time.Time) {
+func (q *Queries) logQuery(sqlString, query string, params []zap.Field, err error, start time.Time) {
 	if q.logger == nil {
 		return
 	}
@@ -148,6 +152,9 @@ func (q *Queries) logQuery(query string, params []zap.Field, err error, start ti
 		zap.Time("ts", start),
 		zap.String("query_name", query),
 	)
+	if q.LogRawSqlString {
+		fields = append(fields, zap.String("sql", sqlString))
+	}
 	if q.txID != "" {
 		fields = append(fields, zap.String("txID", q.txID))
 	}

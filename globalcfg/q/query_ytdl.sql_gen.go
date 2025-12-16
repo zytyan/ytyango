@@ -26,15 +26,17 @@ func (q *Queries) GetYtDlpDbCache(ctx context.Context, url string, audioOnly boo
 	var logFields []zap.Field
 	var start time.Time
 	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 6)
+		logFields = make([]zap.Field, 0, 8)
 		start = time.Now()
-		logFields = append(logFields,
-			zap.Dict("fields",
-				zap.String("url", url),
-				zap.Bool("audio_only", audioOnly),
-				zap.Int64("resolution", resolution),
-			),
-		)
+		if q.LogArgument {
+			logFields = append(logFields,
+				zap.Dict("fields",
+					zap.String("url", url),
+					zap.Bool("audio_only", audioOnly),
+					zap.Int64("resolution", resolution),
+				),
+			)
+		}
 	}
 	row := q.queryRow(ctx, q.getYtDlpDbCacheStmt, getYtDlpDbCache, url, audioOnly, resolution)
 	var i YtDlResult
@@ -48,7 +50,7 @@ func (q *Queries) GetYtDlpDbCache(ctx context.Context, url string, audioOnly boo
 		&i.Uploader,
 		&i.UploadCount,
 	)
-	q.logQuery("GetYtDlpDbCache", logFields, err, start)
+	q.logQuery(getYtDlpDbCache, "GetYtDlpDbCache", logFields, err, start)
 	return i, err
 }
 
@@ -62,16 +64,18 @@ func (q *Queries) IncYtDlUploadCount(ctx context.Context, fileID string) error {
 	var logFields []zap.Field
 	var start time.Time
 	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 6)
+		logFields = make([]zap.Field, 0, 8)
 		start = time.Now()
-		logFields = append(logFields,
-			zap.Dict("fields",
-				zap.String("file_id", fileID),
-			),
-		)
+		if q.LogArgument {
+			logFields = append(logFields,
+				zap.Dict("fields",
+					zap.String("file_id", fileID),
+				),
+			)
+		}
 	}
 	_, err := q.exec(ctx, q.incYtDlUploadCountStmt, incYtDlUploadCount, fileID)
-	q.logQuery("IncYtDlUploadCount", logFields, err, start)
+	q.logQuery(incYtDlUploadCount, "IncYtDlUploadCount", logFields, err, start)
 	return err
 }
 
@@ -100,19 +104,21 @@ func (q *Queries) UpdateYtDlpCache(ctx context.Context, arg UpdateYtDlpCachePara
 	var logFields []zap.Field
 	var start time.Time
 	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 6)
+		logFields = make([]zap.Field, 0, 8)
 		start = time.Now()
-		logFields = append(logFields,
-			zap.Dict("fields",
-				zap.String("url", arg.Url),
-				zap.Bool("audio_only", arg.AudioOnly),
-				zap.Int64("resolution", arg.Resolution),
-				zap.String("file_id", arg.FileID),
-				zap.String("title", arg.Title),
-				zap.String("description", arg.Description),
-				zap.String("uploader", arg.Uploader),
-			),
-		)
+		if q.LogArgument {
+			logFields = append(logFields,
+				zap.Dict("fields",
+					zap.String("url", arg.Url),
+					zap.Bool("audio_only", arg.AudioOnly),
+					zap.Int64("resolution", arg.Resolution),
+					zap.String("file_id", arg.FileID),
+					zap.String("title", arg.Title),
+					zap.String("description", arg.Description),
+					zap.String("uploader", arg.Uploader),
+				),
+			)
+		}
 	}
 	_, err := q.exec(ctx, q.updateYtDlpCacheStmt, updateYtDlpCache,
 		arg.Url,
@@ -123,6 +129,6 @@ func (q *Queries) UpdateYtDlpCache(ctx context.Context, arg UpdateYtDlpCachePara
 		arg.Description,
 		arg.Uploader,
 	)
-	q.logQuery("UpdateYtDlpCache", logFields, err, start)
+	q.logQuery(updateYtDlpCache, "UpdateYtDlpCache", logFields, err, start)
 	return err
 }

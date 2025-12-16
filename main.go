@@ -102,7 +102,7 @@ func (g *GroupedDispatcher) Command(command string, handler handlers.Response) {
 		funcName:    funcName(handler),
 		checkerName: "cmd(" + command + ")",
 	}
-	g.Dispatcher.AddHandlerToGroup(hdr, g.inc())
+	g.AddHandlerToGroup(hdr, g.inc())
 }
 
 func (g *GroupedDispatcher) NewMessage(msg filters.Message, handler handlers.Response) {
@@ -113,7 +113,7 @@ func (g *GroupedDispatcher) NewMessage(msg filters.Message, handler handlers.Res
 		funcName:    funcName(handler),
 		checkerName: funcName(msg),
 	}
-	g.Dispatcher.AddHandlerToGroup(hdr, g.inc())
+	g.AddHandlerToGroup(hdr, g.inc())
 }
 
 func (g *GroupedDispatcher) NewCallback(filter filters.CallbackQuery, handler handlers.Response) {
@@ -124,7 +124,7 @@ func (g *GroupedDispatcher) NewCallback(filter filters.CallbackQuery, handler ha
 		funcName:    funcName(handler),
 		checkerName: funcName(filter),
 	}
-	g.Dispatcher.AddHandlerToGroup(hdr, g.inc())
+	g.AddHandlerToGroup(hdr, g.inc())
 }
 
 func (g *GroupedDispatcher) NewInlineQuery(callback filters.InlineQuery, handler handlers.Response) {
@@ -135,7 +135,7 @@ func (g *GroupedDispatcher) NewInlineQuery(callback filters.InlineQuery, handler
 		funcName:    funcName(handler),
 		checkerName: funcName(callback),
 	}
-	g.Dispatcher.AddHandlerToGroup(hdr, g.inc())
+	g.AddHandlerToGroup(hdr, g.inc())
 }
 
 func newBot(token string) *gotgbot.Bot {
@@ -298,6 +298,6 @@ func main() {
 	if err != nil {
 		panic("failed to start polling: " + err.Error())
 	}
-	log.Infof("%s has been started...", b.User.Username)
+	log.Infof("%s has been started...", b.Username)
 	updater.Idle()
 }

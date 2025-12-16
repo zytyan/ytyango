@@ -22,13 +22,15 @@ func (q *Queries) GetNsfwPicByFileUid(ctx context.Context, fileUid string) (Save
 	var logFields []zap.Field
 	var start time.Time
 	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 6)
+		logFields = make([]zap.Field, 0, 8)
 		start = time.Now()
-		logFields = append(logFields,
-			zap.Dict("fields",
-				zap.String("file_uid", fileUid),
-			),
-		)
+		if q.LogArgument {
+			logFields = append(logFields,
+				zap.Dict("fields",
+					zap.String("file_uid", fileUid),
+				),
+			)
+		}
 	}
 	row := q.queryRow(ctx, q.getNsfwPicByFileUidStmt, getNsfwPicByFileUid, fileUid)
 	var i SavedPic
@@ -41,7 +43,7 @@ func (q *Queries) GetNsfwPicByFileUid(ctx context.Context, fileUid string) (Save
 		&i.UserRatingSum,
 		&i.RateUserCount,
 	)
-	q.logQuery("GetNsfwPicByFileUid", logFields, err, start)
+	q.logQuery(getNsfwPicByFileUid, "GetNsfwPicByFileUid", logFields, err, start)
 	return i, err
 }
 
@@ -61,17 +63,19 @@ func (q *Queries) ListNsfwPicUserRatesByFileUid(ctx context.Context, fileUid str
 	var logFields []zap.Field
 	var start time.Time
 	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 6)
+		logFields = make([]zap.Field, 0, 8)
 		start = time.Now()
-		logFields = append(logFields,
-			zap.Dict("fields",
-				zap.String("file_uid", fileUid),
-			),
-		)
+		if q.LogArgument {
+			logFields = append(logFields,
+				zap.Dict("fields",
+					zap.String("file_uid", fileUid),
+				),
+			)
+		}
 	}
 	rows, err := q.query(ctx, q.listNsfwPicUserRatesByFileUidStmt, listNsfwPicUserRatesByFileUid, fileUid)
 	defer func() {
-		q.logQuery("ListNsfwPicUserRatesByFileUid", logFields, err, start)
+		q.logQuery(listNsfwPicUserRatesByFileUid, "ListNsfwPicUserRatesByFileUid", logFields, err, start)
 	}()
 	if err != nil {
 		return nil, err
@@ -103,18 +107,20 @@ func (q *Queries) createNsfwPicUserRate(ctx context.Context, fileUid string, use
 	var logFields []zap.Field
 	var start time.Time
 	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 6)
+		logFields = make([]zap.Field, 0, 8)
 		start = time.Now()
-		logFields = append(logFields,
-			zap.Dict("fields",
-				zap.String("file_uid", fileUid),
-				zap.Int64("user_id", userID),
-				zap.Int64("rating", rating),
-			),
-		)
+		if q.LogArgument {
+			logFields = append(logFields,
+				zap.Dict("fields",
+					zap.String("file_uid", fileUid),
+					zap.Int64("user_id", userID),
+					zap.Int64("rating", rating),
+				),
+			)
+		}
 	}
 	_, err := q.exec(ctx, q.createNsfwPicUserRateStmt, createNsfwPicUserRate, fileUid, userID, rating)
-	q.logQuery("createNsfwPicUserRate", logFields, err, start)
+	q.logQuery(createNsfwPicUserRate, "createNsfwPicUserRate", logFields, err, start)
 	return err
 }
 
@@ -130,16 +136,18 @@ func (q *Queries) createOrUpdateNsfwPic(ctx context.Context, fileUid string, fil
 	var logFields []zap.Field
 	var start time.Time
 	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 6)
+		logFields = make([]zap.Field, 0, 8)
 		start = time.Now()
-		logFields = append(logFields,
-			zap.Dict("fields",
-				zap.String("file_uid", fileUid),
-				zap.String("file_id", fileID),
-				zap.Int64("bot_rate", botRate),
-				zap.Int64("rand_key", randKey),
-			),
-		)
+		if q.LogArgument {
+			logFields = append(logFields,
+				zap.Dict("fields",
+					zap.String("file_uid", fileUid),
+					zap.String("file_id", fileID),
+					zap.Int64("bot_rate", botRate),
+					zap.Int64("rand_key", randKey),
+				),
+			)
+		}
 	}
 	row := q.queryRow(ctx, q.createOrUpdateNsfwPicStmt, createOrUpdateNsfwPic,
 		fileUid,
@@ -157,7 +165,7 @@ func (q *Queries) createOrUpdateNsfwPic(ctx context.Context, fileUid string, fil
 		&i.UserRatingSum,
 		&i.RateUserCount,
 	)
-	q.logQuery("createOrUpdateNsfwPic", logFields, err, start)
+	q.logQuery(createOrUpdateNsfwPic, "createOrUpdateNsfwPic", logFields, err, start)
 	return i, err
 }
 
@@ -175,14 +183,16 @@ func (q *Queries) getNsfwPicByRateAndRandKey(ctx context.Context, userRate int64
 	var logFields []zap.Field
 	var start time.Time
 	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 6)
+		logFields = make([]zap.Field, 0, 8)
 		start = time.Now()
-		logFields = append(logFields,
-			zap.Dict("fields",
-				zap.Int64("user_rate", userRate),
-				zap.Int64("rand_key", randKey),
-			),
-		)
+		if q.LogArgument {
+			logFields = append(logFields,
+				zap.Dict("fields",
+					zap.Int64("user_rate", userRate),
+					zap.Int64("rand_key", randKey),
+				),
+			)
+		}
 	}
 	row := q.queryRow(ctx, q.getNsfwPicByRateAndRandKeyStmt, getNsfwPicByRateAndRandKey, userRate, randKey)
 	var i SavedPic
@@ -195,7 +205,7 @@ func (q *Queries) getNsfwPicByRateAndRandKey(ctx context.Context, userRate int64
 		&i.UserRatingSum,
 		&i.RateUserCount,
 	)
-	q.logQuery("getNsfwPicByRateAndRandKey", logFields, err, start)
+	q.logQuery(getNsfwPicByRateAndRandKey, "getNsfwPicByRateAndRandKey", logFields, err, start)
 	return i, err
 }
 
@@ -211,13 +221,15 @@ func (q *Queries) getNsfwPicByRateFirst(ctx context.Context, userRate int64) (Sa
 	var logFields []zap.Field
 	var start time.Time
 	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 6)
+		logFields = make([]zap.Field, 0, 8)
 		start = time.Now()
-		logFields = append(logFields,
-			zap.Dict("fields",
-				zap.Int64("user_rate", userRate),
-			),
-		)
+		if q.LogArgument {
+			logFields = append(logFields,
+				zap.Dict("fields",
+					zap.Int64("user_rate", userRate),
+				),
+			)
+		}
 	}
 	row := q.queryRow(ctx, q.getNsfwPicByRateFirstStmt, getNsfwPicByRateFirst, userRate)
 	var i SavedPic
@@ -230,7 +242,7 @@ func (q *Queries) getNsfwPicByRateFirst(ctx context.Context, userRate int64) (Sa
 		&i.UserRatingSum,
 		&i.RateUserCount,
 	)
-	q.logQuery("getNsfwPicByRateFirst", logFields, err, start)
+	q.logQuery(getNsfwPicByRateFirst, "getNsfwPicByRateFirst", logFields, err, start)
 	return i, err
 }
 
@@ -245,19 +257,21 @@ func (q *Queries) getNsfwPicRateByUserId(ctx context.Context, fileUid string, us
 	var logFields []zap.Field
 	var start time.Time
 	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 6)
+		logFields = make([]zap.Field, 0, 8)
 		start = time.Now()
-		logFields = append(logFields,
-			zap.Dict("fields",
-				zap.String("file_uid", fileUid),
-				zap.Int64("user_id", userID),
-			),
-		)
+		if q.LogArgument {
+			logFields = append(logFields,
+				zap.Dict("fields",
+					zap.String("file_uid", fileUid),
+					zap.Int64("user_id", userID),
+				),
+			)
+		}
 	}
 	row := q.queryRow(ctx, q.getNsfwPicRateByUserIdStmt, getNsfwPicRateByUserId, fileUid, userID)
 	var rating int64
 	err := row.Scan(&rating)
-	q.logQuery("getNsfwPicRateByUserId", logFields, err, start)
+	q.logQuery(getNsfwPicRateByUserId, "getNsfwPicRateByUserId", logFields, err, start)
 	return rating, err
 }
 
@@ -271,13 +285,15 @@ func (q *Queries) listNsfwPicRateCounter(ctx context.Context) ([]PicRateCounter,
 	var logFields []zap.Field
 	var start time.Time
 	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 6)
+		logFields = make([]zap.Field, 0, 8)
 		start = time.Now()
-		logFields = append(logFields, zap.Dict("fields"))
+		if q.LogArgument {
+			logFields = append(logFields, zap.Dict("fields"))
+		}
 	}
 	rows, err := q.query(ctx, q.listNsfwPicRateCounterStmt, listNsfwPicRateCounter)
 	defer func() {
-		q.logQuery("listNsfwPicRateCounter", logFields, err, start)
+		q.logQuery(listNsfwPicRateCounter, "listNsfwPicRateCounter", logFields, err, start)
 	}()
 	if err != nil {
 		return nil, err
@@ -311,17 +327,19 @@ func (q *Queries) updateNsfwPicUserRate(ctx context.Context, rating int64, fileU
 	var logFields []zap.Field
 	var start time.Time
 	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 6)
+		logFields = make([]zap.Field, 0, 8)
 		start = time.Now()
-		logFields = append(logFields,
-			zap.Dict("fields",
-				zap.Int64("rating", rating),
-				zap.String("file_uid", fileUid),
-				zap.Int64("user_id", userID),
-			),
-		)
+		if q.LogArgument {
+			logFields = append(logFields,
+				zap.Dict("fields",
+					zap.Int64("rating", rating),
+					zap.String("file_uid", fileUid),
+					zap.Int64("user_id", userID),
+				),
+			)
+		}
 	}
 	_, err := q.exec(ctx, q.updateNsfwPicUserRateStmt, updateNsfwPicUserRate, rating, fileUid, userID)
-	q.logQuery("updateNsfwPicUserRate", logFields, err, start)
+	q.logQuery(updateNsfwPicUserRate, "updateNsfwPicUserRate", logFields, err, start)
 	return err
 }
