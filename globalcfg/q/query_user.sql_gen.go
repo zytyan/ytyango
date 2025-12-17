@@ -218,14 +218,13 @@ func (q *Queries) updateUserProfilePhoto(ctx context.Context, userID int64, prof
 }
 
 const updateUserTimeZone = `-- name: updateUserTimeZone :exec
-INSERT INTO users (user_id, updated_at, timezone)
-VALUES (?, ?, ?)
-ON CONFLICT DO UPDATE SET updated_at=excluded.updated_at,
-                          timezone=excluded.timezone
+UPDATE users
+SET timezone = ?2
+WHERE user_id = ?1
 RETURNING id
 `
 
-func (q *Queries) updateUserTimeZone(ctx context.Context, userID int64, updatedAt UnixTime, timezone int64) error {
+func (q *Queries) updateUserTimeZone(ctx context.Context, userID int64, timezone int64) error {
 	var logFields []zap.Field
 	var start time.Time
 	if q.logger != nil {
@@ -235,13 +234,12 @@ func (q *Queries) updateUserTimeZone(ctx context.Context, userID int64, updatedA
 			logFields = append(logFields,
 				zap.Dict("fields",
 					zap.Int64("user_id", userID),
-					updatedAt.ZapObject("updated_at"),
 					zap.Int64("timezone", timezone),
 				),
 			)
 		}
 	}
-	_, err := q.exec(ctx, q.updateUserTimeZoneStmt, updateUserTimeZone, userID, updatedAt, timezone)
+	_, err := q.exec(ctx, q.updateUserTimeZoneStmt, updateUserTimeZone, userID, timezone)
 	q.logQuery(updateUserTimeZone, "updateUserTimeZone", logFields, err, start)
 	return err
 }

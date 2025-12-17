@@ -95,7 +95,9 @@ func (c *Cache[K, V]) Range() iter.Seq2[K, V] {
 		c.mu.Lock()
 		defer c.mu.Unlock()
 		for k, v := range c.items {
-			yield(k, v.Value.(V))
+			if !yield(k, v.Value.(entry[K, V]).value) {
+				return
+			}
 		}
 	}
 }

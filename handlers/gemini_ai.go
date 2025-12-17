@@ -379,7 +379,7 @@ func SetUserTimeZone(bot *gotgbot.Bot, ctx *ext.Context) error {
 		return err
 	}
 	_, zone := t.Zone()
-	user, err := g.Q.GetUserByTg(context.Background(), ctx.EffectiveUser)
+	user, err := g.Q.GetOrCreateUserByTg(context.Background(), ctx.EffectiveUser)
 	if err != nil {
 		return err
 	}

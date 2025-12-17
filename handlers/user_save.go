@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"database/sql"
+	"errors"
 	g "main/globalcfg"
 	"main/globalcfg/q"
 	"time"
@@ -32,8 +33,8 @@ func UpdateUser(bot *gotgbot.Bot, ctx *ext.Context) error {
 	if ctx.EffectiveUser == nil {
 		return nil
 	}
-	user, err := g.Q.GetUserByTg(context.Background(), ctx.EffectiveUser)
-	if err != nil {
+	user, err := g.Q.GetOrCreateUserByTg(context.Background(), ctx.EffectiveUser)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return err
 	}
 	if err = user.TryUpdate(g.Q, ctx.EffectiveUser); err != nil {

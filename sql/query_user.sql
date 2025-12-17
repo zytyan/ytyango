@@ -25,10 +25,9 @@ SET profile_update_at = ?2,
 WHERE user_id = ?1;
 
 -- name: updateUserTimeZone :exec
-INSERT INTO users (user_id, updated_at, timezone)
-VALUES (?, ?, ?)
-ON CONFLICT DO UPDATE SET updated_at=excluded.updated_at,
-                          timezone=excluded.timezone
+UPDATE users
+SET timezone = ?2
+WHERE user_id = ?1
 RETURNING id;
 
 -- name: SetPrprCache :exec

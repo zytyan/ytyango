@@ -22,13 +22,58 @@ func (q *Queries) GetUserById(ctx context.Context, id int64) (*User, error) {
 	})
 }
 
-func (q *Queries) GetUserByTg(ctx context.Context, tgUser *gotgbot.User) (*User, error) {
+func (q *Queries) GetOrCreateUserByTg(ctx context.Context, tgUser *gotgbot.User) (*User, error) {
 	if tgUser == nil {
 		return nil, errors.New("tgUser is nil")
 	}
-	return q.GetUserById(ctx, tgUser.Id)
+	user, err := q.GetUserById(ctx, tgUser.Id)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return nil, err
+	}
+	if user != nil {
+		return user, nil
+	}
+	return q.CreateNewUserByTg(ctx, tgUser, nil)
 }
+func (q *Queries) CreateNewUserByTg(ctx context.Context, tgUser *gotgbot.User, bot *gotgbot.Bot) (*User, error) {
+	if tgUser == nil {
+		return nil, errors.New("tgUser is nil")
+	}
+	v, err := userCache.Get(tgUser.Id, func() (*User, error) {
+		_, err := q.createNewUser(ctx, createNewUserParams{
+			UpdatedAt:    UnixTime{time.Now()},
+			UserID:       tgUser.Id,
+			FirstName:    tgUser.FirstName,
+			LastName:     sql.NullString{String: tgUser.LastName, Valid: tgUser.LastName != ""},
+			ProfilePhoto: sql.NullString{},
+			Timezone:     8 * 60 * 60,
+		})
+		if err != nil {
+			return nil, err
+		}
+		user, err := q.getUserById(ctx, tgUser.Id)
+		if err != nil {
+			return nil, err
+		}
+		if bot == nil {
+			return &user, nil
+		}
+		photoList, err := tgUser.GetProfilePhotos(bot, nil)
+		if err != nil || len(photoList.Photos) == 0 {
+			return &user, nil
+		}
+		back := len(photoList.Photos) - 1
+		lastPhoto := photoList.Photos[back]
+		if len(lastPhoto) == 0 {
+			return &user, nil
+		}
+		photo := lastPhoto[len(lastPhoto)-1]
+		_ = q.updateUserProfilePhoto(ctx, tgUser.Id, UnixTime{time.Now()}, sql.NullString{String: photo.FileId, Valid: true})
+		return &user, nil
+	})
+	return v, err
 
+}
 func (u *User) TryUpdate(q *Queries, tgUser *gotgbot.User) error {
 	needCommit := false
 	if u.FirstName != tgUser.FirstName {
@@ -66,8 +111,7 @@ func (q *Queries) UpdateUserTimeZone(ctx context.Context, user *User, zone int64
 		return errors.New("user is nil")
 	}
 	user.Timezone = zone
-	now := UnixTime{time.Now()}
-	return q.updateUserTimeZone(ctx, user.ID, now, zone)
+	return q.updateUserTimeZone(ctx, user.ID, zone)
 }
 
 // DownloadProfilePhoto downloads the user's profile photo using provided bot and returns the local file path.
