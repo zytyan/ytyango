@@ -51,9 +51,10 @@ func Normalize(markdown string, opts ...Option) (*NormalizedMessage, error) {
 		opt(&options)
 	}
 
-	root := defaultMarkdownParser().Parser().Parse(text.NewReader([]byte(markdown)))
+	processed := preprocessMarkdown(markdown)
+	root := defaultMarkdownParser().Parser().Parse(text.NewReader([]byte(processed)))
 	b := &builder{
-		source:   []byte(markdown),
+		source:   []byte(processed),
 		options:  options,
 		offset:   0,
 		warnings: make([]string, 0),
@@ -86,6 +87,7 @@ func defaultMarkdownParser() goldmark.Markdown {
 	mdParser = goldmark.New(
 		goldmark.WithExtensions(
 			extension.GFM,
+			extension.NewCJK(extension.WithEscapedSpace()),
 			extension.Strikethrough,
 			extension.Linkify,
 			extension.Table,
@@ -113,9 +115,6 @@ type builder struct {
 	warnings []string
 	options  Options
 	offset   int64 // UTF-16 code units
-
-	fallbackBoldOpen  bool
-	fallbackBoldStart int64
 }
 
 func (b *builder) walkBlocks(node ast.Node) error {
@@ -193,7 +192,7 @@ func (b *builder) walkInline(node ast.Node) error {
 			if n.IsCode() || n.IsRaw() {
 				b.appendText(text, escapeNone)
 			} else {
-				b.appendFallbackBold(text)
+				b.appendText(text, escapeText)
 			}
 		case *ast.Emphasis:
 			entityType := "italic"
@@ -233,7 +232,7 @@ func (b *builder) walkInline(node ast.Node) error {
 					return err
 				}
 			} else if literal := child.Text(b.source); len(literal) > 0 {
-				b.appendFallbackBold(string(literal))
+				b.appendText(string(literal), escapeText)
 			}
 		}
 	}
@@ -254,7 +253,7 @@ func (b *builder) handleText(node *ast.Text) error {
 			b.addEntity("code", start, b.offset-start, "")
 			continue
 		}
-		b.appendFallbackBold(part.value)
+		b.appendText(part.value, escapeText)
 	}
 
 	if node.HardLineBreak() {
@@ -392,37 +391,11 @@ func (b *builder) appendText(text string, mode escapeMode) {
 		return
 	}
 
+	if mode != escapeCode {
+		text = stripEscapedSpace(text)
+	}
 	b.sb.WriteString(text)
 	b.offset += utf16Length(text)
-}
-
-type chunk struct {
-	text   string
-	entity string
-}
-
-func (b *builder) appendFallbackBold(text string) {
-	for len(text) > 0 {
-		idx := strings.Index(text, "**")
-		if idx < 0 {
-			b.appendText(text, escapeText)
-			return
-		}
-
-		if idx > 0 {
-			b.appendText(text[:idx], escapeText)
-		}
-
-		if b.fallbackBoldOpen {
-			b.addEntity("bold", b.fallbackBoldStart, b.offset-b.fallbackBoldStart, "")
-			b.fallbackBoldOpen = false
-		} else {
-			b.fallbackBoldOpen = true
-			b.fallbackBoldStart = b.offset
-		}
-
-		text = text[idx+2:]
-	}
 }
 
 func (b *builder) addEntity(entityType string, offset int64, length int64, languageOrURL string) {
