@@ -123,13 +123,23 @@ func TestEscape(t *testing.T) {
 }
 
 func TestPracticePhrase(t *testing.T) {
+	as := require.New(t)
 	msg, err := Normalize(`练习的初步要求是能够做到**“左手画方，右手画圆”**。`)
-	require.NoError(t, err)
+	as.NoError(err)
 
-	require.Equal(t, "练习的初步要求是能够做到“左手画方，右手画圆”。\n", msg.Text)
-	require.Len(t, msg.Entities, 1)
+	as.Equal("练习的初步要求是能够做到“左手画方，右手画圆”。\n", msg.Text)
+	as.Len(msg.Entities, 1)
 	ent := msg.Entities[0]
-	require.Equal(t, "bold", ent.Type)
-	require.EqualValues(t, utf16Length("练习的初步要求是能够做到"), ent.Offset)
-	require.EqualValues(t, utf16Length("“左手画方，右手画圆”"), ent.Length)
+	as.Equal("bold", ent.Type)
+	as.EqualValues(utf16Length("练习的初步要求是能够做到"), ent.Offset)
+	as.EqualValues(utf16Length("“左手画方，右手画圆”"), ent.Length)
+
+	msg, err = Normalize(`由**库洛游戏（Kuro Game）**开发。`)
+	as.NoError(err)
+	as.Equal("由库洛游戏（Kuro Game）开发。\n", msg.Text)
+	ent = msg.Entities[0]
+	as.Equal("bold", ent.Type)
+	as.EqualValues(utf16Length("由"), ent.Offset)
+	as.EqualValues(utf16Length("库洛游戏（Kuro Game）"), ent.Length)
+
 }

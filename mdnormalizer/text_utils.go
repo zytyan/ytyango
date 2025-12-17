@@ -19,13 +19,16 @@ type mathPart struct {
 	value string
 }
 
-var reAddSpaceEscape = regexp.MustCompile(`(\*\*?|__?|~|\|\|)([\p{Pi}\p{Pf}\p{Ps}\p{Pe}])`)
+var reOpenEscape = regexp.MustCompile(`([^\s\p{P}])(\*\*?|__?|~|\|\|)([\p{Pi}\p{Pf}\p{Ps}\p{Pe}])`)
+var reCloseEscape = regexp.MustCompile(`([\p{Pf}\p{Pe}])(\*\*?|__?|~|\|\|)([^\s\p{P}])`)
 
 func preprocessMarkdown(text string) string {
 	if !strings.Contains(text, "*") {
 		return text
 	}
-	return reAddSpaceEscape.ReplaceAllString(text, `\ $1$2`)
+	out := reOpenEscape.ReplaceAllString(text, `$1\ $2$3`)
+	out = reCloseEscape.ReplaceAllString(out, `$1$2\ $3`)
+	return out
 }
 
 func stripEscapedSpace(text string) string {
