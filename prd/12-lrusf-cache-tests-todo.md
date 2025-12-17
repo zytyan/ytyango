@@ -1,7 +1,7 @@
 # Todo: lrusf cache tests
 
-- [ ] Write tests for Get/Add/TryGet/Remove behavior
-- [ ] Write test for singleflight fetch de-duplication
-- [ ] Write test for LRU eviction and onEvict callback
-- [ ] Write test for Range returning all key/value pairs
-- [ ] Fix implementation issues found by tests and keep todo updated
+- [x] Write tests for Get/Add/TryGet/Remove behavior
+- [x] Write test for singleflight fetch de-duplication
+- [x] Write test for LRU eviction and onEvict callback
+- [x] Write test for Range returning all key/value pairs
+- [x] Fix implementation issues found by tests and keep todo updated
