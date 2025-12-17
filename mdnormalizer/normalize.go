@@ -188,11 +188,11 @@ func (b *builder) walkInline(node ast.Node) error {
 				return err
 			}
 		case *ast.String:
-			text := string(n.Value)
+			t := string(n.Value)
 			if n.IsCode() || n.IsRaw() {
-				b.appendText(text, escapeNone)
+				b.appendText(t, escapeNone)
 			} else {
-				b.appendText(text, escapeText)
+				b.appendText(t, escapeText)
 			}
 		case *ast.Emphasis:
 			entityType := "italic"

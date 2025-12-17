@@ -16,6 +16,7 @@ import (
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
+	"go.uber.org/zap"
 	"google.golang.org/genai"
 )
 
@@ -66,6 +67,9 @@ type:%s
 `, content.MsgID, content.SentTime.Format("2006-01-02 15:04:05"), content.Username, content.MsgType)
 	if content.ReplyToMsgID.Valid {
 		label += fmt.Sprintf("reply:%d\n", content.ReplyToMsgID.Int64)
+	}
+	if content.QuotePart.Valid {
+		label += fmt.Sprintf("quote:%s\n", content.QuotePart.String)
 	}
 	label += "-end-label-\n"
 	out.Parts = append(out.Parts, &genai.Part{
@@ -123,6 +127,9 @@ func (s *GeminiSession) AddTgMessage(bot *gotgbot.Bot, msg *gotgbot.Message) (er
 	if msg.ReplyToMessage != nil {
 		content.ReplyToMsgID.Valid = true
 		content.ReplyToMsgID.Int64 = msg.ReplyToMessage.MessageId
+		if msg.Quote != nil && msg.Quote.IsManual {
+			content.QuotePart = sql.NullString{String: msg.Quote.Text, Valid: true}
+		}
 	}
 	if msg.Text != "" {
 		content.Text.Valid = true
@@ -272,12 +279,13 @@ func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 	}
 	session.mu.Lock()
 	defer session.mu.Unlock()
-	sysInst := fmt.Sprintf(`now:%s
+	sysInst := fmt.Sprintf(`现在是:%s
 这里是一个Telegram聊天 type:%s,name:%s
 你是一个Telegram机器人，name: %s username: %s
 你会看到很多消息，每个消息头部都有一个元数据，以 '-start-label-'开头， '-end-label-' 结尾，元数据中标记了消息的ID(id)，发送时间(time)，发送者的用户名（name)以及消息类型(type)
 消息类型有 text, photo, sticker三种，对应文本消息、图片消息及表情消息。
 若用户明确回复了某条消息，则有回复的消息的ID(reply)字段。
+若用户特地引用了被回复的消息中的某段文字，则会有引用(quote)字段。
 这些元数据由代码自动生成，不要在模型的输出中加入该数据。
 请使用中文回复消息。`,
 		time.Now().Format("2006-01-02 15:04:05 -07:00"),
@@ -304,7 +312,23 @@ func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 	if err != nil {
 		log.Warnf("set reaction emoji to message %s(%d) failed ", getChatName(&ctx.EffectiveMessage.Chat), ctx.EffectiveMessage.MessageId)
 	}
+	ticker := time.NewTicker(time.Second * 4)
+	defer ticker.Stop()
+	tickerCtx, tickerCancel := context.WithCancel(context.Background())
+	defer tickerCancel()
+	go func() {
+		for {
+			select {
+			case <-ticker.C:
+				_, _ = bot.SendChatAction(ctx.EffectiveChat.Id, "typing", nil)
+			case <-tickerCtx.Done():
+				return
+			}
+		}
+	}()
 	res, err := client.Models.GenerateContent(genCtx, geminiModel, session.ToGenaiContents(), config)
+	tickerCancel()
+	ticker.Stop()
 	if err != nil {
 		_, _ = ctx.EffectiveMessage.SetReaction(bot, &gotgbot.SetMessageReactionOpts{
 			Reaction: []gotgbot.ReactionType{gotgbot.ReactionTypeEmoji{Emoji: "😭"}},
@@ -316,7 +340,7 @@ func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 	if text == "" {
 		text = "模型没有返回任何信息"
 		if res.PromptFeedback != nil {
-			text += "，原因: " + res.PromptFeedback.BlockReasonMessage
+			text += "，原因: " + string(res.PromptFeedback.BlockReason) + res.PromptFeedback.BlockReasonMessage
 		}
 		_, _ = ctx.EffectiveMessage.SetReaction(bot, &gotgbot.SetMessageReactionOpts{
 			Reaction: []gotgbot.ReactionType{gotgbot.ReactionTypeEmoji{Emoji: "😭"}},
@@ -326,6 +350,7 @@ func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 	var respMsg *gotgbot.Message
 	if err != nil {
 		respMsg, err = ctx.EffectiveMessage.Reply(bot, text, nil)
+		logD.Warn("parse markdown failed", zap.Error(err))
 	} else {
 		respMsg, err = ctx.EffectiveMessage.Reply(bot, normTxt.Text, &gotgbot.SendMessageOpts{Entities: normTxt.Entities})
 	}

@@ -376,7 +376,7 @@ func shuntingYard(tokens []Token) ([]Token, error) {
 				return fail(errorAt(-1, ErrorMismatchedParentheses, "mismatched parentheses"))
 			}
 		case EOF:
-			break
+			// do nothing
 		default:
 			return fail(errorAt(-1, ErrorUnexpectedToken, "unexpected token in shunting yard: %v", tok))
 		}

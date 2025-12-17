@@ -23,5 +23,6 @@ func (g *GeminiContent) Save(ctx context.Context, q *Queries) error {
 		Text:         g.Text,
 		Blob:         g.Blob,
 		MimeType:     g.MimeType,
+		QuotePart:    g.QuotePart,
 	})
 }

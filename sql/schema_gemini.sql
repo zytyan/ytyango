@@ -21,7 +21,7 @@ CREATE TABLE gemini_contents
     text            TEXT,                  -- 可以与blob共存，若同时存在，则使用两个part，但两个至少应该有一个
     blob            BLOB,
     mime_type       TEXT,                  -- 若blob存在，mime_type必须存在
-
+    quote_part      TEXT,                  -- 回复消息时，被回复的消息被引用的部分。
     -- 一个消息唯一由 SessionId + MsgId 组成
     PRIMARY KEY (session_id, msg_id),
 

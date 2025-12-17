@@ -24,8 +24,9 @@ INSERT INTO gemini_contents (session_id,
                              reply_to_msg_id,
                              text,
                              blob,
-                             mime_type)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                             mime_type,
+                             quote_part)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type AddGeminiMessageParams struct {
@@ -40,6 +41,7 @@ type AddGeminiMessageParams struct {
 	Text         sql.NullString `json:"text"`
 	Blob         []byte         `json:"blob"`
 	MimeType     sql.NullString `json:"mime_type"`
+	QuotePart    sql.NullString `json:"quote_part"`
 }
 
 func (q *Queries) AddGeminiMessage(ctx context.Context, arg AddGeminiMessageParams) error {
@@ -62,6 +64,7 @@ func (q *Queries) AddGeminiMessage(ctx context.Context, arg AddGeminiMessagePara
 					zapNullString("text", arg.Text),
 					zap.ByteString("blob", arg.Blob),
 					zapNullString("mime_type", arg.MimeType),
+					zapNullString("quote_part", arg.QuotePart),
 				),
 			)
 		}
@@ -78,6 +81,7 @@ func (q *Queries) AddGeminiMessage(ctx context.Context, arg AddGeminiMessagePara
 		arg.Text,
 		arg.Blob,
 		arg.MimeType,
+		arg.QuotePart,
 	)
 	q.logQuery(addGeminiMessage, "AddGeminiMessage", logFields, err, start)
 	return err
@@ -181,7 +185,7 @@ func (q *Queries) GetSessionIdByMessage(ctx context.Context, chatID int64, msgID
 }
 
 const getAllMsgInSessionReversed = `-- name: getAllMsgInSessionReversed :many
-SELECT session_id, chat_id, msg_id, role, sent_time, username, msg_type, reply_to_msg_id, text, blob, mime_type
+SELECT session_id, chat_id, msg_id, role, sent_time, username, msg_type, reply_to_msg_id, text, blob, mime_type, quote_part
 FROM gemini_contents
 WHERE session_id = ?
 ORDER BY msg_id DESC
@@ -226,6 +230,7 @@ func (q *Queries) getAllMsgInSessionReversed(ctx context.Context, sessionID int6
 			&i.Text,
 			&i.Blob,
 			&i.MimeType,
+			&i.QuotePart,
 		); err != nil {
 			return nil, err
 		}

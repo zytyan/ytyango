@@ -145,6 +145,7 @@ func saveMessageToMeilisearch(bot *gotgbot.Bot, ctx *ext.Context, msg *gotgbot.M
 	defer post.Body.Close()
 	var data []byte
 	logFn := logger.Debug
+
 	if !(200 <= post.StatusCode && post.StatusCode < 300) || logger.Level().Enabled(zapcore.DebugLevel) {
 		if !(200 <= post.StatusCode && post.StatusCode < 300) {
 			logFn = logger.Error

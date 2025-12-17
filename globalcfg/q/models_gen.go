@@ -54,6 +54,7 @@ type GeminiContent struct {
 	Text         sql.NullString `json:"text"`
 	Blob         []byte         `json:"blob"`
 	MimeType     sql.NullString `json:"mime_type"`
+	QuotePart    sql.NullString `json:"quote_part"`
 }
 
 type GeminiSession struct {
