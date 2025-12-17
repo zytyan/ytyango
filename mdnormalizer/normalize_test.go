@@ -121,3 +121,15 @@ func TestEscape(t *testing.T) {
 	r.Equal("\\.\n", msg.Text)
 	r.Empty(msg.Entities)
 }
+
+func TestPracticePhrase(t *testing.T) {
+	msg, err := Normalize(`练习的初步要求是能够做到**“左手画方，右手画圆”**。`)
+	require.NoError(t, err)
+
+	require.Equal(t, "练习的初步要求是能够做到“左手画方，右手画圆”。\n", msg.Text)
+	require.Len(t, msg.Entities, 1)
+	ent := msg.Entities[0]
+	require.Equal(t, "bold", ent.Type)
+	require.EqualValues(t, utf16Length("练习的初步要求是能够做到"), ent.Offset)
+	require.EqualValues(t, utf16Length("“左手画方，右手画圆”"), ent.Length)
+}

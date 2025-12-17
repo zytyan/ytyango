@@ -113,6 +113,9 @@ type builder struct {
 	warnings []string
 	options  Options
 	offset   int64 // UTF-16 code units
+
+	fallbackBoldOpen  bool
+	fallbackBoldStart int64
 }
 
 func (b *builder) walkBlocks(node ast.Node) error {
@@ -185,6 +188,13 @@ func (b *builder) walkInline(node ast.Node) error {
 			if err := b.handleText(n); err != nil {
 				return err
 			}
+		case *ast.String:
+			text := string(n.Value)
+			if n.IsCode() || n.IsRaw() {
+				b.appendText(text, escapeNone)
+			} else {
+				b.appendFallbackBold(text)
+			}
 		case *ast.Emphasis:
 			entityType := "italic"
 			if n.Level == 2 {
@@ -223,7 +233,7 @@ func (b *builder) walkInline(node ast.Node) error {
 					return err
 				}
 			} else if literal := child.Text(b.source); len(literal) > 0 {
-				b.appendText(string(literal), escapeText)
+				b.appendFallbackBold(string(literal))
 			}
 		}
 	}
@@ -244,7 +254,7 @@ func (b *builder) handleText(node *ast.Text) error {
 			b.addEntity("code", start, b.offset-start, "")
 			continue
 		}
-		b.appendText(part.value, escapeText)
+		b.appendFallbackBold(part.value)
 	}
 
 	if node.HardLineBreak() {
@@ -384,6 +394,35 @@ func (b *builder) appendText(text string, mode escapeMode) {
 
 	b.sb.WriteString(text)
 	b.offset += utf16Length(text)
+}
+
+type chunk struct {
+	text   string
+	entity string
+}
+
+func (b *builder) appendFallbackBold(text string) {
+	for len(text) > 0 {
+		idx := strings.Index(text, "**")
+		if idx < 0 {
+			b.appendText(text, escapeText)
+			return
+		}
+
+		if idx > 0 {
+			b.appendText(text[:idx], escapeText)
+		}
+
+		if b.fallbackBoldOpen {
+			b.addEntity("bold", b.fallbackBoldStart, b.offset-b.fallbackBoldStart, "")
+			b.fallbackBoldOpen = false
+		} else {
+			b.fallbackBoldOpen = true
+			b.fallbackBoldStart = b.offset
+		}
+
+		text = text[idx+2:]
+	}
 }
 
 func (b *builder) addEntity(entityType string, offset int64, length int64, languageOrURL string) {
