@@ -150,4 +150,11 @@ func TestPracticePhrase(t *testing.T) {
 	as.EqualValues(utf16Length("你引用了“"), ent.Offset)
 	as.EqualValues(utf16Length("二次元开放世界"), ent.Length)
 
+	msg, err = Normalize("这是一个关于**“25岁女子为赚2500元胸罩藏违禁品”**的新闻事件。")
+	as.NoError(err)
+	as.Equal("这是一个关于“25岁女子为赚2500元胸罩藏违禁品”的新闻事件。\n", msg.Text)
+	ent = msg.Entities[0]
+	as.Equal("bold", ent.Type)
+	as.EqualValues(utf16Length("这是一个关于"), ent.Offset)
+	as.EqualValues(utf16Length("“25岁女子为赚2500元胸罩藏违禁品”"), ent.Length)
 }
