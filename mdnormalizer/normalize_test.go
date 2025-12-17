@@ -142,4 +142,12 @@ func TestPracticePhrase(t *testing.T) {
 	as.EqualValues(utf16Length("由"), ent.Offset)
 	as.EqualValues(utf16Length("库洛游戏（Kuro Game）"), ent.Length)
 
+	msg, err = Normalize(`你引用了“**二次元开放世界**”这几个字。`)
+	as.NoError(err)
+	as.Equal("你引用了“二次元开放世界”这几个字。\n", msg.Text)
+	ent = msg.Entities[0]
+	as.Equal("bold", ent.Type)
+	as.EqualValues(utf16Length("你引用了“"), ent.Offset)
+	as.EqualValues(utf16Length("二次元开放世界"), ent.Length)
+
 }

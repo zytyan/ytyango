@@ -19,7 +19,7 @@ type mathPart struct {
 	value string
 }
 
-var reOpenEscape = regexp.MustCompile(`([^\s\p{P}])(\*\*?|__?|~|\|\|)([\p{Pi}\p{Pf}\p{Ps}\p{Pe}])`)
+var reOpenEscape = regexp.MustCompile(`([^\s\p{P}])(\*\*?|__?|~|\|\|)([\p{Pi}\p{Ps}])`)
 var reCloseEscape = regexp.MustCompile(`([\p{Pf}\p{Pe}])(\*\*?|__?|~|\|\|)([^\s\p{P}])`)
 
 func preprocessMarkdown(text string) string {
