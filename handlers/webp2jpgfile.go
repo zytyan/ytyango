@@ -49,7 +49,7 @@ func WebpToPng(bot *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.Message
 	defer os.Remove(pngFile)
 	_, err = bot.SendDocument(msg.Chat.Id, h.LocalFile(pngFile), &gotgbot.SendDocumentOpts{
-		ReplyParameters: MakeReplyToMsgID(msg.Chat.Id),
+		ReplyParameters: MakeReplyToMsgID(msg.MessageId),
 	})
 	return err
 }
