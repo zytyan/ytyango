@@ -317,6 +317,7 @@ func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 	tickerCtx, tickerCancel := context.WithCancel(context.Background())
 	defer tickerCancel()
 	go func() {
+		_, _ = bot.SendChatAction(ctx.EffectiveChat.Id, "typing", nil)
 		for {
 			select {
 			case <-ticker.C:
