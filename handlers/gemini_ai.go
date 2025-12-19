@@ -16,6 +16,7 @@ import (
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
+	"github.com/dop251/goja"
 	"go.uber.org/zap"
 	"google.golang.org/genai"
 )
@@ -44,6 +45,8 @@ type GeminiSession struct {
 	Contents    []q.GeminiContent
 	TmpContents []q.GeminiContent
 	UpdateTime  time.Time
+	vm          *goja.Runtime
+	buf         strings.Builder
 }
 
 var geminiSessions struct {
@@ -53,6 +56,35 @@ var geminiSessions struct {
 	chatIdToSess map[int64]*GeminiSession
 }
 
+func (g *GeminiSession) RunJs(script string) (string, error) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if g.vm == nil {
+		g.vm = goja.New()
+		err := g.vm.Set("innerBufWrite", func(call goja.FunctionCall) {
+			if len(call.Arguments) != 1 {
+				panic(g.vm.ToValue("reply(payload) requires exactly 1 argument"))
+			}
+			g.buf.WriteString(call.Arguments[0].String())
+			g.buf.WriteString("\n")
+		})
+		if err != nil {
+			return "", err
+		}
+		_, err = g.vm.RunString(`
+function reply(obj) {
+	innerBufWrite(JSON.stringify(obj));
+}`)
+		if err != nil {
+			return "", err
+		}
+	}
+	_, err := g.vm.RunString(script)
+	if err != nil {
+		return "", err
+	}
+	return g.buf.String(), nil
+}
 func init() {
 	geminiSessions.sidToSess = make(map[int64]*GeminiSession)
 	geminiSessions.chatIdToSess = make(map[int64]*GeminiSession)
@@ -287,6 +319,8 @@ func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 若用户明确回复了某条消息，则有回复的消息的ID(reply)字段。
 若用户特地引用了被回复的消息中的某段文字，则会有引用(quote)字段。
 这些元数据由代码自动生成，不要在模型的输出中加入该数据。
+你可以通过输出 //execjs+\n 后接JavaScript代码来执行js，使用 //execjs-\n 停止输出脚本，但当前js无任何有意义的接口，仅能执行符合EMCA5.1标准的js代码。
+js中，你可以使用 reply(arg) 函数将对象输出为json格式，这些输出会添加入下一轮对话。
 请使用中文回复消息。`,
 		time.Now().Format("2006-01-02 15:04:05 -07:00"),
 		session.ChatType,
@@ -327,7 +361,19 @@ func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 			}
 		}
 	}()
-	res, err := client.Models.GenerateContent(genCtx, geminiModel, session.ToGenaiContents(), config)
+	var res *genai.GenerateContentResponse
+	for {
+		res, err = client.Models.GenerateContent(genCtx, geminiModel, session.ToGenaiContents(), config)
+		if err != nil {
+			break
+		}
+		const execJs = "//execjs"
+		idx := strings.Index(res.Text(), execJs)
+		if idx == -1 {
+			break
+		}
+
+	}
 	tickerCancel()
 	ticker.Stop()
 	if err != nil {

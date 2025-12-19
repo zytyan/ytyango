@@ -6,6 +6,7 @@ require (
 	github.com/PaulSonOfLars/gotgbot/v2 v2.0.0-rc.33
 	github.com/bwmarrin/snowflake v0.3.0
 	github.com/disintegration/imaging v1.6.2
+	github.com/dop251/goja v0.0.0-20251201205617-2bb4c724c0f9
 	github.com/go-co-op/gocron v1.37.0
 	github.com/go-faster/errors v0.7.1
 	github.com/go-faster/jx v1.2.0
@@ -45,7 +46,9 @@ require (
 	github.com/go-faster/yaml v0.4.6 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
+	github.com/go-sourcemap/sourcemap v2.1.3+incompatible // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
+	github.com/google/pprof v0.0.0-20230207041349-798e818bf904 // indirect
 	github.com/google/s2a-go v0.1.9 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.7 // indirect
 	github.com/googleapis/gax-go/v2 v2.15.0 // indirect
