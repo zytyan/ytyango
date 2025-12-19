@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"main/globalcfg/q"
+
+	"google.golang.org/genai"
 )
 
 func TestSplitExecBlocks(t *testing.T) {
@@ -80,5 +82,43 @@ func TestRunExecBlocksStoresNoteAndReply(t *testing.T) {
 	}
 	if strings.Contains(sess.tmpContents[0].Text.String, "reply({v:1+1});") {
 		t.Fatalf("note should not expose script content")
+	}
+}
+
+func TestHandleSearchCallReturnsUserID(t *testing.T) {
+	h, err := New(Config{Search: SearchConfig{MaxResults: 3, MaxSnippet: 64}})
+	if err != nil {
+		t.Fatalf("new handler: %v", err)
+	}
+	h.searchFn = func(ctx context.Context, s *Session, args searchArgs) ([]searchResult, error) {
+		return []searchResult{{
+			MsgID:    1,
+			ChatID:   2,
+			UserID:   42,
+			Username: "alice",
+			Text:     "hello world",
+		}}, nil
+	}
+	sess := newSession(q.GeminiSession{ID: 1, ChatID: 2, ChatName: "c", ChatType: "group"}, "bot", "bot_u", 64, 512)
+	part, note, err := h.handleSearchCall(context.Background(), sess, &genai.FunctionCall{
+		Name: searchToolName,
+		Args: map[string]any{"query": "hi", "limit": 1},
+	})
+	if err != nil {
+		t.Fatalf("handleSearchCall error: %v", err)
+	}
+	if part == nil || part.FunctionResponse == nil {
+		t.Fatalf("function response nil")
+	}
+	resp := part.FunctionResponse.Response
+	matches, ok := resp["matches"].([]searchResult)
+	if !ok || len(matches) != 1 {
+		t.Fatalf("unexpected matches: %#v", resp["matches"])
+	}
+	if matches[0].UserID != 42 || matches[0].Username != "alice" {
+		t.Fatalf("unexpected user info: %#v", matches[0])
+	}
+	if !strings.Contains(note, "42") || !strings.Contains(note, "alice") {
+		t.Fatalf("note missing user info: %s", note)
 	}
 }

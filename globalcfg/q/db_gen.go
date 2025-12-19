@@ -73,6 +73,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.listNsfwPicUserRatesByFileUidStmt, err = db.PrepareContext(ctx, listNsfwPicUserRatesByFileUid); err != nil {
 		return nil, fmt.Errorf("error preparing query ListNsfwPicUserRatesByFileUid: %w", err)
 	}
+	if q.searchGeminiContentsStmt, err = db.PrepareContext(ctx, searchGeminiContents); err != nil {
+		return nil, fmt.Errorf("error preparing query SearchGeminiContents: %w", err)
+	}
 	if q.setCocCharAttrStmt, err = db.PrepareContext(ctx, setCocCharAttr); err != nil {
 		return nil, fmt.Errorf("error preparing query SetCocCharAttr: %w", err)
 	}
@@ -220,6 +223,11 @@ func (q *Queries) Close() error {
 	if q.listNsfwPicUserRatesByFileUidStmt != nil {
 		if cerr := q.listNsfwPicUserRatesByFileUidStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing listNsfwPicUserRatesByFileUidStmt: %w", cerr)
+		}
+	}
+	if q.searchGeminiContentsStmt != nil {
+		if cerr := q.searchGeminiContentsStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing searchGeminiContentsStmt: %w", cerr)
 		}
 	}
 	if q.setCocCharAttrStmt != nil {
@@ -396,6 +404,7 @@ type Queries struct {
 	getYtDlpDbCacheStmt               *sql.Stmt
 	incYtDlUploadCountStmt            *sql.Stmt
 	listNsfwPicUserRatesByFileUidStmt *sql.Stmt
+	searchGeminiContentsStmt          *sql.Stmt
 	setCocCharAttrStmt                *sql.Stmt
 	setPrprCacheStmt                  *sql.Stmt
 	updateBiliInlineMsgIdStmt         *sql.Stmt
@@ -445,6 +454,7 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		getYtDlpDbCacheStmt:               q.getYtDlpDbCacheStmt,
 		incYtDlUploadCountStmt:            q.incYtDlUploadCountStmt,
 		listNsfwPicUserRatesByFileUidStmt: q.listNsfwPicUserRatesByFileUidStmt,
+		searchGeminiContentsStmt:          q.searchGeminiContentsStmt,
 		setCocCharAttrStmt:                q.setCocCharAttrStmt,
 		setPrprCacheStmt:                  q.setPrprCacheStmt,
 		updateBiliInlineMsgIdStmt:         q.updateBiliInlineMsgIdStmt,

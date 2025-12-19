@@ -9,5 +9,5 @@
   - [x] Prompt templating and execjs parsing/execution/error notes
   - [ ] Session hit/miss coverage (needs lightweight DB harness)
 - [x] Run `gofmt`, `go mod tidy` (if deps change), and `go test ./...`
-- [ ] Add message search tool (keywords/user) exposed to genai_hldr and integrate into prompt/tools，结果需包含 user_id 与用户名
-- [ ] Tests for message search tool and result shaping/limits（含 user_id/username 字段）
+- [x] Add message search tool (keywords/user) exposed to genai_hldr and integrate into prompt/tools，结果需包含 user_id 与用户名
+- [x] Tests for message search tool and result shaping/limits（含 user_id/username 字段）

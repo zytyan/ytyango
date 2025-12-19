@@ -27,6 +27,10 @@ const (
 	defaultMaxReplyBytes       = 2 * 1024
 	defaultMaxCallStack        = 256
 	defaultExecStatusNoteLimit = 160
+	defaultSearchResultLimit   = 5
+	defaultSearchSnippetLimit  = 160
+	maxFunctionCallIterations  = 3
+	searchToolName             = "search_messages"
 )
 
 var defaultAllowedChats = []int64{-1001471592463, -1001282155019, -1001126241898, -1001170816274}
@@ -38,12 +42,18 @@ type ExecLimits struct {
 	MaxCallStack   int
 }
 
+type SearchConfig struct {
+	MaxResults int
+	MaxSnippet int
+}
+
 type Config struct {
 	Model               string
 	SessionContentLimit int
 	AllowedChatIDs      []int64
 	RequestTimeout      time.Duration
 	Exec                ExecLimits
+	Search              SearchConfig
 }
 
 type Handler struct {
@@ -56,6 +66,7 @@ type Handler struct {
 	clientErr   error
 	sessions    *sessionCache
 	clientSetup func() (*genai.Client, error)
+	searchFn    func(context.Context, *Session, searchArgs) ([]searchResult, error)
 }
 
 func New(cfg Config) (*Handler, error) {
@@ -80,6 +91,12 @@ func New(cfg Config) (*Handler, error) {
 	if cfg.Exec.MaxCallStack == 0 {
 		cfg.Exec.MaxCallStack = defaultMaxCallStack
 	}
+	if cfg.Search.MaxResults == 0 {
+		cfg.Search.MaxResults = defaultSearchResultLimit
+	}
+	if cfg.Search.MaxSnippet == 0 {
+		cfg.Search.MaxSnippet = defaultSearchSnippetLimit
+	}
 	if len(cfg.AllowedChatIDs) == 0 {
 		cfg.AllowedChatIDs = defaultAllowedChats
 	}
@@ -88,14 +105,16 @@ func New(cfg Config) (*Handler, error) {
 		return nil, err
 	}
 	logger := g.GetLogger("genai_hldr", zap.InfoLevel)
-	return &Handler{
+	h := &Handler{
 		cfg:         cfg,
 		prompt:      pr,
 		log:         logger,
 		logD:        logger.Desugar(),
 		sessions:    newSessionCache(),
 		clientSetup: initGenaiClient,
-	}, nil
+	}
+	h.searchFn = h.searchMessages
+	return h, nil
 }
 
 func initGenaiClient() (*genai.Client, error) {
@@ -166,9 +185,7 @@ func (h *Handler) Handle(bot *gotgbot.Bot, ctx *ext.Context) error {
 	}
 	cfg := &genai.GenerateContentConfig{
 		SystemInstruction: genai.NewContentFromText(prompt, genai.RoleModel),
-		Tools: []*genai.Tool{
-			{GoogleSearch: &genai.GoogleSearch{}},
-		},
+		Tools:             h.tools(),
 	}
 
 	ticker := time.NewTicker(time.Second * 4)
@@ -192,6 +209,23 @@ func (h *Handler) Handle(bot *gotgbot.Bot, ctx *ext.Context) error {
 	res, err := client.Models.GenerateContent(genCtx, h.cfg.Model, session.ToGenaiContents(), cfg)
 	if err != nil {
 		return h.handleError(bot, ctx, err)
+	}
+	for i := 0; i < maxFunctionCallIterations; i++ {
+		calls := res.FunctionCalls()
+		if len(calls) == 0 {
+			break
+		}
+		funcContents, funcErr := h.handleFunctionCalls(genCtx, session, calls)
+		if funcErr != nil {
+			h.log.Warnw("function call handling error", "error", funcErr, "chat_id", session.ChatID, "session_id", session.ID)
+		}
+		if len(funcContents) == 0 {
+			break
+		}
+		res, err = client.Models.GenerateContent(genCtx, h.cfg.Model, append(session.ToGenaiContents(), funcContents...), cfg)
+		if err != nil {
+			return h.handleError(bot, ctx, err)
+		}
 	}
 	cleanText, blocks := splitExecBlocks(res.Text())
 	execNotes, execErr := h.runExecBlocks(genCtx, session, blocks)

@@ -184,6 +184,92 @@ func (q *Queries) GetSessionIdByMessage(ctx context.Context, chatID int64, msgID
 	return session_id, err
 }
 
+const searchGeminiContents = `-- name: SearchGeminiContents :many
+SELECT msg_id,
+       chat_id,
+       username,
+       role,
+       sent_time,
+       msg_type,
+       reply_to_msg_id,
+       text,
+       quote_part
+FROM gemini_contents
+WHERE chat_id = ?
+  AND (? = '' OR instr(lower(coalesce(text, '') || ' ' || coalesce(quote_part, '') || ' ' || coalesce(username, '')), lower(?)) > 0)
+ORDER BY msg_id DESC
+LIMIT ?
+`
+
+type SearchGeminiContentsRow struct {
+	MsgID        int64          `json:"msg_id"`
+	ChatID       int64          `json:"chat_id"`
+	Username     string         `json:"username"`
+	Role         string         `json:"role"`
+	SentTime     UnixTime       `json:"sent_time"`
+	MsgType      string         `json:"msg_type"`
+	ReplyToMsgID sql.NullInt64  `json:"reply_to_msg_id"`
+	Text         sql.NullString `json:"text"`
+	QuotePart    sql.NullString `json:"quote_part"`
+}
+
+func (q *Queries) SearchGeminiContents(ctx context.Context, chatID int64, column2 interface{}, lOWER string, limit int64) ([]SearchGeminiContentsRow, error) {
+	var logFields []zap.Field
+	var start time.Time
+	if q.logger != nil {
+		logFields = make([]zap.Field, 0, 8)
+		start = time.Now()
+		if q.LogArgument {
+			logFields = append(logFields,
+				zap.Dict("fields",
+					zap.Int64("chat_id", chatID),
+					zap.Any("column_2", column2),
+					zap.String("LOWER", lOWER),
+					zap.Int64("limit", limit),
+				),
+			)
+		}
+	}
+	rows, err := q.query(ctx, q.searchGeminiContentsStmt, searchGeminiContents,
+		chatID,
+		column2,
+		lOWER,
+		limit,
+	)
+	defer func() {
+		q.logQuery(searchGeminiContents, "SearchGeminiContents", logFields, err, start)
+	}()
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []SearchGeminiContentsRow
+	for rows.Next() {
+		var i SearchGeminiContentsRow
+		if err = rows.Scan(
+			&i.MsgID,
+			&i.ChatID,
+			&i.Username,
+			&i.Role,
+			&i.SentTime,
+			&i.MsgType,
+			&i.ReplyToMsgID,
+			&i.Text,
+			&i.QuotePart,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err = rows.Close(); err != nil {
+		return nil, err
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getAllMsgInSessionReversed = `-- name: getAllMsgInSessionReversed :many
 SELECT session_id, chat_id, msg_id, role, sent_time, username, msg_type, reply_to_msg_id, text, blob, mime_type, quote_part
 FROM gemini_contents

@@ -37,3 +37,19 @@ WHERE chat_id = ?
 SELECT *
 FROM gemini_sessions
 WHERE id = ?;
+
+-- name: SearchGeminiContents :many
+SELECT msg_id,
+       chat_id,
+       username,
+       role,
+       sent_time,
+       msg_type,
+       reply_to_msg_id,
+       text,
+       quote_part
+FROM gemini_contents
+WHERE chat_id = ?
+  AND (? = '' OR instr(lower(coalesce(text, '') || ' ' || coalesce(quote_part, '') || ' ' || coalesce(username, '')), lower(?)) > 0)
+ORDER BY msg_id DESC
+LIMIT ?;
