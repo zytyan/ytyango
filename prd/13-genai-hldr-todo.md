@@ -9,3 +9,5 @@
   - [x] Prompt templating and execjs parsing/execution/error notes
   - [ ] Session hit/miss coverage (needs lightweight DB harness)
 - [x] Run `gofmt`, `go mod tidy` (if deps change), and `go test ./...`
+- [ ] Add message search tool (keywords/user) exposed to genai_hldr and integrate into prompt/tools
+- [ ] Tests for message search tool and result shaping/limits
