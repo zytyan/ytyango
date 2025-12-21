@@ -9,7 +9,6 @@ require (
 	github.com/go-faster/errors v0.7.1
 	github.com/go-faster/jx v1.2.0
 	github.com/google/uuid v1.6.0
-	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/json-iterator/go v1.1.12
 	github.com/kolesa-team/go-webp v1.0.5
 	github.com/mattn/go-sqlite3 v1.14.32
