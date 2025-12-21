@@ -17,7 +17,7 @@ func TestParseReq(t *testing.T) {
 func TestBadReq(t *testing.T) {
 	as := assert.New(t)
 	req, err := ParseExchangeRate("1.4.3 usd to cny")
-	as.Equal(CashNotAvail, err)
+	as.Equal(ErrCashNotAvail, err)
 	as.Equal(Req{}, req)
 }
 

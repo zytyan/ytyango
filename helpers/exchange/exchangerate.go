@@ -70,9 +70,10 @@ func (a *ApiResp) LastUpdateAt() time.Time {
 }
 
 var (
-	ErrFromNotFound = errors.New("from currency not found")
-	ErrToNotFound   = errors.New("to currency not found")
-	CashNotAvail    = errors.New("currency not supported")
+	ErrFromNotFound         = errors.New("from currency not found")
+	ErrToNotFound           = errors.New("to currency not found")
+	ErrCashNotAvail         = errors.New("currency not supported")
+	ErrNotAValidExchangeReq = errors.New("not a valid exchange request")
 )
 
 func (a *ApiResp) Exchange(req Req) (resp Resp, err error) {
@@ -143,8 +144,6 @@ type Req struct {
 	To     string
 }
 
-var NotAValidExchangeReq = errors.New("not a valid exchange request")
-
 func GetExchangeRate(req Req) (Resp, error) {
 	var resp Resp
 	resp.req = req
@@ -154,7 +153,7 @@ func GetExchangeRate(req Req) (Resp, error) {
 		return resp, nil
 	}
 	if !IsAvailableCash(req.From) || !IsAvailableCash(req.To) {
-		return resp, CashNotAvail
+		return resp, ErrCashNotAvail
 	}
 	err := refreshCache(req)
 	if err != nil {
@@ -183,14 +182,14 @@ func GetExchangeRateWithAlias(req Req, alias map[string]string) (Resp, error) {
 func ParseExchangeRate(text string) (Req, error) {
 	match := exRe.FindStringSubmatch(text)
 	if match == nil {
-		return Req{}, CashNotAvail
+		return Req{}, ErrCashNotAvail
 	}
 	amount := match[1]
 	from := strings.ToUpper(match[3])
 	to := strings.ToUpper(match[6])
 	amountFloat, err := strconv.ParseFloat(amount, 64)
 	if err != nil {
-		return Req{}, NotAValidExchangeReq
+		return Req{}, ErrNotAValidExchangeReq
 	}
 	if to == "" {
 		to = "CNY"

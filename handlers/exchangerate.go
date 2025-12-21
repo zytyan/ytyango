@@ -29,13 +29,13 @@ func ExchangeRateCalc(bot *gotgbot.Bot, ctx *ext.Context) error {
 	}
 	rate, err := exchange.GetExchangeRateWithAlias(req, exchangeAlias)
 	if err != nil {
-		if errors.Is(err, exchange.NotAValidExchangeReq) {
+		if errors.Is(err, exchange.ErrNotAValidExchangeReq) {
 			return nil
 		} else if errors.Is(err, exchange.ErrFromNotFound) {
 			return nil
 		} else if errors.Is(err, exchange.ErrToNotFound) {
 			return nil
-		} else if errors.Is(err, exchange.CashNotAvail) {
+		} else if errors.Is(err, exchange.ErrCashNotAvail) {
 			return nil
 		}
 		_, err = ctx.EffectiveMessage.Reply(bot, err.Error(), nil)

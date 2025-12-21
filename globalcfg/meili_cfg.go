@@ -5,12 +5,10 @@ import (
 )
 
 type MeiliConfig struct {
-	BaseUrl        string `yaml:"base-url"`
-	IndexName      string `yaml:"index-name"`
-	PrimaryKey     string `yaml:"primary-key"`
-	MasterKey      string `yaml:"master-key,omitempty"`
-	saveUrlCache   string
-	searchUrlCache string
+	BaseUrl    string `yaml:"base-url"`
+	IndexName  string `yaml:"index-name"`
+	PrimaryKey string `yaml:"primary-key"`
+	MasterKey  string `yaml:"master-key,omitempty"`
 }
 
 var MeiliClient *meilisearch.Client

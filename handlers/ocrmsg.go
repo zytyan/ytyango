@@ -7,7 +7,7 @@ import (
 
 func OcrMessage(bot *gotgbot.Bot, ctx *ext.Context) error {
 	if ctx.Message == nil {
-		return NoImage
+		return ErrNoImage
 	}
 	var photo *gotgbot.PhotoSize
 	if ctx.Message.Photo != nil {
@@ -15,7 +15,7 @@ func OcrMessage(bot *gotgbot.Bot, ctx *ext.Context) error {
 	} else if ctx.Message.ReplyToMessage != nil && ctx.Message.ReplyToMessage.Photo != nil {
 		photo = &ctx.Message.ReplyToMessage.Photo[len(ctx.Message.ReplyToMessage.Photo)-1]
 	} else {
-		return NoImage
+		return ErrNoImage
 	}
 	content, err := ocrMsg(bot, photo)
 	if err != nil {

@@ -45,7 +45,7 @@ func downloadSinaGif(sinaUrl string) (gifFile string, err error) {
 		return "", err
 	}
 	// 获取url中的文件名
-	pathBuf := strings.SplitN(urlObj.Path, "/", -1)
+	pathBuf := strings.Split(urlObj.Path, "/")
 	gifFile = filepath.Join(os.TempDir(), pathBuf[len(pathBuf)-1])
 	defer get.Body.Close()
 	if get.StatusCode != http.StatusOK {

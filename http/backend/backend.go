@@ -23,7 +23,7 @@ type Handler struct {
 // NewHandler builds a handler using the configured bot token hash and bot provider.
 func NewHandler(bot *gotgbot.Bot) *Handler {
 	mac := hmac.New(sha256.New, []byte("WebAppData"))
-	mac.Write([]byte(g.GetConfig().BotToken))
+	_, _ = mac.Write([]byte(g.GetConfig().BotToken))
 	sum := mac.Sum(nil)
 	return &Handler{
 		verifyKey: sum,

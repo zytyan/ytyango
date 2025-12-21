@@ -146,7 +146,7 @@ func setLoggerLevel(w http.ResponseWriter, r *http.Request) {
 
 	logger, exists := g.GetAllLoggers()[loggerName]
 	if !exists {
-		_, _ = w.Write([]byte(fmt.Sprintf("logger %s not found\n%s", loggerName, formatLoggers())))
+		_, _ = fmt.Fprintf(w, "logger %s not found\n%s", loggerName, formatLoggers())
 		return
 	}
 

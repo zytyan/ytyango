@@ -14,8 +14,8 @@ import (
 	"golang.org/x/time/rate"
 )
 
-var NoImage = errors.New("no image or image too small")
-var RateLimited = errors.New("rate limited")
+var ErrNoImage = errors.New("no image or image too small")
+var ErrRateLimited = errors.New("rate limited")
 
 type limiterConfig struct {
 	rpm         int
@@ -50,7 +50,7 @@ func waitForTurn(l *rate.Limiter, key string) error {
 	if dur > maxReservationDelay {
 		log.Warnf("dur = %s > %s, too long to handle %s", dur, maxReservationDelay, key)
 		r.Cancel()
-		return RateLimited
+		return ErrRateLimited
 	}
 	time.Sleep(dur)
 	return nil
@@ -144,7 +144,7 @@ func moderatorMsg(bot *gotgbot.Bot, file *gotgbot.PhotoSize) (*azure.ModeratorV2
 		return nil, err
 	}
 	if cfg.Width < 128 || cfg.Height < 128 {
-		return nil, NoImage
+		return nil, ErrNoImage
 	}
 	log.Debugf("start ocr file %s", file.FileUniqueId)
 	res, err := withRetry(func() (*azure.ModeratorV2Result, error) {

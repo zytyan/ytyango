@@ -7,7 +7,6 @@ import (
 	"math/big"
 	"strconv"
 	"strings"
-	"sync"
 	"unicode"
 	"unicode/utf8"
 )
@@ -65,27 +64,11 @@ var e, _ = new(big.Rat).SetString(`2.718281828459`)
 var pi, _ = new(big.Rat).SetString(`3.141592653589793`)
 
 const (
-	maxPooledSliceCap = 256
 	maxFastIntDigits  = 18
 	maxFastFracDigits = 9
 )
 
 var (
-	tokenPool = sync.Pool{
-		New: func() any {
-			return make([]Token, 0, 16)
-		},
-	}
-	rpnPool = sync.Pool{
-		New: func() any {
-			return make([]Token, 0, 16)
-		},
-	}
-	ratPool = sync.Pool{
-		New: func() any {
-			return make([]big.Rat, 0, 16)
-		},
-	}
 	pow10Int64 = [...]int64{
 		1,
 		10,
@@ -99,54 +82,6 @@ var (
 		1000000000,
 	}
 )
-
-func getTokenSlice(need int) []Token {
-	buf := tokenPool.Get().([]Token)
-	if cap(buf) < need {
-		return make([]Token, 0, need)
-	}
-	return buf[:0]
-}
-
-func putTokenSlice(buf []Token) {
-	if cap(buf) > maxPooledSliceCap {
-		return
-	}
-	tokenPool.Put(buf[:0])
-}
-
-func getRpnSlice(need int) []Token {
-	buf := rpnPool.Get().([]Token)
-	if cap(buf) < need {
-		return make([]Token, 0, need)
-	}
-	return buf[:0]
-}
-
-func putRpnSlice(buf []Token) {
-	if cap(buf) > maxPooledSliceCap {
-		return
-	}
-	rpnPool.Put(buf[:0])
-}
-
-func getRatSlice(need int) []big.Rat {
-	buf := ratPool.Get().([]big.Rat)
-	if cap(buf) < need {
-		return make([]big.Rat, need)
-	}
-	return buf[:need]
-}
-
-func putRatSlice(buf []big.Rat) {
-	if cap(buf) > maxPooledSliceCap {
-		return
-	}
-	for i := range buf {
-		buf[i].SetInt64(0)
-	}
-	ratPool.Put(buf[:0])
-}
 
 func fastParseRat(raw string, dst *big.Rat) bool {
 	if raw == "" {
@@ -202,7 +137,7 @@ func tokenize(input string) ([]Token, error) {
 	if needsReplace(input) {
 		input = replacer.Replace(input)
 	}
-	tokens := getTokenSlice(len(input) + 1)
+	tokens := make([]Token, 0, len(input)+1)
 	bytePos := 0
 	runePos := 0
 
@@ -336,11 +271,9 @@ func isRightAssociative(tok Token) bool {
 // shuntingYard converts infix tokens to postfix (RPN)
 
 func shuntingYard(tokens []Token) ([]Token, error) {
-	output := getRpnSlice(len(tokens))
-	ops := getTokenSlice(len(tokens))
-	defer putTokenSlice(ops)
+	output := make([]Token, 0, len(tokens))
+	ops := make([]Token, 0, len(tokens))
 	fail := func(err error) ([]Token, error) {
-		putRpnSlice(output)
 		return nil, err
 	}
 
@@ -399,7 +332,7 @@ type ratStack struct {
 
 func newRatStack(size int) ratStack {
 	return ratStack{
-		data: getRatSlice(size),
+		data: make([]big.Rat, size),
 	}
 }
 
@@ -427,17 +360,10 @@ func (s *ratStack) popBinary() (*big.Rat, *big.Rat, error) {
 	return left, right, nil
 }
 
-func (s *ratStack) release() {
-	putRatSlice(s.data)
-	s.data = nil
-	s.top = 0
-}
-
 // evalRPN evaluates a postfix token list and returns big.Rat result
 
 func evalRPN(rpn []Token) (*big.Rat, error) {
 	stack := newRatStack(len(rpn))
-	defer stack.release()
 	var tmpInt1, tmpInt2, tmpInt3 big.Int
 	var tmpRat big.Rat
 
@@ -648,12 +574,10 @@ func Evaluate(expr string) (*big.Rat, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer putTokenSlice(tokens)
 	rpn, err := shuntingYard(tokens)
 	if err != nil {
 		return nil, err
 	}
-	defer putRpnSlice(rpn)
 	return evalRPN(rpn)
 }
 
