@@ -296,7 +296,7 @@ func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 	config := &genai.GenerateContentConfig{
 		SystemInstruction: genai.NewContentFromText(sysInst, genai.RoleModel),
 		Tools: []*genai.Tool{
-			{GoogleSearch: &genai.GoogleSearch{}},
+			{GoogleSearch: &genai.GoogleSearch{}, CodeExecution: &genai.ToolCodeExecution{}},
 		},
 	}
 	if err := session.AddTgMessage(bot, ctx.EffectiveMessage.ReplyToMessage); err != nil {
