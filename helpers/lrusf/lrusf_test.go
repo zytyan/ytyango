@@ -8,7 +8,7 @@ import (
 )
 
 func TestCacheGetAddRemove(t *testing.T) {
-	cache := New[int, string](2, func(k int) string { return strconv.Itoa(k) }, nil)
+	cache := NewCache[int, string](2, func(k int) string { return strconv.Itoa(k) }, nil)
 
 	cache.Add(1, "a")
 	if v, ok := cache.TryGet(1); !ok || v != "a" {
@@ -57,7 +57,7 @@ func TestCacheGetAddRemove(t *testing.T) {
 }
 
 func TestCacheSingleflight(t *testing.T) {
-	cache := New[int, string](2, func(k int) string { return strconv.Itoa(k) }, nil)
+	cache := NewCache[int, string](2, func(k int) string { return strconv.Itoa(k) }, nil)
 
 	var fetchCalls atomic.Int32
 	fetchStarted := make(chan struct{})
@@ -106,7 +106,7 @@ func TestCacheEvictionLRU(t *testing.T) {
 	var evictedKey int
 	var evictedValue string
 	var evictedCount atomic.Int32
-	cache := New[int, string](2, func(k int) string { return strconv.Itoa(k) }, func(k int, v string) {
+	cache := NewCache[int, string](2, func(k int) string { return strconv.Itoa(k) }, func(k int, v string) {
 		evictedKey = k
 		evictedValue = v
 		evictedCount.Add(1)
@@ -140,7 +140,7 @@ func TestCacheEvictionLRU(t *testing.T) {
 }
 
 func TestCacheRange(t *testing.T) {
-	cache := New[int, string](3, func(k int) string { return strconv.Itoa(k) }, nil)
+	cache := NewCache[int, string](3, func(k int) string { return strconv.Itoa(k) }, nil)
 	cache.Add(1, "a")
 	cache.Add(2, "b")
 	cache.Add(3, "c")

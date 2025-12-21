@@ -34,13 +34,13 @@ func chatStatCacheKey(key ChatStatKey) string {
 
 func initCaches(q *Queries) {
 	cacheOnce.Do(func() {
-		userCache = lrusf.New[int64, *User](2048, id2str, nil)
-		chatCache = lrusf.New[int64, *ChatCfg](2048, id2str, func(i int64, cfg *ChatCfg) {
+		userCache = lrusf.NewCache[int64, *User](2048, id2str, nil)
+		chatCache = lrusf.NewCache[int64, *ChatCfg](2048, id2str, func(i int64, cfg *ChatCfg) {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
 			defer cancel()
 			_ = cfg.Save(ctx, q)
 		})
-		chatStatCache = lrusf.New[ChatStatKey, *ChatStat](64, chatStatCacheKey, func(key ChatStatKey, daily *ChatStat) {
+		chatStatCache = lrusf.NewCache[ChatStatKey, *ChatStat](64, chatStatCacheKey, func(key ChatStatKey, daily *ChatStat) {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
 			defer cancel()
 			_ = daily.Save(ctx, q)

@@ -24,6 +24,7 @@ var logD = log.Desugar()
 func chatCfg(id int64) *q.ChatCfg {
 	return g.Q.GetChatCfgByIdOrDefault(id)
 }
+
 func BiliMsgFilter(msg *gotgbot.Message) bool {
 	if !chatCfg(msg.Chat.Id).AutoCvtBili {
 		return false

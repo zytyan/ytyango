@@ -177,8 +177,8 @@ func DownloadToMemoryCached(bot *gotgbot.Bot, fileId string) (data []byte, err e
 }
 
 func init() {
-	memCache = lrusf.New[string, []byte](128, idToKey, nil)
-	diskCache = lrusf.New[string, diskCacheEntry](2048, idToKey, func(_ string, entry diskCacheEntry) {
+	memCache = lrusf.NewCache[string, []byte](128, idToKey, nil)
+	diskCache = lrusf.NewCache[string, diskCacheEntry](2048, idToKey, func(_ string, entry diskCacheEntry) {
 		if entry.removeOnEvict {
 			_ = os.Remove(entry.path)
 		}

@@ -9,6 +9,7 @@ import (
 )
 
 func StatMessage(bot *gotgbot.Bot, ctx *ext.Context) error {
+	_ = bot
 	msg := ctx.EffectiveMessage
 	chat := ctx.EffectiveChat
 	user := ctx.EffectiveUser

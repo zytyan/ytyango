@@ -23,10 +23,10 @@ type entry[K comparable, V any] struct {
 	value V
 }
 
-// New 创建缓存。
+// NewCache 创建缓存。
 // keyFn：将 K 映射为 singleflight 使用的 string key（必须稳定且唯一）。
 // onEvict：容量驱逐时回调；可为 nil。
-func New[K comparable, V any](cap int, keyFn func(K) string, onEvict func(K, V)) *Cache[K, V] {
+func NewCache[K comparable, V any](cap int, keyFn func(K) string, onEvict func(K, V)) *Cache[K, V] {
 	if cap <= 0 {
 		panic("cap must be > 0")
 	}
@@ -40,6 +40,12 @@ func New[K comparable, V any](cap int, keyFn func(K) string, onEvict func(K, V))
 		keyFn:   keyFn,
 		onEvict: onEvict,
 	}
+}
+
+// NewStringKeyCache 创建key类型为string的缓存。
+func NewStringKeyCache[V any](cap int, onEvict func(string, V)) *Cache[string, V] {
+	fn := func(s string) string { return s }
+	return NewCache[string, V](cap, fn, onEvict)
 }
 
 // Get
