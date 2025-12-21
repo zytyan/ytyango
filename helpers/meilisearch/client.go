@@ -53,7 +53,7 @@ func (c *Client) postJsonData(u string, data io.Reader, ignoreOutput bool) ([]by
 	if err != nil {
 		return nil, err
 	}
-	if validStatusCode(resp.StatusCode) {
+	if !validStatusCode(resp.StatusCode) {
 		return nil, fmt.Errorf("POST %s http status code %d, error: %s", u, resp.StatusCode, outBuf.Bytes())
 	}
 	return outBuf.Bytes(), nil
