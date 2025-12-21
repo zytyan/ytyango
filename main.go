@@ -285,7 +285,7 @@ func main() {
 	dp.NewCallback(hdrs.IsBilibiliBtn, hdrs.DownloadVideoCallback)
 	dp.NewCallback(hdrs.IsBilibiliInlineBtn, hdrs.DownloadInlinedBv)
 	dp.NewCallback(hdrs.IsNsfwPicRateBtn, hdrs.RateNsfwPicByBtn)
-
+	dp.NewCallback(hdrs.IsDelMsgCallback, hdrs.DelMessage)
 	dp.NewCallback(callbackquery.Prefix(hdrs.GroupConfigModifyPrefix), hdrs.ModifyGroupConfigByButton)
 
 	err := updater.StartPolling(b, &ext.PollingOpts{
