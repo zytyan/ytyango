@@ -42,6 +42,7 @@ func initByConfig() {
 	}
 	Msgs.SlowQueryThreshold = time.Millisecond * 50
 	logger.Infof("Database msgs initialized")
+	initMeili()
 }
 
 func init() {

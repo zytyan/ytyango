@@ -1,21 +1,15 @@
 package backend
 
 import (
-	"bytes"
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
-	"io"
-	"net/http"
+	"main/helpers/meilisearch"
 	"strconv"
 
 	g "main/globalcfg"
 	"main/handlers"
 	api "main/http/backend/ogen"
-
-	jsoniter "github.com/json-iterator/go"
-	"go.uber.org/zap"
 )
 
 type searchQuery struct {
@@ -33,14 +27,6 @@ type searchResult struct {
 	Limit              int    `json:"limit"`
 	Offset             int    `json:"offset"`
 	EstimatedTotalHits int    `json:"estimatedTotalHits"`
-}
-
-type meiliQuery struct {
-	Q      string   `json:"q"`
-	Filter string   `json:"filter"`
-	Limit  int      `json:"limit"`
-	Offset int      `json:"offset"`
-	Sort   []string `json:"sort"`
 }
 
 func (h *Handler) SearchMessages(ctx context.Context, req *api.SearchRequest) (api.SearchMessagesRes, error) {
@@ -70,58 +56,27 @@ func (h *Handler) SearchMessages(ctx context.Context, req *api.SearchRequest) (a
 }
 
 func (h *Handler) meiliSearch(ctx context.Context, query searchQuery) (*api.SearchResult, error) {
-	searchURL := g.GetConfig().MeiliConfig.GetSearchUrl()
+	limit := query.Limit
 	chat, err := g.Q.GetChatByWebId(ctx, query.InsID)
 	if err != nil {
 		return nil, err
 	}
-	limit := query.Limit
-	meiliPayload := meiliQuery{
+	meiliQ := meilisearch.SearchQuery{
 		Q:      query.Query,
 		Filter: "peer_id = " + strconv.FormatInt(chat.ID, 10),
 		Limit:  limit,
 		Offset: (query.Page - 1) * limit,
 		Sort:   []string{"date:desc"},
 	}
-	data, err := jsoniter.Marshal(meiliPayload)
-	if err != nil {
-		return nil, err
-	}
-	preparedPost, err := http.NewRequestWithContext(ctx, http.MethodPost, searchURL, bytes.NewReader(data))
-	if err != nil {
-		return nil, err
-	}
-	if token := g.GetConfig().MeiliConfig.MasterKey; token != "" {
-		preparedPost.Header.Set("Authorization", "Bearer "+token)
-	}
-	preparedPost.Header.Set("Content-Type", "application/json")
-	post, err := http.DefaultClient.Do(preparedPost)
-	if err != nil {
-		return nil, err
-	}
-	defer post.Body.Close()
-
-	body, err := io.ReadAll(post.Body)
-	if err != nil {
-		return nil, err
-	}
-	if post.StatusCode < 200 || post.StatusCode >= 300 {
-		h.log.Error("status code not ok",
-			zap.Int("status_code", post.StatusCode),
-			zap.ByteString("body", body),
-		)
-		return nil, fmt.Errorf("search request failed: status=%d", post.StatusCode)
-	}
-
 	var result searchResult
-	if err := jsoniter.Unmarshal(body, &result); err != nil {
+	err = g.MeiliClient.Search(meiliQ, &result)
+	if err != nil {
 		return nil, err
 	}
 	hits := make([]api.MeiliMsg, 0, len(result.Hits))
 	for _, hit := range result.Hits {
 		hits = append(hits, mapMeiliMsg(hit))
 	}
-
 	return &api.SearchResult{
 		Hits:               hits,
 		Query:              result.Query,
@@ -134,11 +89,11 @@ func (h *Handler) meiliSearch(ctx context.Context, query searchQuery) (*api.Sear
 
 func mapMeiliMsg(src handlers.MeiliMsg) api.MeiliMsg {
 	return api.MeiliMsg{
-		MongoID:   api.NewOptString(src.MongoId),
-		PeerID:    api.NewOptInt64(src.PeerId),
-		FromID:    api.NewOptInt64(src.FromId),
-		MsgID:     api.NewOptInt64(src.MsgId),
-		Date:      api.NewOptFloat64(src.Date),
+		MongoID:   src.MongoId,
+		PeerID:    src.PeerId,
+		FromID:    src.FromId,
+		MsgID:     src.MsgId,
+		Date:      src.Date,
 		Message:   api.NewOptString(src.Message),
 		ImageText: api.NewOptString(src.ImageText),
 		QrResult:  api.NewOptString(src.QrResult),

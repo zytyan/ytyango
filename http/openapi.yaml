@@ -13,9 +13,9 @@ paths:
     post:
       summary: Search messages for a group
       operationId: searchMessages
-      tags: [search]
+      tags: [ search ]
       security:
-        - TgAuth: []
+        - TgAuth: [ ]
       requestBody:
         required: true
         content:
@@ -37,9 +37,9 @@ paths:
     post:
       summary: Get basic info for multiple users
       operationId: getUsersInfo
-      tags: [users]
+      tags: [ users ]
       security:
-        - TgAuth: []
+        - TgAuth: [ ]
       requestBody:
         required: true
         content:
@@ -61,7 +61,7 @@ paths:
     get:
       summary: Get a user's avatar (webp)
       operationId: getUserAvatar
-      tags: [users]
+      tags: [ users ]
       parameters:
         - $ref: "#/components/parameters/UserId"
         - $ref: "#/components/parameters/TgAuth"
@@ -136,7 +136,7 @@ components:
   schemas:
     SearchRequest:
       type: object
-      required: [q, ins_id, page]
+      required: [ q, ins_id, page ]
       properties:
         q:
           type: string
@@ -159,6 +159,8 @@ components:
           default: 20
     MeiliMsg:
       type: object
+      required:
+        [ mongo_id, peer_id, from_id, msg_id, date ]
       properties:
         mongo_id:
           type: string
@@ -183,7 +185,7 @@ components:
     SearchResult:
       type: object
       required:
-        [hits, query, processingTimeMs, limit, offset, estimatedTotalHits]
+        [ hits, query, processingTimeMs, limit, offset, estimatedTotalHits ]
       properties:
         hits:
           type: array
@@ -205,7 +207,7 @@ components:
           format: int32
     UserInfoRequest:
       type: object
-      required: [user_ids]
+      required: [ user_ids ]
       properties:
         user_ids:
           type: array
@@ -216,7 +218,7 @@ components:
             format: int64
     UserInfo:
       type: object
-      required: [id, name]
+      required: [ id, name ]
       properties:
         id:
           type: integer
@@ -231,7 +233,7 @@ components:
           nullable: true
     UserInfoResponse:
       type: object
-      required: [users]
+      required: [ users ]
       properties:
         users:
           type: array
@@ -239,7 +241,7 @@ components:
             $ref: "#/components/schemas/UserInfo"
     Error:
       type: object
-      required: [message]
+      required: [ message ]
       properties:
         message:
           type: string

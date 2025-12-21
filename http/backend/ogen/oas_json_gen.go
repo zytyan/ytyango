@@ -345,34 +345,24 @@ func (s *MeiliMsg) Encode(e *jx.Encoder) {
 // encodeFields encodes fields.
 func (s *MeiliMsg) encodeFields(e *jx.Encoder) {
 	{
-		if s.MongoID.Set {
-			e.FieldStart("mongo_id")
-			s.MongoID.Encode(e)
-		}
+		e.FieldStart("mongo_id")
+		e.Str(s.MongoID)
 	}
 	{
-		if s.PeerID.Set {
-			e.FieldStart("peer_id")
-			s.PeerID.Encode(e)
-		}
+		e.FieldStart("peer_id")
+		e.Int64(s.PeerID)
 	}
 	{
-		if s.FromID.Set {
-			e.FieldStart("from_id")
-			s.FromID.Encode(e)
-		}
+		e.FieldStart("from_id")
+		e.Int64(s.FromID)
 	}
 	{
-		if s.MsgID.Set {
-			e.FieldStart("msg_id")
-			s.MsgID.Encode(e)
-		}
+		e.FieldStart("msg_id")
+		e.Int64(s.MsgID)
 	}
 	{
-		if s.Date.Set {
-			e.FieldStart("date")
-			s.Date.Encode(e)
-		}
+		e.FieldStart("date")
+		e.Float64(s.Date)
 	}
 	{
 		if s.Message.Set {
@@ -410,13 +400,16 @@ func (s *MeiliMsg) Decode(d *jx.Decoder) error {
 	if s == nil {
 		return errors.New("invalid: unable to decode MeiliMsg to nil")
 	}
+	var requiredBitSet [1]uint8
 
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
 		switch string(k) {
 		case "mongo_id":
+			requiredBitSet[0] |= 1 << 0
 			if err := func() error {
-				s.MongoID.Reset()
-				if err := s.MongoID.Decode(d); err != nil {
+				v, err := d.Str()
+				s.MongoID = string(v)
+				if err != nil {
 					return err
 				}
 				return nil
@@ -424,9 +417,11 @@ func (s *MeiliMsg) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"mongo_id\"")
 			}
 		case "peer_id":
+			requiredBitSet[0] |= 1 << 1
 			if err := func() error {
-				s.PeerID.Reset()
-				if err := s.PeerID.Decode(d); err != nil {
+				v, err := d.Int64()
+				s.PeerID = int64(v)
+				if err != nil {
 					return err
 				}
 				return nil
@@ -434,9 +429,11 @@ func (s *MeiliMsg) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"peer_id\"")
 			}
 		case "from_id":
+			requiredBitSet[0] |= 1 << 2
 			if err := func() error {
-				s.FromID.Reset()
-				if err := s.FromID.Decode(d); err != nil {
+				v, err := d.Int64()
+				s.FromID = int64(v)
+				if err != nil {
 					return err
 				}
 				return nil
@@ -444,9 +441,11 @@ func (s *MeiliMsg) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"from_id\"")
 			}
 		case "msg_id":
+			requiredBitSet[0] |= 1 << 3
 			if err := func() error {
-				s.MsgID.Reset()
-				if err := s.MsgID.Decode(d); err != nil {
+				v, err := d.Int64()
+				s.MsgID = int64(v)
+				if err != nil {
 					return err
 				}
 				return nil
@@ -454,9 +453,11 @@ func (s *MeiliMsg) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"msg_id\"")
 			}
 		case "date":
+			requiredBitSet[0] |= 1 << 4
 			if err := func() error {
-				s.Date.Reset()
-				if err := s.Date.Decode(d); err != nil {
+				v, err := d.Float64()
+				s.Date = float64(v)
+				if err != nil {
 					return err
 				}
 				return nil
@@ -500,6 +501,38 @@ func (s *MeiliMsg) Decode(d *jx.Decoder) error {
 	}); err != nil {
 		return errors.Wrap(err, "decode MeiliMsg")
 	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00011111,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfMeiliMsg) {
+					name = jsonFieldsNameOfMeiliMsg[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
 
 	return nil
 }
@@ -513,41 +546,6 @@ func (s *MeiliMsg) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *MeiliMsg) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes float64 as json.
-func (o OptFloat64) Encode(e *jx.Encoder) {
-	if !o.Set {
-		return
-	}
-	e.Float64(float64(o.Value))
-}
-
-// Decode decodes float64 from json.
-func (o *OptFloat64) Decode(d *jx.Decoder) error {
-	if o == nil {
-		return errors.New("invalid: unable to decode OptFloat64 to nil")
-	}
-	o.Set = true
-	v, err := d.Float64()
-	if err != nil {
-		return err
-	}
-	o.Value = float64(v)
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s OptFloat64) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *OptFloat64) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -583,41 +581,6 @@ func (s OptInt32) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *OptInt32) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes int64 as json.
-func (o OptInt64) Encode(e *jx.Encoder) {
-	if !o.Set {
-		return
-	}
-	e.Int64(int64(o.Value))
-}
-
-// Decode decodes int64 from json.
-func (o *OptInt64) Decode(d *jx.Decoder) error {
-	if o == nil {
-		return errors.New("invalid: unable to decode OptInt64 to nil")
-	}
-	o.Set = true
-	v, err := d.Int64()
-	if err != nil {
-		return err
-	}
-	o.Value = int64(v)
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s OptInt64) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *OptInt64) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }

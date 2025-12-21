@@ -1,32 +1,16 @@
 package handlers
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
-	"io"
 	g "main/globalcfg"
 	"main/globalcfg/msgs"
-	"net/http"
-	"strings"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
-	"github.com/bwmarrin/snowflake"
+	"github.com/google/uuid"
 	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 )
-
-var saveMsgMeili = &http.Client{}
-var meili = g.GetConfig().MeiliConfig
-var snowflakeNode = func() *snowflake.Node {
-	node, err := snowflake.NewNode(1)
-	if err != nil {
-		panic(err)
-	}
-	return node
-}
 
 type MeiliMsg struct {
 	MongoId   string  `json:"mongo_id"`
@@ -61,7 +45,7 @@ func saveMessage(bot *gotgbot.Bot, ctx *ext.Context) {
 			logD.Warn("persist saved message", zap.Error(err), updateId)
 		}
 	}
-	if err := saveMessageToMeilisearch(bot, ctx, msg); err != nil {
+	if err := saveMessageToMeilisearch(bot, msg); err != nil {
 		logD.Error("save message error", zap.Error(err), updateId)
 	}
 }
@@ -69,19 +53,6 @@ func saveMessage(bot *gotgbot.Bot, ctx *ext.Context) {
 func SaveMessage(bot *gotgbot.Bot, ctx *ext.Context) error {
 	go saveMessage(bot, ctx)
 	return nil
-}
-
-type QrRes struct {
-	Result []string      `json:"res"`
-	Points [][][]float64 `json:"points"`
-}
-
-func (q *QrRes) ToString() string {
-	return strings.Join(q.Result, "\n\n")
-}
-
-func (q *QrRes) Empty() bool {
-	return len(q.Result) == 0
 }
 
 func setImageText(bot *gotgbot.Bot, msg *gotgbot.Message, meili *MeiliMsg) error {
@@ -93,29 +64,32 @@ func setImageText(bot *gotgbot.Bot, msg *gotgbot.Message, meili *MeiliMsg) error
 	return err
 }
 
-func saveMessageToMeilisearch(bot *gotgbot.Bot, ctx *ext.Context, msg *gotgbot.Message) (err error) {
+func saveMessageToMeilisearch(bot *gotgbot.Bot, msg *gotgbot.Message) (err error) {
 	if msg == nil {
 		return nil
 	}
-	mongoId := snowflakeNode().Generate().Base32()
+	uid, err := uuid.NewV7()
+	if err != nil {
+		return err
+	}
+	mongoId := uid.String()
 	meiliMsg := &MeiliMsg{
 		MongoId:   mongoId,
-		PeerId:    ctx.EffectiveChat.Id,
+		PeerId:    msg.GetChat().Id,
 		FromId:    msg.GetSender().Id(),
 		MsgId:     msg.MessageId,
 		Date:      float64(msg.Date),
-		Message:   getText(ctx),
+		Message:   msg.GetText(),
 		ImageText: "",
 		QrResult:  "",
 	}
 	logger := logD.With(
-		zap.Int64("update_id", ctx.UpdateId),
 		zap.Int64("message_id", msg.MessageId),
-		zap.Int64("chat_id", ctx.EffectiveChat.Id),
+		zap.Int64("chat_id", msg.GetChat().Id),
 		zap.String("mongo_id", mongoId),
 	)
 
-	if chatCfg(ctx.EffectiveChat.Id).AutoOcr {
+	if chatCfg(msg.GetChat().Id).AutoOcr {
 		err = setImageText(bot, msg, meiliMsg)
 		if err != nil {
 			logger.Warn("set image text", zap.Error(err))
@@ -125,39 +99,10 @@ func saveMessageToMeilisearch(bot *gotgbot.Bot, ctx *ext.Context, msg *gotgbot.M
 		logger.Debug("skip save message to meilisearch, no text")
 		return nil
 	}
-
-	j, err := json.Marshal(meiliMsg)
+	err = g.MeiliClient.AddDocument(meiliMsg)
 	if err != nil {
-		logger.Error("marshal meili msg", zap.Error(err))
-		return err
+		logger.Warn("save message to meilisearch", zap.Error(err))
 	}
-	logger.Debug("save to meili", zap.ByteString("json", j))
-	preparedPost, _ := http.NewRequest("POST", meili.GetSaveUrl(), bytes.NewReader(j))
-	if meili.MasterKey != "" {
-		preparedPost.Header.Set("Authorization", "Bearer "+meili.MasterKey)
-	}
-	preparedPost.Header.Set("Content-Type", "application/json")
-	post, err := saveMsgMeili.Do(preparedPost)
-	if err != nil {
-		logger.Warn("post to meili", zap.Error(err))
-		return err
-	}
-	defer post.Body.Close()
-	var data []byte
-	logFn := logger.Debug
-
-	if !(200 <= post.StatusCode && post.StatusCode < 300) || logger.Level().Enabled(zapcore.DebugLevel) {
-		if !(200 <= post.StatusCode && post.StatusCode < 300) {
-			logFn = logger.Error
-		}
-		data, err = io.ReadAll(post.Body)
-		logFn("post to meili",
-			zap.Int("status_code", post.StatusCode),
-			zap.ByteString("response", data),
-			zap.NamedError("read_body_error", err),
-		)
-	}
-
 	return err
 }
 

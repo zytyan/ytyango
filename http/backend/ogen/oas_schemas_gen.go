@@ -63,38 +63,38 @@ func (*GetUsersInfoInternalServerError) getUsersInfoRes() {}
 
 // Ref: #/components/schemas/MeiliMsg
 type MeiliMsg struct {
-	MongoID   OptString  `json:"mongo_id"`
-	PeerID    OptInt64   `json:"peer_id"`
-	FromID    OptInt64   `json:"from_id"`
-	MsgID     OptInt64   `json:"msg_id"`
-	Date      OptFloat64 `json:"date"`
-	Message   OptString  `json:"message"`
-	ImageText OptString  `json:"image_text"`
-	QrResult  OptString  `json:"qr_result"`
+	MongoID   string    `json:"mongo_id"`
+	PeerID    int64     `json:"peer_id"`
+	FromID    int64     `json:"from_id"`
+	MsgID     int64     `json:"msg_id"`
+	Date      float64   `json:"date"`
+	Message   OptString `json:"message"`
+	ImageText OptString `json:"image_text"`
+	QrResult  OptString `json:"qr_result"`
 }
 
 // GetMongoID returns the value of MongoID.
-func (s *MeiliMsg) GetMongoID() OptString {
+func (s *MeiliMsg) GetMongoID() string {
 	return s.MongoID
 }
 
 // GetPeerID returns the value of PeerID.
-func (s *MeiliMsg) GetPeerID() OptInt64 {
+func (s *MeiliMsg) GetPeerID() int64 {
 	return s.PeerID
 }
 
 // GetFromID returns the value of FromID.
-func (s *MeiliMsg) GetFromID() OptInt64 {
+func (s *MeiliMsg) GetFromID() int64 {
 	return s.FromID
 }
 
 // GetMsgID returns the value of MsgID.
-func (s *MeiliMsg) GetMsgID() OptInt64 {
+func (s *MeiliMsg) GetMsgID() int64 {
 	return s.MsgID
 }
 
 // GetDate returns the value of Date.
-func (s *MeiliMsg) GetDate() OptFloat64 {
+func (s *MeiliMsg) GetDate() float64 {
 	return s.Date
 }
 
@@ -114,27 +114,27 @@ func (s *MeiliMsg) GetQrResult() OptString {
 }
 
 // SetMongoID sets the value of MongoID.
-func (s *MeiliMsg) SetMongoID(val OptString) {
+func (s *MeiliMsg) SetMongoID(val string) {
 	s.MongoID = val
 }
 
 // SetPeerID sets the value of PeerID.
-func (s *MeiliMsg) SetPeerID(val OptInt64) {
+func (s *MeiliMsg) SetPeerID(val int64) {
 	s.PeerID = val
 }
 
 // SetFromID sets the value of FromID.
-func (s *MeiliMsg) SetFromID(val OptInt64) {
+func (s *MeiliMsg) SetFromID(val int64) {
 	s.FromID = val
 }
 
 // SetMsgID sets the value of MsgID.
-func (s *MeiliMsg) SetMsgID(val OptInt64) {
+func (s *MeiliMsg) SetMsgID(val int64) {
 	s.MsgID = val
 }
 
 // SetDate sets the value of Date.
-func (s *MeiliMsg) SetDate(val OptFloat64) {
+func (s *MeiliMsg) SetDate(val float64) {
 	s.Date = val
 }
 
@@ -151,52 +151,6 @@ func (s *MeiliMsg) SetImageText(val OptString) {
 // SetQrResult sets the value of QrResult.
 func (s *MeiliMsg) SetQrResult(val OptString) {
 	s.QrResult = val
-}
-
-// NewOptFloat64 returns new OptFloat64 with value set to v.
-func NewOptFloat64(v float64) OptFloat64 {
-	return OptFloat64{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptFloat64 is optional float64.
-type OptFloat64 struct {
-	Value float64
-	Set   bool
-}
-
-// IsSet returns true if OptFloat64 was set.
-func (o OptFloat64) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptFloat64) Reset() {
-	var v float64
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptFloat64) SetTo(v float64) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptFloat64) Get() (v float64, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptFloat64) Or(d float64) float64 {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
 }
 
 // NewOptInt32 returns new OptInt32 with value set to v.
@@ -239,52 +193,6 @@ func (o OptInt32) Get() (v int32, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptInt32) Or(d int32) int32 {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
-// NewOptInt64 returns new OptInt64 with value set to v.
-func NewOptInt64(v int64) OptInt64 {
-	return OptInt64{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptInt64 is optional int64.
-type OptInt64 struct {
-	Value int64
-	Set   bool
-}
-
-// IsSet returns true if OptInt64 was set.
-func (o OptInt64) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptInt64) Reset() {
-	var v int64
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptInt64) SetTo(v int64) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptInt64) Get() (v int64, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptInt64) Or(d int64) int64 {
 	if v, ok := o.Get(); ok {
 		return v
 	}
