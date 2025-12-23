@@ -72,9 +72,14 @@ type:%s
 		label += fmt.Sprintf("quote:%s\n", content.QuotePart.String)
 	}
 	label += "-end-label-\n"
-	out.Parts = append(out.Parts, &genai.Part{
+	out.Role = content.Role
+	textPart := &genai.Part{
 		Text: label,
-	})
+	}
+	if content.ThoughtSignature.Valid {
+		textPart.ThoughtSignature = content.ThoughtSignature.String
+	}
+	out.Parts = append(out.Parts, textPart)
 	if content.Text.Valid {
 		out.Parts = append(out.Parts, &genai.Part{Text: content.Text.String})
 	}

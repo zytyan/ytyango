@@ -43,18 +43,19 @@ type ChatStatDaily struct {
 }
 
 type GeminiContent struct {
-	SessionID    int64          `json:"session_id"`
-	ChatID       int64          `json:"chat_id"`
-	MsgID        int64          `json:"msg_id"`
-	Role         string         `json:"role"`
-	SentTime     UnixTime       `json:"sent_time"`
-	Username     string         `json:"username"`
-	MsgType      string         `json:"msg_type"`
-	ReplyToMsgID sql.NullInt64  `json:"reply_to_msg_id"`
-	Text         sql.NullString `json:"text"`
-	Blob         []byte         `json:"blob"`
-	MimeType     sql.NullString `json:"mime_type"`
-	QuotePart    sql.NullString `json:"quote_part"`
+	SessionID        int64          `json:"session_id"`
+	ChatID           int64          `json:"chat_id"`
+	MsgID            int64          `json:"msg_id"`
+	Role             string         `json:"role"`
+	SentTime         UnixTime       `json:"sent_time"`
+	Username         string         `json:"username"`
+	MsgType          string         `json:"msg_type"`
+	ReplyToMsgID     sql.NullInt64  `json:"reply_to_msg_id"`
+	Text             sql.NullString `json:"text"`
+	Blob             []byte         `json:"blob"`
+	MimeType         sql.NullString `json:"mime_type"`
+	QuotePart        sql.NullString `json:"quote_part"`
+	ThoughtSignature sql.NullString `json:"thought_signature"`
 }
 
 type GeminiSession struct {

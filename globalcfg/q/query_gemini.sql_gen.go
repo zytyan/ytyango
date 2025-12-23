@@ -25,23 +25,25 @@ INSERT INTO gemini_contents (session_id,
                              text,
                              blob,
                              mime_type,
-                             quote_part)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                             quote_part,
+                             thought_signature)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type AddGeminiMessageParams struct {
-	SessionID    int64          `json:"session_id"`
-	ChatID       int64          `json:"chat_id"`
-	MsgID        int64          `json:"msg_id"`
-	Role         string         `json:"role"`
-	SentTime     UnixTime       `json:"sent_time"`
-	Username     string         `json:"username"`
-	MsgType      string         `json:"msg_type"`
-	ReplyToMsgID sql.NullInt64  `json:"reply_to_msg_id"`
-	Text         sql.NullString `json:"text"`
-	Blob         []byte         `json:"blob"`
-	MimeType     sql.NullString `json:"mime_type"`
-	QuotePart    sql.NullString `json:"quote_part"`
+	SessionID        int64          `json:"session_id"`
+	ChatID           int64          `json:"chat_id"`
+	MsgID            int64          `json:"msg_id"`
+	Role             string         `json:"role"`
+	SentTime         UnixTime       `json:"sent_time"`
+	Username         string         `json:"username"`
+	MsgType          string         `json:"msg_type"`
+	ReplyToMsgID     sql.NullInt64  `json:"reply_to_msg_id"`
+	Text             sql.NullString `json:"text"`
+	Blob             []byte         `json:"blob"`
+	MimeType         sql.NullString `json:"mime_type"`
+	QuotePart        sql.NullString `json:"quote_part"`
+	ThoughtSignature sql.NullString `json:"thought_signature"`
 }
 
 func (q *Queries) AddGeminiMessage(ctx context.Context, arg AddGeminiMessageParams) error {
@@ -65,6 +67,7 @@ func (q *Queries) AddGeminiMessage(ctx context.Context, arg AddGeminiMessagePara
 					zap.ByteString("blob", arg.Blob),
 					zapNullString("mime_type", arg.MimeType),
 					zapNullString("quote_part", arg.QuotePart),
+					zapNullString("thought_signature", arg.ThoughtSignature),
 				),
 			)
 		}
@@ -82,6 +85,7 @@ func (q *Queries) AddGeminiMessage(ctx context.Context, arg AddGeminiMessagePara
 		arg.Blob,
 		arg.MimeType,
 		arg.QuotePart,
+		arg.ThoughtSignature,
 	)
 	q.logQuery(addGeminiMessage, "AddGeminiMessage", logFields, err, start)
 	return err
@@ -185,7 +189,7 @@ func (q *Queries) GetSessionIdByMessage(ctx context.Context, chatID int64, msgID
 }
 
 const getAllMsgInSessionReversed = `-- name: getAllMsgInSessionReversed :many
-SELECT session_id, chat_id, msg_id, role, sent_time, username, msg_type, reply_to_msg_id, text, blob, mime_type, quote_part
+SELECT session_id, chat_id, msg_id, role, sent_time, username, msg_type, reply_to_msg_id, text, blob, mime_type, quote_part, thought_signature
 FROM gemini_contents
 WHERE session_id = ?
 ORDER BY msg_id DESC
@@ -231,6 +235,7 @@ func (q *Queries) getAllMsgInSessionReversed(ctx context.Context, sessionID int6
 			&i.Blob,
 			&i.MimeType,
 			&i.QuotePart,
+			&i.ThoughtSignature,
 		); err != nil {
 			return nil, err
 		}

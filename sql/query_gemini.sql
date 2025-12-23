@@ -17,8 +17,9 @@ INSERT INTO gemini_contents (session_id,
                              text,
                              blob,
                              mime_type,
-                             quote_part)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                             quote_part,
+                             thought_signature)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 -- name: getAllMsgInSessionReversed :many
 SELECT *

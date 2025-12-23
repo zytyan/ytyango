@@ -10,18 +10,19 @@ CREATE TABLE gemini_sessions
 -- Contents（消息内容表）
 CREATE TABLE gemini_contents
 (
-    session_id      INTEGER      NOT NULL,
-    chat_id         INTEGER      NOT NULL,
-    msg_id          INTEGER      NOT NULL, -- 对应 MsgId
-    role            TEXT         NOT NULL,
-    sent_time       INT_UNIX_SEC NOT NULL, -- yyyy-mm-dd HH:MM:SS
-    username        TEXT         NOT NULL,
-    msg_type        TEXT         NOT NULL, -- 使用英语标识类型，包括 text, photo, sticker，将来可能有更多类型（或许）
-    reply_to_msg_id INTEGER,               -- 若有，代表该消息为回复消息
-    text            TEXT,                  -- 可以与blob共存，若同时存在，则使用两个part，但两个至少应该有一个
-    blob            BLOB,
-    mime_type       TEXT,                  -- 若blob存在，mime_type必须存在
-    quote_part      TEXT,                  -- 回复消息时，被回复的消息被引用的部分。
+    session_id        INTEGER      NOT NULL,
+    chat_id           INTEGER      NOT NULL,
+    msg_id            INTEGER      NOT NULL, -- 对应 MsgId
+    role              TEXT         NOT NULL,
+    sent_time         INT_UNIX_SEC NOT NULL, -- yyyy-mm-dd HH:MM:SS
+    username          TEXT         NOT NULL,
+    msg_type          TEXT         NOT NULL, -- 使用英语标识类型，包括 text, photo, sticker，将来可能有更多类型（或许）
+    reply_to_msg_id   INTEGER,               -- 若有，代表该消息为回复消息
+    text              TEXT,                  -- 可以与blob共存，若同时存在，则使用两个part，但两个至少应该有一个
+    blob              BLOB,
+    mime_type         TEXT,                  -- 若blob存在，mime_type必须存在
+    quote_part        TEXT,                  -- 回复消息时，被回复的消息被引用的部分。
+    thought_signature TEXT,                  -- 模型的思考签名
     -- 一个消息唯一由 SessionId + MsgId 组成
     PRIMARY KEY (session_id, msg_id),
 
