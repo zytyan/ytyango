@@ -89,7 +89,7 @@
 
 | ID | 描述 | 优先级 |
 | --- | --- | --- |
-| FR-13 | 替换 sqlite3 驱动为 `pgx/v5`（池或 stdlib），`globalcfg` 初始化与 `Q/Msgs` 准备逻辑适配新驱动与上下文超时。 | 高 |
+| FR-13 | 使用 `pgx/v5` 原生接口（`pgxpool`），不再依赖 `database/sql`；`globalcfg` 初始化与 `Q/Msgs` 准备逻辑基于 pgx 适配上下文超时。 | 高 |
 | FR-14 | 更新错误处理：将 `sqlite3.ErrConstraint*` 重写为 `pgconn.PgError`（唯一冲突等），保持重试/降级语义（如插入 `saved_pics` 时的 RandKey 冲突）。 | 高 |
 | FR-15 | 重写测试初始化：使用 PostgreSQL 测试实例（Docker/本地/CI 环境变量），提供 schema 初始化脚本，移除对内存 SQLite 的硬依赖。 | 高 |
 | FR-16 | 更新脚本与文档：`sqlc` 重新生成、`go mod tidy`、`gofmt`，以及 README/配置示例指向 PostgreSQL。 | 中 |
@@ -114,7 +114,7 @@
 
 ## **8. 技术方案（Tech Design Summary）**
 
-- 连接：优先 `pgx/v5` 的 `pgxpool`；若保持 `database/sql` 接口，可使用 `pgx/v5/stdlib` 注册驱动并自定义池参数，慢查询记录继续由 `Queries.logger` 负责。
+- 连接：使用 `pgx/v5` 的 `pgxpool` 原生接口（不通过 `database/sql`），统一连接池与超时配置，慢查询记录继续由 `Queries.logger` 负责。
 - DDL：为自定义类型提供映射/Domain（可选 `CREATE DOMAIN int_unix_sec AS bigint` 等），所有表用 PostgreSQL 语法重写；触发器用 `plpgsql` 函数实现评分计数与编辑历史。
 - `sqlc`：`engine: postgresql`，指定 `sql_package: "pgx/v5"`（取决于 wasm 插件支持），调整 overrides 映射到新类型，SQL 占位符改为 `$n`。
 - 迁移：提供 CLI/脚本读取 SQLite（行流式），按表批量插入 PostgreSQL，附加校验（计数、采样 checksum），可跳过 `saved_msgs` 或拆分批次。
