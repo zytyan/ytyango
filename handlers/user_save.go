@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	g "main/globalcfg"
 	"main/globalcfg/q"
@@ -11,11 +10,15 @@ import (
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const profileRefreshInterval = time.Hour
 
 func profileNeedUpdate(user *q.User) bool {
+	if !user.ProfileUpdateAt.Valid {
+		return true
+	}
 	return time.Since(user.ProfileUpdateAt.Time) > profileRefreshInterval
 }
 
@@ -54,8 +57,8 @@ func UpdateUser(bot *gotgbot.Bot, ctx *ext.Context) error {
 		log.Warnf("update profile photo failed: %v", err)
 		return nil
 	}
-	user.ProfileUpdateAt = q.UnixTime{Time: time.Now()}
-	user.ProfilePhoto = sql.NullString{String: photo, Valid: photo != ""}
+	user.ProfileUpdateAt = pgtype.Timestamptz{Time: time.Now(), Valid: true}
+	user.ProfilePhoto = pgtype.Text{String: photo, Valid: photo != ""}
 
 	return nil
 }

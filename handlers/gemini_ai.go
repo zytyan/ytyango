@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	g "main/globalcfg"
@@ -17,6 +16,7 @@ import (
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"go.uber.org/zap"
 	"google.golang.org/genai"
 )
@@ -65,7 +65,7 @@ id:%d
 time:%s
 name:%s
 type:%s
-`, content.MsgID, content.SentTime.Format("2006-01-02 15:04:05"), content.Username, content.MsgType)
+`, content.MsgID, content.SentTime.Time.Format("2006-01-02 15:04:05"), content.Username, content.MsgType)
 	if content.ReplyToMsgID.Valid {
 		label += fmt.Sprintf("reply:%d\n", content.ReplyToMsgID.Int64)
 	}
@@ -127,14 +127,14 @@ func (s *GeminiSession) AddTgMessage(bot *gotgbot.Bot, msg *gotgbot.Message) (er
 		ChatID:    msg.Chat.Id,
 		MsgID:     msg.MessageId,
 		Role:      role,
-		SentTime:  q.UnixTime{Time: time.Unix(msg.Date, 0)},
+		SentTime:  pgtype.Timestamptz{Time: time.Unix(msg.Date, 0), Valid: true},
 		Username:  msg.GetSender().Name(),
 	}
 	if msg.ReplyToMessage != nil {
 		content.ReplyToMsgID.Valid = true
 		content.ReplyToMsgID.Int64 = msg.ReplyToMessage.MessageId
 		if msg.Quote != nil && msg.Quote.IsManual {
-			content.QuotePart = sql.NullString{String: msg.Quote.Text, Valid: true}
+			content.QuotePart = pgtype.Text{String: msg.Quote.Text, Valid: true}
 		}
 	}
 	if msg.Text != "" {

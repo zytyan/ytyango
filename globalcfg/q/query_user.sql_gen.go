@@ -7,7 +7,8 @@ package q
 
 import (
 	"context"
-	"database/sql"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const getPrprCache = `-- name: GetPrprCache :one
@@ -40,12 +41,12 @@ RETURNING id
 `
 
 type createNewUserParams struct {
-	UpdatedAt    UnixTime       `json:"updated_at"`
-	UserID       int64          `json:"user_id"`
-	FirstName    string         `json:"first_name"`
-	LastName     sql.NullString `json:"last_name"`
-	ProfilePhoto sql.NullString `json:"profile_photo"`
-	Timezone     int32          `json:"timezone"`
+	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
+	UserID       int64              `json:"user_id"`
+	FirstName    string             `json:"first_name"`
+	LastName     pgtype.Text        `json:"last_name"`
+	ProfilePhoto pgtype.Text        `json:"profile_photo"`
+	Timezone     int32              `json:"timezone"`
 }
 
 func (q *Queries) createNewUser(ctx context.Context, arg createNewUserParams) (int64, error) {
@@ -95,7 +96,7 @@ WHERE user_id = $1
 RETURNING id
 `
 
-func (q *Queries) updateUserBase(ctx context.Context, userID int64, updatedAt UnixTime, firstName string, lastName sql.NullString) (int64, error) {
+func (q *Queries) updateUserBase(ctx context.Context, userID int64, updatedAt pgtype.Timestamptz, firstName string, lastName pgtype.Text) (int64, error) {
 	row := q.db.QueryRow(ctx, updateUserBase,
 		userID,
 		updatedAt,
@@ -114,7 +115,7 @@ SET profile_update_at = $2,
 WHERE user_id = $1
 `
 
-func (q *Queries) updateUserProfilePhoto(ctx context.Context, userID int64, profileUpdateAt UnixTime, profilePhoto sql.NullString) error {
+func (q *Queries) updateUserProfilePhoto(ctx context.Context, userID int64, profileUpdateAt pgtype.Timestamptz, profilePhoto pgtype.Text) error {
 	_, err := q.db.Exec(ctx, updateUserProfilePhoto, userID, profileUpdateAt, profilePhoto)
 	return err
 }

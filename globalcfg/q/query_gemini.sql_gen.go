@@ -7,7 +7,6 @@ package q
 
 import (
 	"context"
-	"database/sql"
 
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -30,19 +29,19 @@ VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 `
 
 type AddGeminiMessageParams struct {
-	SessionID        int64          `json:"session_id"`
-	ChatID           int64          `json:"chat_id"`
-	MsgID            int64          `json:"msg_id"`
-	Role             string         `json:"role"`
-	SentTime         UnixTime       `json:"sent_time"`
-	Username         string         `json:"username"`
-	MsgType          string         `json:"msg_type"`
-	ReplyToMsgID     pgtype.Int8    `json:"reply_to_msg_id"`
-	Text             sql.NullString `json:"text"`
-	Blob             []byte         `json:"blob"`
-	MimeType         sql.NullString `json:"mime_type"`
-	QuotePart        sql.NullString `json:"quote_part"`
-	ThoughtSignature sql.NullString `json:"thought_signature"`
+	SessionID        int64              `json:"session_id"`
+	ChatID           int64              `json:"chat_id"`
+	MsgID            int64              `json:"msg_id"`
+	Role             string             `json:"role"`
+	SentTime         pgtype.Timestamptz `json:"sent_time"`
+	Username         string             `json:"username"`
+	MsgType          string             `json:"msg_type"`
+	ReplyToMsgID     pgtype.Int8        `json:"reply_to_msg_id"`
+	Text             pgtype.Text        `json:"text"`
+	Blob             []byte             `json:"blob"`
+	MimeType         pgtype.Text        `json:"mime_type"`
+	QuotePart        pgtype.Text        `json:"quote_part"`
+	ThoughtSignature pgtype.Text        `json:"thought_signature"`
 }
 
 func (q *Queries) AddGeminiMessage(ctx context.Context, arg AddGeminiMessageParams) error {

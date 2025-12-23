@@ -5,8 +5,6 @@
 package msgs
 
 import (
-	"database/sql"
-
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -29,20 +27,20 @@ type SavedMsg struct {
 	ChatID            int64              `json:"chat_id"`
 	FromUserID        pgtype.Int8        `json:"from_user_id"`
 	SenderChatID      pgtype.Int8        `json:"sender_chat_id"`
-	Date              UnixTime           `json:"date"`
-	ForwardOriginName sql.NullString     `json:"forward_origin_name"`
+	Date              pgtype.Timestamptz `json:"date"`
+	ForwardOriginName pgtype.Text        `json:"forward_origin_name"`
 	ForwardOriginID   pgtype.Int8        `json:"forward_origin_id"`
 	MessageThreadID   pgtype.Int8        `json:"message_thread_id"`
 	ReplyToMessageID  pgtype.Int8        `json:"reply_to_message_id"`
 	ReplyToChatID     pgtype.Int8        `json:"reply_to_chat_id"`
 	ViaBotID          pgtype.Int8        `json:"via_bot_id"`
-	EditDate          sql.Null[UnixTime] `json:"edit_date"`
-	MediaGroupID      sql.NullString     `json:"media_group_id"`
-	Text              sql.NullString     `json:"text"`
+	EditDate          pgtype.Timestamptz `json:"edit_date"`
+	MediaGroupID      pgtype.Text        `json:"media_group_id"`
+	Text              pgtype.Text        `json:"text"`
 	EntitiesJson      []byte             `json:"entities_json"`
-	MediaID           sql.NullString     `json:"media_id"`
-	MediaUid          sql.NullString     `json:"media_uid"`
-	MediaType         sql.NullString     `json:"media_type"`
+	MediaID           pgtype.Text        `json:"media_id"`
+	MediaUid          pgtype.Text        `json:"media_uid"`
+	MediaType         pgtype.Text        `json:"media_type"`
 	ExtraData         []byte             `json:"extra_data"`
-	ExtraType         sql.NullString     `json:"extra_type"`
+	ExtraType         pgtype.Text        `json:"extra_type"`
 }

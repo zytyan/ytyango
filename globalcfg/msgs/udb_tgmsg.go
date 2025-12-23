@@ -2,7 +2,6 @@ package msgs
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"time"
 
@@ -14,8 +13,8 @@ import (
 
 const defaultDBTimeout = 2 * time.Second
 
-func nullString(s string) sql.NullString {
-	return sql.NullString{String: s, Valid: s != ""}
+func textValue(s string) pgtype.Text {
+	return pgtype.Text{String: s, Valid: s != ""}
 }
 
 func marshalJSON(v any) ([]byte, error) {
@@ -38,10 +37,6 @@ func (q *Queries) marshalWithWarn(v any, field string) []byte {
 	return js
 }
 
-func toInt8(v sql.NullInt64) pgtype.Int8 {
-	return pgtype.Int8{Int64: v.Int64, Valid: v.Valid}
-}
-
 // SaveRawUpdate stores the raw update payload. JSON marshal failure returns an error.
 func (q *Queries) SaveRawUpdate(ctx *ext.Context) error {
 	if ctx == nil || ctx.Update == nil {
@@ -51,22 +46,22 @@ func (q *Queries) SaveRawUpdate(ctx *ext.Context) error {
 	if err != nil {
 		return err
 	}
-	chatID := sql.NullInt64{}
-	msgID := sql.NullInt64{}
+	chatID := pgtype.Int8{}
+	msgID := pgtype.Int8{}
 	if ctx.EffectiveChat != nil {
-		chatID = sql.NullInt64{Int64: ctx.EffectiveChat.Id, Valid: true}
+		chatID = pgtype.Int8{Int64: ctx.EffectiveChat.Id, Valid: true}
 	}
 	if ctx.EffectiveMessage != nil {
-		msgID = sql.NullInt64{Int64: ctx.EffectiveMessage.MessageId, Valid: true}
+		msgID = pgtype.Int8{Int64: ctx.EffectiveMessage.MessageId, Valid: true}
 	}
 	c, cancel := context.WithTimeout(context.Background(), defaultDBTimeout)
 	defer cancel()
-	return q.InsertRawUpdate(c, toInt8(chatID), toInt8(msgID), raw)
+	return q.InsertRawUpdate(c, chatID, msgID, raw)
 }
 
-func forwardInfo(msg *gotgbot.Message) (sql.NullString, sql.NullInt64) {
+func forwardInfo(msg *gotgbot.Message) (pgtype.Text, pgtype.Int8) {
 	if msg == nil || msg.ForwardOrigin == nil {
-		return sql.NullString{}, sql.NullInt64{}
+		return pgtype.Text{}, pgtype.Int8{}
 	}
 	fwd := msg.ForwardOrigin.MergeMessageOrigin()
 	switch fwd.Type {
@@ -76,48 +71,48 @@ func forwardInfo(msg *gotgbot.Message) (sql.NullString, sql.NullInt64) {
 			if fwd.SenderUser.LastName != "" {
 				name += " " + fwd.SenderUser.LastName
 			}
-			return nullString(name), sql.NullInt64{Int64: fwd.SenderUser.Id, Valid: true}
+			return textValue(name), pgtype.Int8{Int64: fwd.SenderUser.Id, Valid: true}
 		}
 	case "channel":
 		if fwd.Chat != nil {
-			return nullString(fwd.Chat.Title), sql.NullInt64{Int64: fwd.Chat.Id, Valid: true}
+			return textValue(fwd.Chat.Title), pgtype.Int8{Int64: fwd.Chat.Id, Valid: true}
 		}
 	case "chat":
 		if fwd.SenderChat != nil {
-			return nullString(fwd.SenderChat.Title), sql.NullInt64{Int64: fwd.SenderChat.Id, Valid: true}
+			return textValue(fwd.SenderChat.Title), pgtype.Int8{Int64: fwd.SenderChat.Id, Valid: true}
 		}
 	case "hidden_user":
-		return nullString(fwd.SenderUserName), sql.NullInt64{}
+		return textValue(fwd.SenderUserName), pgtype.Int8{}
 	}
-	return sql.NullString{}, sql.NullInt64{}
+	return pgtype.Text{}, pgtype.Int8{}
 }
 
-func replyInfo(msg *gotgbot.Message) (sql.NullInt64, sql.NullInt64) {
+func replyInfo(msg *gotgbot.Message) (pgtype.Int8, pgtype.Int8) {
 	if msg == nil {
-		return sql.NullInt64{}, sql.NullInt64{}
+		return pgtype.Int8{}, pgtype.Int8{}
 	}
 	if msg.ReplyToMessage != nil {
-		replyChat := sql.NullInt64{}
+		replyChat := pgtype.Int8{}
 		if msg.ReplyToMessage.Chat.Id != 0 {
-			replyChat = sql.NullInt64{Int64: msg.ReplyToMessage.Chat.Id, Valid: true}
+			replyChat = pgtype.Int8{Int64: msg.ReplyToMessage.Chat.Id, Valid: true}
 		}
-		return sql.NullInt64{Int64: msg.ReplyToMessage.MessageId, Valid: true}, replyChat
+		return pgtype.Int8{Int64: msg.ReplyToMessage.MessageId, Valid: true}, replyChat
 	}
 	if msg.ExternalReply != nil {
-		replyChat := sql.NullInt64{}
+		replyChat := pgtype.Int8{}
 		if msg.ExternalReply.Chat != nil {
-			replyChat = sql.NullInt64{Int64: msg.ExternalReply.Chat.Id, Valid: true}
+			replyChat = pgtype.Int8{Int64: msg.ExternalReply.Chat.Id, Valid: true}
 		}
-		return sql.NullInt64{Int64: msg.ExternalReply.MessageId, Valid: msg.ExternalReply.MessageId != 0},
+		return pgtype.Int8{Int64: msg.ExternalReply.MessageId, Valid: msg.ExternalReply.MessageId != 0},
 			replyChat
 	}
-	return sql.NullInt64{}, sql.NullInt64{}
+	return pgtype.Int8{}, pgtype.Int8{}
 }
 
 type mediaInfo struct {
-	id   sql.NullString
-	uid  sql.NullString
-	kind sql.NullString
+	id   pgtype.Text
+	uid  pgtype.Text
+	kind pgtype.Text
 }
 
 func pickMedia(msg *gotgbot.Message) mediaInfo {
@@ -127,61 +122,61 @@ func pickMedia(msg *gotgbot.Message) mediaInfo {
 	if len(msg.Photo) > 0 {
 		last := msg.Photo[len(msg.Photo)-1]
 		return mediaInfo{
-			id:   nullString(last.FileId),
-			uid:  nullString(last.FileUniqueId),
-			kind: nullString("photo"),
+			id:   textValue(last.FileId),
+			uid:  textValue(last.FileUniqueId),
+			kind: textValue("photo"),
 		}
 	}
 	if msg.Video != nil {
-		return mediaInfo{id: nullString(msg.Video.FileId), uid: nullString(msg.Video.FileUniqueId), kind: nullString("video")}
+		return mediaInfo{id: textValue(msg.Video.FileId), uid: textValue(msg.Video.FileUniqueId), kind: textValue("video")}
 	}
 	if msg.Animation != nil {
-		return mediaInfo{id: nullString(msg.Animation.FileId), uid: nullString(msg.Animation.FileUniqueId), kind: nullString("animation")}
+		return mediaInfo{id: textValue(msg.Animation.FileId), uid: textValue(msg.Animation.FileUniqueId), kind: textValue("animation")}
 	}
 	if msg.Document != nil {
-		return mediaInfo{id: nullString(msg.Document.FileId), uid: nullString(msg.Document.FileUniqueId), kind: nullString("document")}
+		return mediaInfo{id: textValue(msg.Document.FileId), uid: textValue(msg.Document.FileUniqueId), kind: textValue("document")}
 	}
 	if msg.Audio != nil {
-		return mediaInfo{id: nullString(msg.Audio.FileId), uid: nullString(msg.Audio.FileUniqueId), kind: nullString("audio")}
+		return mediaInfo{id: textValue(msg.Audio.FileId), uid: textValue(msg.Audio.FileUniqueId), kind: textValue("audio")}
 	}
 	if msg.Voice != nil {
-		return mediaInfo{id: nullString(msg.Voice.FileId), uid: nullString(msg.Voice.FileUniqueId), kind: nullString("voice")}
+		return mediaInfo{id: textValue(msg.Voice.FileId), uid: textValue(msg.Voice.FileUniqueId), kind: textValue("voice")}
 	}
 	if msg.VideoNote != nil {
-		return mediaInfo{id: nullString(msg.VideoNote.FileId), uid: nullString(msg.VideoNote.FileUniqueId), kind: nullString("video_note")}
+		return mediaInfo{id: textValue(msg.VideoNote.FileId), uid: textValue(msg.VideoNote.FileUniqueId), kind: textValue("video_note")}
 	}
 	if msg.Sticker != nil {
-		return mediaInfo{id: nullString(msg.Sticker.FileId), uid: nullString(msg.Sticker.FileUniqueId), kind: nullString("sticker")}
+		return mediaInfo{id: textValue(msg.Sticker.FileId), uid: textValue(msg.Sticker.FileUniqueId), kind: textValue("sticker")}
 	}
 	if msg.Story != nil {
 		return mediaInfo{
-			id:   nullString("story"),
-			uid:  nullString("story"),
-			kind: nullString("story"),
+			id:   textValue("story"),
+			uid:  textValue("story"),
+			kind: textValue("story"),
 		}
 	}
 	return mediaInfo{}
 }
 
-func (q *Queries) extraPayload(msg *gotgbot.Message) ([]byte, sql.NullString) {
+func (q *Queries) extraPayload(msg *gotgbot.Message) ([]byte, pgtype.Text) {
 	if msg == nil {
-		return nil, sql.NullString{}
+		return nil, pgtype.Text{}
 	}
 	switch {
 	case msg.Contact != nil:
-		return q.marshalWithWarn(msg.Contact, "contact"), nullString("contact")
+		return q.marshalWithWarn(msg.Contact, "contact"), textValue("contact")
 	case msg.Dice != nil:
-		return q.marshalWithWarn(msg.Dice, "dice"), nullString("dice")
+		return q.marshalWithWarn(msg.Dice, "dice"), textValue("dice")
 	case msg.Poll != nil:
-		return q.marshalWithWarn(msg.Poll, "poll"), nullString("poll")
+		return q.marshalWithWarn(msg.Poll, "poll"), textValue("poll")
 	case msg.Venue != nil:
-		return q.marshalWithWarn(msg.Venue, "venue"), nullString("venue")
+		return q.marshalWithWarn(msg.Venue, "venue"), textValue("venue")
 	case msg.Location != nil:
-		return q.marshalWithWarn(msg.Location, "location"), nullString("location")
+		return q.marshalWithWarn(msg.Location, "location"), textValue("location")
 	case msg.Game != nil:
-		return q.marshalWithWarn(msg.Game, "game"), nullString("game")
+		return q.marshalWithWarn(msg.Game, "game"), textValue("game")
 	}
-	return nil, sql.NullString{}
+	return nil, pgtype.Text{}
 }
 
 func (q *Queries) entitiesPayload(msg *gotgbot.Message) []byte {
@@ -210,36 +205,36 @@ func (q *Queries) SaveNewMsg(msg *gotgbot.Message) error {
 	extra, extraType := q.extraPayload(msg)
 	entities := q.entitiesPayload(msg)
 
-	fromUser := sql.NullInt64{}
+	fromUser := pgtype.Int8{}
 	if msg.From != nil {
-		fromUser = sql.NullInt64{Int64: msg.From.Id, Valid: true}
+		fromUser = pgtype.Int8{Int64: msg.From.Id, Valid: true}
 	}
-	senderChat := sql.NullInt64{}
+	senderChat := pgtype.Int8{}
 	if msg.SenderChat != nil {
-		senderChat = sql.NullInt64{Int64: msg.SenderChat.Id, Valid: true}
+		senderChat = pgtype.Int8{Int64: msg.SenderChat.Id, Valid: true}
 	}
 
 	c, cancel := context.WithTimeout(context.Background(), defaultDBTimeout)
 	defer cancel()
-	viaBot := sql.NullInt64{Valid: msg.ViaBot != nil}
+	viaBot := pgtype.Int8{Valid: msg.ViaBot != nil}
 	if viaBot.Valid {
 		viaBot.Int64 = msg.ViaBot.Id
 	}
 	err := q.InsertSavedMessage(c, InsertSavedMessageParams{
 		MessageID:         msg.MessageId,
 		ChatID:            msg.Chat.Id,
-		FromUserID:        toInt8(fromUser),
-		SenderChatID:      toInt8(senderChat),
-		Date:              UnixTime{time.Unix(msg.Date, 0)},
+		FromUserID:        fromUser,
+		SenderChatID:      senderChat,
+		Date:              pgtype.Timestamptz{Time: time.Unix(msg.Date, 0), Valid: true},
 		ForwardOriginName: forwardName,
-		ForwardOriginID:   toInt8(forwardID),
-		MessageThreadID:   toInt8(sql.NullInt64{Int64: msg.MessageThreadId, Valid: msg.MessageThreadId != 0}),
-		ReplyToMessageID:  toInt8(replyMsgID),
-		ReplyToChatID:     toInt8(replyChatID),
-		ViaBotID:          toInt8(viaBot),
-		EditDate:          sql.Null[UnixTime]{Valid: false},
-		MediaGroupID:      nullString(msg.MediaGroupId),
-		Text:              nullString(msg.GetText()),
+		ForwardOriginID:   forwardID,
+		MessageThreadID:   pgtype.Int8{Int64: msg.MessageThreadId, Valid: msg.MessageThreadId != 0},
+		ReplyToMessageID:  replyMsgID,
+		ReplyToChatID:     replyChatID,
+		ViaBotID:          viaBot,
+		EditDate:          pgtype.Timestamptz{},
+		MediaGroupID:      textValue(msg.MediaGroupId),
+		Text:              textValue(msg.GetText()),
 		EntitiesJson:      entities,
 		MediaID:           media.id,
 		MediaUid:          media.uid,
@@ -263,9 +258,9 @@ func (q *Queries) SaveEditedMsg(msg *gotgbot.Message) error {
 	defer cancel()
 
 	err := q.UpdateMessageText(c, UpdateMessageTextParams{
-		Text:         nullString(msg.GetText()),
+		Text:         textValue(msg.GetText()),
 		EntitiesJson: entities,
-		EditDate:     sql.Null[UnixTime]{V: UnixTime{time.Unix(msg.EditDate, 0)}, Valid: true},
+		EditDate:     pgtype.Timestamptz{Time: time.Unix(msg.EditDate, 0), Valid: true},
 		ChatID:       msg.Chat.Id,
 		MessageID:    msg.MessageId,
 	})

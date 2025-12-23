@@ -5,8 +5,6 @@
 package q
 
 import (
-	"database/sql"
-
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -45,19 +43,19 @@ type ChatStatDaily struct {
 }
 
 type GeminiContent struct {
-	SessionID        int64          `json:"session_id"`
-	ChatID           int64          `json:"chat_id"`
-	MsgID            int64          `json:"msg_id"`
-	Role             string         `json:"role"`
-	SentTime         UnixTime       `json:"sent_time"`
-	Username         string         `json:"username"`
-	MsgType          string         `json:"msg_type"`
-	ReplyToMsgID     pgtype.Int8    `json:"reply_to_msg_id"`
-	Text             sql.NullString `json:"text"`
-	Blob             []byte         `json:"blob"`
-	MimeType         sql.NullString `json:"mime_type"`
-	QuotePart        sql.NullString `json:"quote_part"`
-	ThoughtSignature sql.NullString `json:"thought_signature"`
+	SessionID        int64              `json:"session_id"`
+	ChatID           int64              `json:"chat_id"`
+	MsgID            int64              `json:"msg_id"`
+	Role             string             `json:"role"`
+	SentTime         pgtype.Timestamptz `json:"sent_time"`
+	Username         string             `json:"username"`
+	MsgType          string             `json:"msg_type"`
+	ReplyToMsgID     pgtype.Int8        `json:"reply_to_msg_id"`
+	Text             pgtype.Text        `json:"text"`
+	Blob             []byte             `json:"blob"`
+	MimeType         pgtype.Text        `json:"mime_type"`
+	QuotePart        pgtype.Text        `json:"quote_part"`
+	ThoughtSignature pgtype.Text        `json:"thought_signature"`
 }
 
 type GeminiSession struct {
@@ -94,14 +92,14 @@ type SavedPicsRating struct {
 }
 
 type User struct {
-	ID              int64          `json:"id"`
-	UpdatedAt       UnixTime       `json:"updated_at"`
-	UserID          int64          `json:"user_id"`
-	FirstName       string         `json:"first_name"`
-	LastName        sql.NullString `json:"last_name"`
-	ProfileUpdateAt UnixTime       `json:"profile_update_at"`
-	ProfilePhoto    sql.NullString `json:"profile_photo"`
-	Timezone        int32          `json:"timezone"`
+	ID              int64              `json:"id"`
+	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
+	UserID          int64              `json:"user_id"`
+	FirstName       string             `json:"first_name"`
+	LastName        pgtype.Text        `json:"last_name"`
+	ProfileUpdateAt pgtype.Timestamptz `json:"profile_update_at"`
+	ProfilePhoto    pgtype.Text        `json:"profile_photo"`
+	Timezone        int32              `json:"timezone"`
 }
 
 type YtDlResult struct {

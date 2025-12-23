@@ -7,16 +7,6 @@ plugins:
 overrides:
   go:
     overrides:
-      - db_type: "timestamptz"
-        engine: "postgresql"
-        go_type:
-          type: "UnixTime"
-      - db_type: "timestamptz"
-        engine: "postgresql"
-        nullable: true
-        go_type:
-          type: "Null[UnixTime]"
-          import: "database/sql"
 sql:
   - engine: "postgresql"
     queries:
@@ -53,30 +43,6 @@ sql:
           rename:
             chat_cfg: chatCfg
           overrides:
-            - db_type: "timestamptz"
-              engine: "postgresql"
-              zap_field_method: true
-              go_type:
-                type: "UnixTime"
-            - db_type: "timestamptz"
-              engine: "postgresql"
-              nullable: true
-              zap_field_method: true
-              go_type:
-                type: "Null[UnixTime]"
-                import: "database/sql"
-            - db_type: "text"
-              engine: "postgresql"
-              nullable: true
-              go_type:
-                type: "NullString"
-                import: "database/sql"
-            - db_type: "bigint"
-              engine: "postgresql"
-              nullable: true
-              go_type:
-                type: "sql.NullInt64"
-                import: "database/sql"
             - column: "chat_stat_daily.user_msg_stat"
               go_type:
                 type: UserMsgStatMap
@@ -108,37 +74,4 @@ sql:
           emit_prepared_queries: true
           rename:
             chat_cfg: chatCfg
-          overrides:
-            - db_type: "timestamptz"
-              engine: "postgresql"
-              zap_field_method: true
-              go_type:
-                type: "UnixTime"
-            - db_type: "timestamptz"
-              engine: "postgresql"
-              nullable: true
-              zap_field_method: true
-              go_type:
-                type: "Null[UnixTime]"
-                import: "database/sql"
-            - db_type: "text"
-              engine: "postgresql"
-              nullable: true
-              go_type:
-                type: "NullString"
-                import: "database/sql"
-            - db_type: "bigint"
-              engine: "postgresql"
-              nullable: true
-              go_type:
-                type: "sql.NullInt64"
-                import: "database/sql"
-            - db_type: "jsonb"
-              engine: "postgresql"
-              go_type:
-                type: "[]byte"
-            - db_type: "jsonb"
-              engine: "postgresql"
-              nullable: true
-              go_type:
-                type: "[]byte"
+          overrides: []

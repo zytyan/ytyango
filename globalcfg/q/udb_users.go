@@ -2,13 +2,13 @@ package q
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"main/helpers/lrusf"
 	"time"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 var userCache *lrusf.Cache[int64, *User]
@@ -42,11 +42,11 @@ func (q *Queries) CreateNewUserByTg(ctx context.Context, tgUser *gotgbot.User, b
 	}
 	v, err := userCache.Get(tgUser.Id, func() (*User, error) {
 		_, err := q.createNewUser(ctx, createNewUserParams{
-			UpdatedAt:    UnixTime{time.Now()},
+			UpdatedAt:    pgtype.Timestamptz{Time: time.Now(), Valid: true},
 			UserID:       tgUser.Id,
 			FirstName:    tgUser.FirstName,
-			LastName:     sql.NullString{String: tgUser.LastName, Valid: tgUser.LastName != ""},
-			ProfilePhoto: sql.NullString{},
+			LastName:     pgtype.Text{String: tgUser.LastName, Valid: tgUser.LastName != ""},
+			ProfilePhoto: pgtype.Text{},
 			Timezone:     8 * 60 * 60,
 		})
 		if err != nil {
@@ -69,7 +69,7 @@ func (q *Queries) CreateNewUserByTg(ctx context.Context, tgUser *gotgbot.User, b
 			return &user, nil
 		}
 		photo := lastPhoto[len(lastPhoto)-1]
-		_ = q.updateUserProfilePhoto(ctx, tgUser.Id, UnixTime{time.Now()}, sql.NullString{String: photo.FileId, Valid: true})
+		_ = q.updateUserProfilePhoto(ctx, tgUser.Id, pgtype.Timestamptz{Time: time.Now(), Valid: true}, pgtype.Text{String: photo.FileId, Valid: true})
 		return &user, nil
 	})
 	return v, err
@@ -87,7 +87,7 @@ func (u *User) TryUpdate(q *Queries, tgUser *gotgbot.User) error {
 		needCommit = true
 	}
 	if needCommit {
-		_, err := q.updateUserBase(context.Background(), u.UserID, UnixTime{time.Now()}, u.FirstName, u.LastName)
+		_, err := q.updateUserBase(context.Background(), u.UserID, pgtype.Timestamptz{Time: time.Now(), Valid: true}, u.FirstName, u.LastName)
 		return err
 	}
 	return nil
@@ -104,7 +104,7 @@ func (u *User) Name() string {
 }
 
 func (q *Queries) UpdateUserProfilePhoto(ctx context.Context, userID int64, profilePhoto string) error {
-	return q.updateUserProfilePhoto(ctx, userID, UnixTime{time.Now()}, sql.NullString{String: profilePhoto, Valid: profilePhoto != ""})
+	return q.updateUserProfilePhoto(ctx, userID, pgtype.Timestamptz{Time: time.Now(), Valid: true}, pgtype.Text{String: profilePhoto, Valid: profilePhoto != ""})
 }
 
 func (q *Queries) UpdateUserTimeZone(ctx context.Context, user *User, zone int32) error {
