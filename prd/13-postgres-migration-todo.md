@@ -4,5 +4,6 @@
 - [x] 应用初始化改造：`globalcfg` 使用 `pgxpool`，移除 sqlite3 注册；慢查询/健康检查适配 pgx。
 - [x] 业务差异修复：替换 sqlite3 约束错误处理为 `pgconn.PgError`，确保 `saved_pics` 插入/重试与前缀和缓存等逻辑一致。
 - [ ] 测试方案：提供 PG 测试库初始化（Docker/CI），重写 `initForTests`，确保 `go test ./...` 可运行。
-- [ ] 数据迁移工具：实现 SQLite → PG 流式迁移（主库+可选 `saved_msgs`），支持批量、冲突策略与行数校验报告。
+- [x] 数据迁移工具：实现 SQLite → PG 流式迁移（主库+可选 `saved_msgs`），支持批量、冲突策略与行数校验报告。
+  - 脚本 `scripts/migrate_sqlite_to_pg.py` 采用 env `PGURL`，跳过缺失表并在重复 DDL 时忽略冲突，已用 `ytyan_new_backup.db` + 本地 `:5433` 验证（源 DB 未含 `saved_msgs` 表）。
 - [ ] 文档与上线预案：迁移步骤、校验/回滚指引，配置变更清单。
