@@ -16,31 +16,39 @@ func initByConfig() {
 	var err error
 	config = initConfig()
 	gWriteSyncer = initWriteSyncer()
-	db = initDatabase(config.DatabasePath)
-	logger := GetLogger("database", zap.WarnLevel)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
+	if config.DatabaseURL == "" {
+		panic("database-url is required")
+	}
+	db = initPool(ctx, config.DatabaseURL)
+	if err := db.Ping(ctx); err != nil {
+		panic(err)
+	}
+	logger := GetLogger("database", zap.WarnLevel)
 	Q, err = q.PrepareWithLogger(ctx, db, logger.Desugar())
 	if err != nil {
 		panic(err)
 	}
-	// 设定50ms为慢查询的基线，这对嵌入式的SQLite算是慢的了，说明可能有性能抖动或查询本身有问题。
-	Q.SlowQueryThreshold = time.Millisecond * 50
-	err = Q.BuildCountByRatePrefixSum()
+	err = Q.BuildCountByRatePrefixSum(logger.Desugar())
 	if err != nil {
 		panic(err)
 	}
 	logger.Infof("Database main initialized")
 
-	msgDb = initDatabase(config.MsgDbPath)
+	if config.MsgDatabaseURL == "" {
+		msgDb = db
+	} else {
+		msgDb = initPool(ctx, config.MsgDatabaseURL)
+		if err := msgDb.Ping(ctx); err != nil {
+			panic(err)
+		}
+	}
 	logger = GetLogger("msgs_database", zap.WarnLevel)
-	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
 	Msgs, err = msgs.PrepareWithLogger(ctx, msgDb, logger.Desugar())
 	if err != nil {
 		panic(err)
 	}
-	Msgs.SlowQueryThreshold = time.Millisecond * 50
 	logger.Infof("Database msgs initialized")
 	initMeili()
 }

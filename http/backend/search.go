@@ -2,7 +2,6 @@ package backend
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"main/helpers/meilisearch"
 	"strconv"
@@ -10,6 +9,8 @@ import (
 	g "main/globalcfg"
 	"main/handlers"
 	api "main/http/backend/ogen"
+
+	"github.com/jackc/pgx/v5"
 )
 
 type searchQuery struct {
@@ -47,7 +48,7 @@ func (h *Handler) SearchMessages(ctx context.Context, req *api.SearchRequest) (a
 		Limit: limit,
 	})
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return &api.SearchMessagesBadRequest{Message: "group not found"}, nil
 		}
 		return &api.SearchMessagesInternalServerError{Message: err.Error()}, nil

@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"html"
@@ -21,6 +20,7 @@ import (
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
+	"github.com/jackc/pgx/v5"
 	"go.uber.org/zap"
 	"golang.org/x/sync/singleflight"
 )
@@ -50,7 +50,7 @@ var errNoURL = errors.New("no downloadable url found")
 
 type dlKey struct {
 	Url        string
-	Resolution int64
+	Resolution int32
 	AudioOnly  bool
 }
 
@@ -87,7 +87,7 @@ func (d *dlKey) downloadToFile() (*DlResult, error) {
 		req := ytdlp.Req{
 			Url:             d.Url,
 			AudioOnly:       d.AudioOnly,
-			Resolution:      d.Resolution,
+			Resolution:      int64(d.Resolution),
 			EmbedMetadata:   true,
 			PriorityFormats: []string{"h264", "h265", "av01"},
 		}
@@ -115,7 +115,7 @@ func (d *dlKey) downloadToFile() (*DlResult, error) {
 
 func (d *dlKey) findInDb() *DlResult {
 	result, err := g.Q.GetYtDlpDbCache(context.Background(), d.Url, d.AudioOnly, d.Resolution)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		log.Warnf("query database %s err %v", d.Url, err)
 	}
 	if err != nil {
@@ -183,7 +183,7 @@ func buildYtDlKey(text string, audioOnly bool) (*dlKey, error) {
 		return nil, fmt.Errorf("没有在聊天 %s 中找到任何可下载的链接", text)
 	}
 	resolutionPattern := strings.TrimRight(reResolution.FindString(text), "pP")
-	resolution := int64(parseIntDefault(resolutionPattern, 720))
+	resolution := int32(parseIntDefault(resolutionPattern, 720))
 	url = "https://" + url
 	if strings.Contains(url, "b23.tv") {
 		r, err := bili.ConvertBilibiliLinks(url)

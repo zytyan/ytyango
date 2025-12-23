@@ -1,14 +1,14 @@
 package g
 
 import (
-	"database/sql"
+	"context"
 	"main/globalcfg/msgs"
 	"main/globalcfg/q"
 	"main/helpers/azure"
 	"os"
 	"sync"
 
-	_ "github.com/mattn/go-sqlite3"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"gopkg.in/natefinch/lumberjack.v2"
@@ -40,9 +40,9 @@ type Config struct {
 	LogLevel           int8        `yaml:"log-level"`
 	LocalKvDbPath      string      `yaml:"local-kv-db-path"`
 	TmpPath            string      `yaml:"tmp-path"`
-	DatabasePath       string      `yaml:"database-path"`
+	DatabaseURL        string      `yaml:"database-url"`
+	MsgDatabaseURL     string      `yaml:"msg-database-url"`
 	GeminiKey          string      `yaml:"gemini-key"`
-	MsgDbPath          string      `yaml:"msg-db-path"`
 }
 
 var Ocr *azure.Ocr
@@ -55,6 +55,8 @@ func initConfig() *Config {
 	var cfg Config
 	configFile, exists := os.LookupEnv("GOYTYAN_CONFIG")
 	if !exists {
+		cfg.DatabaseURL = os.Getenv("DATABASE_URL")
+		cfg.MsgDatabaseURL = os.Getenv("MSG_DATABASE_URL")
 		return &cfg
 	}
 	data, err := os.ReadFile(configFile)
@@ -64,6 +66,12 @@ func initConfig() *Config {
 	err = yaml.Unmarshal(data, &cfg)
 	if err != nil {
 		panic(err)
+	}
+	if cfg.DatabaseURL == "" {
+		cfg.DatabaseURL = os.Getenv("DATABASE_URL")
+	}
+	if cfg.MsgDatabaseURL == "" {
+		cfg.MsgDatabaseURL = os.Getenv("MSG_DATABASE_URL")
 	}
 	Ocr = &azure.Ocr{
 		Client:   *azure.NewClient(cfg.Ocr.Endpoint, cfg.Ocr.ApiKey, azure.OcrPath),
@@ -138,36 +146,28 @@ func GetAllLoggers() map[string]LoggerWithLevel {
 	return loggers
 }
 
-var db *sql.DB
-var msgDb *sql.DB
+var db *pgxpool.Pool
+var msgDb *pgxpool.Pool
 
 var Q *q.Queries
 var Msgs *msgs.Queries
 
-func initDatabase(dbPath string) *sql.DB {
-	check := func(_ sql.Result, e error) {
-		if e != nil {
-			panic(e)
-		}
-	}
-	d, err := sql.Open("sqlite3", dbPath)
+func initPool(ctx context.Context, url string) *pgxpool.Pool {
+	cfg, err := pgxpool.ParseConfig(url)
 	if err != nil {
 		panic(err)
 	}
-	check(d.Exec(`PRAGMA journal_mode=WAL;
-						PRAGMA wal_autocheckpoint=1000;
-						PRAGMA synchronous=NORMAL;
-						PRAGMA mmap_size=67108864; -- 64MB
-						PRAGMA cache_size = -32768; -- 32MB page cache
-						PRAGMA busy_timeout=5000;
-						PRAGMA optimize;`))
-	return d
+	pool, err := pgxpool.NewWithConfig(ctx, cfg)
+	if err != nil {
+		panic(err)
+	}
+	return pool
 }
 
-func RawMainDb() *sql.DB {
+func RawMainDb() *pgxpool.Pool {
 	return db
 }
 
-func RawMsgsDb() *sql.DB {
+func RawMsgsDb() *pgxpool.Pool {
 	return msgDb
 }

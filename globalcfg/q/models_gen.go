@@ -6,6 +6,8 @@ package q
 
 import (
 	"database/sql"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type BiliInlineResult struct {
@@ -23,7 +25,7 @@ type CharacterAttr struct {
 
 type ChatStatDaily struct {
 	ChatID             int64          `json:"chat_id"`
-	StatDate           int64          `json:"stat_date"`
+	StatDate           int32          `json:"stat_date"`
 	MessageCount       int64          `json:"message_count"`
 	PhotoCount         int64          `json:"photo_count"`
 	VideoCount         int64          `json:"video_count"`
@@ -50,7 +52,7 @@ type GeminiContent struct {
 	SentTime         UnixTime       `json:"sent_time"`
 	Username         string         `json:"username"`
 	MsgType          string         `json:"msg_type"`
-	ReplyToMsgID     sql.NullInt64  `json:"reply_to_msg_id"`
+	ReplyToMsgID     pgtype.Int8    `json:"reply_to_msg_id"`
 	Text             sql.NullString `json:"text"`
 	Blob             []byte         `json:"blob"`
 	MimeType         sql.NullString `json:"mime_type"`
@@ -66,8 +68,8 @@ type GeminiSession struct {
 }
 
 type PicRateCounter struct {
-	Rate  int64 `json:"rate"`
-	Count int64 `json:"count"`
+	Rate  int32 `json:"rate"`
+	Count int32 `json:"count"`
 }
 
 type PrprCach struct {
@@ -76,19 +78,19 @@ type PrprCach struct {
 }
 
 type SavedPic struct {
-	FileUid       string `json:"file_uid"`
-	FileID        string `json:"file_id"`
-	BotRate       int64  `json:"bot_rate"`
-	RandKey       int64  `json:"rand_key"`
-	UserRate      int64  `json:"user_rate"`
-	UserRatingSum int64  `json:"user_rating_sum"`
-	RateUserCount int64  `json:"rate_user_count"`
+	FileUid       string      `json:"file_uid"`
+	FileID        string      `json:"file_id"`
+	BotRate       int32       `json:"bot_rate"`
+	RandKey       int64       `json:"rand_key"`
+	UserRate      pgtype.Int4 `json:"user_rate"`
+	UserRatingSum int64       `json:"user_rating_sum"`
+	RateUserCount int64       `json:"rate_user_count"`
 }
 
 type SavedPicsRating struct {
 	FileUid string `json:"file_uid"`
 	UserID  int64  `json:"user_id"`
-	Rating  int64  `json:"rating"`
+	Rating  int32  `json:"rating"`
 }
 
 type User struct {
@@ -99,30 +101,30 @@ type User struct {
 	LastName        sql.NullString `json:"last_name"`
 	ProfileUpdateAt UnixTime       `json:"profile_update_at"`
 	ProfilePhoto    sql.NullString `json:"profile_photo"`
-	Timezone        int64          `json:"timezone"`
+	Timezone        int32          `json:"timezone"`
 }
 
 type YtDlResult struct {
 	Url         string `json:"url"`
 	AudioOnly   bool   `json:"audio_only"`
-	Resolution  int64  `json:"resolution"`
+	Resolution  int32  `json:"resolution"`
 	FileID      string `json:"file_id"`
 	Title       string `json:"title"`
 	Description string `json:"description"`
 	Uploader    string `json:"uploader"`
-	UploadCount int64  `json:"upload_count"`
+	UploadCount int32  `json:"upload_count"`
 }
 
 type chatCfg struct {
-	ID             int64         `json:"id"`
-	WebID          sql.NullInt64 `json:"web_id"`
-	AutoCvtBili    bool          `json:"auto_cvt_bili"`
-	AutoOcr        bool          `json:"auto_ocr"`
-	AutoCalculate  bool          `json:"auto_calculate"`
-	AutoExchange   bool          `json:"auto_exchange"`
-	AutoCheckAdult bool          `json:"auto_check_adult"`
-	SaveMessages   bool          `json:"save_messages"`
-	EnableCoc      bool          `json:"enable_coc"`
-	RespNsfwMsg    bool          `json:"resp_nsfw_msg"`
-	Timezone       int64         `json:"timezone"`
+	ID             int64       `json:"id"`
+	WebID          pgtype.Int8 `json:"web_id"`
+	AutoCvtBili    bool        `json:"auto_cvt_bili"`
+	AutoOcr        bool        `json:"auto_ocr"`
+	AutoCalculate  bool        `json:"auto_calculate"`
+	AutoExchange   bool        `json:"auto_exchange"`
+	AutoCheckAdult bool        `json:"auto_check_adult"`
+	SaveMessages   bool        `json:"save_messages"`
+	EnableCoc      bool        `json:"enable_coc"`
+	RespNsfwMsg    bool        `json:"resp_nsfw_msg"`
+	Timezone       int32       `json:"timezone"`
 }

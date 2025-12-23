@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
+	"github.com/jackc/pgx/v5"
 )
 
 var userCache *lrusf.Cache[int64, *User]
@@ -27,7 +28,7 @@ func (q *Queries) GetOrCreateUserByTg(ctx context.Context, tgUser *gotgbot.User)
 		return nil, errors.New("tgUser is nil")
 	}
 	user, err := q.GetUserById(ctx, tgUser.Id)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return nil, err
 	}
 	if user != nil {
@@ -106,7 +107,7 @@ func (q *Queries) UpdateUserProfilePhoto(ctx context.Context, userID int64, prof
 	return q.updateUserProfilePhoto(ctx, userID, UnixTime{time.Now()}, sql.NullString{String: profilePhoto, Valid: profilePhoto != ""})
 }
 
-func (q *Queries) UpdateUserTimeZone(ctx context.Context, user *User, zone int64) error {
+func (q *Queries) UpdateUserTimeZone(ctx context.Context, user *User, zone int32) error {
 	if user == nil {
 		return errors.New("user is nil")
 	}

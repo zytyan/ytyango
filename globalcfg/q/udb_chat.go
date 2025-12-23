@@ -2,25 +2,26 @@ package q
 
 import (
 	"context"
-	"database/sql"
 	"main/helpers/lrusf"
 	"strconv"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type ChatCfg struct {
-	ID             int64         `json:"id"`
-	WebID          sql.NullInt64 `json:"web_id"`
-	AutoCvtBili    bool          `json:"auto_cvt_bili"  btnTxt:"自动转换Bilibili视频链接" pos:"1,1"`
-	AutoOcr        bool          `json:"auto_ocr"`
-	AutoCalculate  bool          `json:"auto_calculate" btnTxt:"自动计算算式" pos:"2,1"`
-	AutoExchange   bool          `json:"auto_exchange"  btnTxt:"自动换算汇率" pos:"2,2"`
-	AutoCheckAdult bool          `json:"auto_check_adult"`
-	SaveMessages   bool          `json:"save_messages"  btnTxt:"保存群组消息" pos:"3,1"`
-	EnableCoc      bool          `json:"enable_coc"     btnTxt:"启用CoC辅助" pos:"3,2"`
-	RespNsfwMsg    bool          `json:"resp_nsfw_msg"  btnTxt:"响应来张色图" pos:"4,1"`
-	Timezone       int64         `json:"timezone"`
-	InDatabase     bool          `json:"in_database"`
+	ID             int64       `json:"id"`
+	WebID          pgtype.Int8 `json:"web_id"`
+	AutoCvtBili    bool        `json:"auto_cvt_bili"  btnTxt:"自动转换Bilibili视频链接" pos:"1,1"`
+	AutoOcr        bool        `json:"auto_ocr"`
+	AutoCalculate  bool        `json:"auto_calculate" btnTxt:"自动计算算式" pos:"2,1"`
+	AutoExchange   bool        `json:"auto_exchange"  btnTxt:"自动换算汇率" pos:"2,2"`
+	AutoCheckAdult bool        `json:"auto_check_adult"`
+	SaveMessages   bool        `json:"save_messages"  btnTxt:"保存群组消息" pos:"3,1"`
+	EnableCoc      bool        `json:"enable_coc"     btnTxt:"启用CoC辅助" pos:"3,2"`
+	RespNsfwMsg    bool        `json:"resp_nsfw_msg"  btnTxt:"响应来张色图" pos:"4,1"`
+	Timezone       int32       `json:"timezone"`
+	InDatabase     bool        `json:"in_database"`
 }
 
 func fromInnerCfg(cfg *chatCfg) *ChatCfg {
@@ -42,11 +43,8 @@ func fromInnerCfg(cfg *chatCfg) *ChatCfg {
 
 func defaultChagCfg(id int64) *ChatCfg {
 	return &ChatCfg{
-		ID: id,
-		WebID: sql.NullInt64{
-			Int64: 0,
-			Valid: false,
-		},
+		ID:             id,
+		WebID:          pgtype.Int8{},
 		AutoCvtBili:    false,
 		AutoOcr:        false,
 		AutoCalculate:  false,
@@ -104,10 +102,7 @@ func (q *Queries) GetChatCfgById(ctx context.Context, id int64) (*ChatCfg, error
 }
 
 func (q *Queries) GetChatByWebId(ctx context.Context, webId int64) (*ChatCfg, error) {
-	webIdQ := sql.NullInt64{
-		Int64: webId,
-		Valid: true,
-	}
+	webIdQ := pgtype.Int8{Int64: webId, Valid: true}
 	chatId, _ := q.getChatIdByWebId(ctx, webIdQ)
 	// 这里不能直接用数据库把查找合并为一个，因为对每个群组都需要单例
 	return q.GetChatCfgById(ctx, chatId)

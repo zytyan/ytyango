@@ -5,7 +5,7 @@ import (
 	"slices"
 )
 
-func (q *Queries) GetAllMsgInSession(ctx context.Context, sessionID int64, limit int64) ([]GeminiContent, error) {
+func (q *Queries) GetAllMsgInSession(ctx context.Context, sessionID int64, limit int32) ([]GeminiContent, error) {
 	contents, err := q.getAllMsgInSessionReversed(ctx, sessionID, limit)
 	slices.Reverse(contents)
 	return contents, err

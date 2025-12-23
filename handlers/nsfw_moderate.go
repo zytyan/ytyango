@@ -186,8 +186,8 @@ func CmdScore(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
 	go saveNsfw(photo.FileUniqueId, photo.FileId, severity)
 	savedPic, err := g.Q.GetNsfwPicByFileUid(context.Background(), photo.FileUniqueId)
 	userRate := severity
-	if err == nil {
-		userRate = int(savedPic.UserRate)
+	if err == nil && savedPic.UserRate.Valid {
+		userRate = int(savedPic.UserRate.Int32)
 	}
 	replyMarkup := BuildNsfwRateButton(photo.FileUniqueId, nsfwCallbackButtonCmdScore)
 	text := fmt.Sprintf("bot评分: %d/6\n用户评分: %d/6", severity, userRate)
@@ -233,7 +233,10 @@ func refreshMsgFromBtn(bot *gotgbot.Bot, ctx *ext.Context, fileUid, cmd string) 
 			log.Warnf("GetPicRateDetailsByFileUid failed, err: %s", err)
 			return
 		}
-		userRate := float64(pic.UserRate)
+		userRate := 0.0
+		if pic.UserRate.Valid {
+			userRate = float64(pic.UserRate.Int32)
+		}
 		if pic.RateUserCount != 0 {
 			userRate = float64(pic.UserRatingSum) / float64(pic.RateUserCount)
 		}

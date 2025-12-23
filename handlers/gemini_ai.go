@@ -16,6 +16,7 @@ import (
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
+	"github.com/jackc/pgx/v5"
 	"go.uber.org/zap"
 	"google.golang.org/genai"
 )
@@ -77,7 +78,7 @@ type:%s
 		Text: label,
 	}
 	if content.ThoughtSignature.Valid {
-		textPart.ThoughtSignature = content.ThoughtSignature.String
+		textPart.ThoughtSignature = []byte(content.ThoughtSignature.String)
 	}
 	out.Parts = append(out.Parts, textPart)
 	if content.Text.Valid {
@@ -183,13 +184,13 @@ func (s *GeminiSession) loadContentFromDatabase(ctx context.Context) error {
 }
 
 func (s *GeminiSession) PersistTmpUpdates(ctx context.Context) error {
-	tx, err := g.RawMainDb().BeginTx(ctx, nil)
+	tx, err := g.RawMainDb().BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return err
 	}
 	defer func() {
 		if err != nil {
-			_ = tx.Rollback()
+			_ = tx.Rollback(ctx)
 		}
 	}()
 	newQ := g.Q.WithTx(tx)
@@ -202,7 +203,7 @@ func (s *GeminiSession) PersistTmpUpdates(ctx context.Context) error {
 	s.Contents = append(s.Contents, s.TmpContents...)
 	s.TmpContents = nil
 	s.UpdateTime = time.Now()
-	return tx.Commit()
+	return tx.Commit(ctx)
 }
 
 func IsGeminiReq(msg *gotgbot.Message) bool {
@@ -232,7 +233,7 @@ func GeminiGetSession(ctx context.Context, msg *gotgbot.Message) *GeminiSession 
 		}
 		session.GeminiSession, err = g.Q.GetSessionById(ctx, sessionId)
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
+			if errors.Is(err, pgx.ErrNoRows) {
 				goto create
 			}
 			return nil
@@ -260,7 +261,7 @@ create:
 		return nil
 	}
 	err = session.loadContentFromDatabase(ctx)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return nil
 	}
 	geminiSessions.sidToSess[session.ID] = session
@@ -389,12 +390,12 @@ func SetUserTimeZone(bot *gotgbot.Bot, ctx *ext.Context) error {
 	if err != nil {
 		return err
 	}
-	err = g.Q.UpdateUserTimeZone(context.Background(), user, int64(zone))
+	err = g.Q.UpdateUserTimeZone(context.Background(), user, int32(zone))
 	if err != nil {
 		_, err = ctx.EffectiveMessage.Reply(bot, err.Error(), nil)
 		return err
 	}
-	user.Timezone = int64(zone)
+	user.Timezone = int32(zone)
 	_, err = ctx.EffectiveMessage.Reply(bot, fmt.Sprintf("设置成功 %d seconds", zone), nil)
 	return err
 }

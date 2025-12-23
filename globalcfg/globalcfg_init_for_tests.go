@@ -2,7 +2,6 @@ package g
 
 import (
 	"context"
-	"database/sql"
 	"main/globalcfg/msgs"
 	"main/globalcfg/q"
 	"os"
@@ -11,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
 )
 
@@ -32,7 +32,7 @@ func mustGetProjectRootDir() string {
 	}
 }
 
-func initMainDatabaseInMemory(database *sql.DB) {
+func initMainDatabase(ctx context.Context, pool *pgxpool.Pool) {
 	projRoot := mustGetProjectRootDir()
 	sqlDir := filepath.Join(projRoot, "sql")
 	dir, err := os.ReadDir(sqlDir)
@@ -51,7 +51,7 @@ func initMainDatabaseInMemory(database *sql.DB) {
 		if err != nil {
 			panic(err)
 		}
-		_, err = database.Exec(string(data))
+		_, err = pool.Exec(ctx, string(data))
 		if err != nil {
 			panic(err)
 		}
@@ -67,6 +67,13 @@ func initForTests() {
 		return
 	}
 	var err error
+	dbURL := os.Getenv("PG_TEST_URL")
+	if dbURL == "" {
+		dbURL = os.Getenv("DATABASE_URL")
+	}
+	if dbURL == "" {
+		panic("PG_TEST_URL or DATABASE_URL must be set for tests")
+	}
 	config = &Config{
 		// 此处的Token已经废弃，可放心使用
 		BotToken:           "554277510:AAEKxRdcRfhEjtSIfxpaYtL19XFgdDcY23U",
@@ -81,27 +88,32 @@ func initForTests() {
 		LogLevel:           -1, // 测试过程中打印所有日志
 		LocalKvDbPath:      "",
 		TmpPath:            "",
-		DatabasePath:       ":memory:",
+		DatabaseURL:        dbURL,
 		GeminiKey:          "",
-		MsgDbPath:          ":memory:",
+		MsgDatabaseURL:     "",
 	}
 	gWriteSyncer = initWriteSyncer()
 	logger := GetLogger("database", zap.DebugLevel)
-	db = initDatabase(config.DatabasePath)
-	msgDb = db
-	initMainDatabaseInMemory(db)
-
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	Q, err = q.PrepareWithLogger(ctx, db, logger.Desugar())
+	db = initPool(ctx, config.DatabaseURL)
+	if err := db.Ping(ctx); err != nil {
+		panic(err)
+	}
+	msgDb = db
+	initMainDatabase(ctx, db)
+
+	ctx2, cancel2 := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel2()
+	Q, err = q.PrepareWithLogger(ctx2, db, logger.Desugar())
 	if err != nil {
 		panic(err)
 	}
-	Msgs, err = msgs.PrepareWithLogger(ctx, msgDb, logger.Desugar())
+	Msgs, err = msgs.PrepareWithLogger(ctx2, msgDb, logger.Desugar())
 	if err != nil {
 		panic(err)
 	}
-	logger.Infof("Database initialized in memory for tests")
+	logger.Infof("Database initialized for tests")
 }
 
 func init() {

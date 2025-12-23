@@ -7,38 +7,20 @@ package q
 
 import (
 	"context"
-	"time"
-
-	"go.uber.org/zap"
 )
 
 const getYtDlpDbCache = `-- name: GetYtDlpDbCache :one
 
 SELECT url, audio_only, resolution, file_id, title, description, uploader, upload_count
 FROM yt_dl_results
-WHERE url = ?
-  AND audio_only = ?
-  AND resolution = ?
+WHERE url = $1
+  AND audio_only = $2
+  AND resolution = $3
 `
 
 // encoding: utf-8
-func (q *Queries) GetYtDlpDbCache(ctx context.Context, url string, audioOnly bool, resolution int64) (YtDlResult, error) {
-	var logFields []zap.Field
-	var start time.Time
-	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 8)
-		start = time.Now()
-		if q.LogArgument {
-			logFields = append(logFields,
-				zap.Dict("fields",
-					zap.String("url", url),
-					zap.Bool("audio_only", audioOnly),
-					zap.Int64("resolution", resolution),
-				),
-			)
-		}
-	}
-	row := q.queryRow(ctx, q.getYtDlpDbCacheStmt, getYtDlpDbCache, url, audioOnly, resolution)
+func (q *Queries) GetYtDlpDbCache(ctx context.Context, url string, audioOnly bool, resolution int32) (YtDlResult, error) {
+	row := q.db.QueryRow(ctx, getYtDlpDbCache, url, audioOnly, resolution)
 	var i YtDlResult
 	err := row.Scan(
 		&i.Url,
@@ -50,50 +32,35 @@ func (q *Queries) GetYtDlpDbCache(ctx context.Context, url string, audioOnly boo
 		&i.Uploader,
 		&i.UploadCount,
 	)
-	q.logQuery(getYtDlpDbCache, "GetYtDlpDbCache", logFields, err, start)
 	return i, err
 }
 
 const incYtDlUploadCount = `-- name: IncYtDlUploadCount :exec
 UPDATE yt_dl_results
 SET upload_count=upload_count + 1
-WHERE file_id = ?
+WHERE file_id = $1
 `
 
 func (q *Queries) IncYtDlUploadCount(ctx context.Context, fileID string) error {
-	var logFields []zap.Field
-	var start time.Time
-	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 8)
-		start = time.Now()
-		if q.LogArgument {
-			logFields = append(logFields,
-				zap.Dict("fields",
-					zap.String("file_id", fileID),
-				),
-			)
-		}
-	}
-	_, err := q.exec(ctx, q.incYtDlUploadCountStmt, incYtDlUploadCount, fileID)
-	q.logQuery(incYtDlUploadCount, "IncYtDlUploadCount", logFields, err, start)
+	_, err := q.db.Exec(ctx, incYtDlUploadCount, fileID)
 	return err
 }
 
 const updateYtDlpCache = `-- name: UpdateYtDlpCache :exec
 INSERT INTO yt_dl_results
 (url, audio_only, resolution, file_id, title, description, uploader, upload_count)
-VALUES (?, ?, ?, ?, ?, ?, ?, 1)
-ON CONFLICT DO UPDATE
-    SET file_id=file_id,
-        title=title,
-        description=description,
-        uploader=uploader
+VALUES ($1, $2, $3, $4, $5, $6, $7, 1)
+ON CONFLICT (url, audio_only, resolution) DO UPDATE
+    SET file_id=EXCLUDED.file_id,
+        title=EXCLUDED.title,
+        description=EXCLUDED.description,
+        uploader=EXCLUDED.uploader
 `
 
 type UpdateYtDlpCacheParams struct {
 	Url         string `json:"url"`
 	AudioOnly   bool   `json:"audio_only"`
-	Resolution  int64  `json:"resolution"`
+	Resolution  int32  `json:"resolution"`
 	FileID      string `json:"file_id"`
 	Title       string `json:"title"`
 	Description string `json:"description"`
@@ -101,26 +68,7 @@ type UpdateYtDlpCacheParams struct {
 }
 
 func (q *Queries) UpdateYtDlpCache(ctx context.Context, arg UpdateYtDlpCacheParams) error {
-	var logFields []zap.Field
-	var start time.Time
-	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 8)
-		start = time.Now()
-		if q.LogArgument {
-			logFields = append(logFields,
-				zap.Dict("fields",
-					zap.String("url", arg.Url),
-					zap.Bool("audio_only", arg.AudioOnly),
-					zap.Int64("resolution", arg.Resolution),
-					zap.String("file_id", arg.FileID),
-					zap.String("title", arg.Title),
-					zap.String("description", arg.Description),
-					zap.String("uploader", arg.Uploader),
-				),
-			)
-		}
-	}
-	_, err := q.exec(ctx, q.updateYtDlpCacheStmt, updateYtDlpCache,
+	_, err := q.db.Exec(ctx, updateYtDlpCache,
 		arg.Url,
 		arg.AudioOnly,
 		arg.Resolution,
@@ -129,6 +77,5 @@ func (q *Queries) UpdateYtDlpCache(ctx context.Context, arg UpdateYtDlpCachePara
 		arg.Description,
 		arg.Uploader,
 	)
-	q.logQuery(updateYtDlpCache, "UpdateYtDlpCache", logFields, err, start)
 	return err
 }

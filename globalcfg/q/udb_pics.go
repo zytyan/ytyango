@@ -3,7 +3,6 @@ package q
 import (
 	"cmp"
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"math/rand/v2"
@@ -12,7 +11,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mattn/go-sqlite3"
+	"github.com/jackc/pgerrcode"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgtype"
 	"go.uber.org/zap"
 )
 
@@ -22,7 +24,7 @@ var psMu sync.RWMutex
 var countByRatePrefixSum []int64
 var minCountRate int // prefixSum 的偏移量
 
-func (q *Queries) BuildCountByRatePrefixSum() error {
+func (q *Queries) BuildCountByRatePrefixSum(logger *zap.Logger) error {
 	psMu.Lock()
 	defer psMu.Unlock()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -34,9 +36,9 @@ func (q *Queries) BuildCountByRatePrefixSum() error {
 	buildPrefixSumFromSparse(counts)
 	go func() {
 		for range time.Tick(6 * time.Hour) {
-			err := q.BuildCountByRatePrefixSum()
-			if err != nil {
-				q.logger.Warn("rebuild BuildCountByRatePrefixSum failed", zap.Error(err))
+			err := q.BuildCountByRatePrefixSum(logger)
+			if err != nil && logger != nil {
+				logger.Warn("rebuild BuildCountByRatePrefixSum failed", zap.Error(err))
 			}
 		}
 	}()
@@ -53,7 +55,7 @@ func buildPrefixSumFromSparse(counts []PicRateCounter) []int64 {
 	size := maxRate - minRate + 1
 	histogram := make([]int64, size)
 	for _, c := range counts {
-		histogram[c.Rate-minRate] = c.Count
+		histogram[c.Rate-minRate] = int64(c.Count)
 	}
 	minCountRate = int(minRate)
 	countByRatePrefixSum = buildPrefixSum(histogram)
@@ -90,9 +92,10 @@ func getRandomRangeByWeight(start, end int) (int, error) {
 
 func (q *Queries) GetPicByUserRate(ctx context.Context, rate int) (SavedPic, error) {
 	rnd := int64(rand.Uint64())
-	result, err := q.getNsfwPicByRateAndRandKey(ctx, int64(rate), rnd)
-	if errors.Is(err, sql.ErrNoRows) {
-		return q.getNsfwPicByRateFirst(ctx, int64(rate))
+	targetRate := pgtype.Int4{Int32: int32(rate), Valid: true}
+	result, err := q.getNsfwPicByRateAndRandKey(ctx, targetRate, rnd)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return q.getNsfwPicByRateFirst(ctx, targetRate)
 	}
 	return result, err
 }
@@ -115,15 +118,13 @@ func (q *Queries) AddPic(ctx context.Context, fileUid, fileId string, botRate in
 		_, err := q.createOrUpdateNsfwPic(ctx,
 			fileUid,
 			fileId,
-			int64(botRate),
+			int32(botRate),
 			rnd,
 		)
 
 		// RandKey 冲突 → 重试
-		var sErr *sqlite3.Error
-		if errors.As(err, &sErr) &&
-			errors.Is(sErr.Code, sqlite3.ErrConstraint) &&
-			errors.Is(sErr.ExtendedCode, sqlite3.ErrConstraintUnique) {
+		var sErr *pgconn.PgError
+		if errors.As(err, &sErr) && sErr.Code == pgerrcode.UniqueViolation {
 			continue
 		}
 		if err != nil {
@@ -135,16 +136,17 @@ func (q *Queries) AddPic(ctx context.Context, fileUid, fileId string, botRate in
 }
 
 func (q *Queries) RatePic(ctx context.Context, fileUid string, userID int64, newRate int64) (bool, int64, error) {
+	newRate32 := int32(newRate)
 	rate, err := q.getNsfwPicRateByUserId(ctx, fileUid, userID)
-	if errors.Is(err, sql.ErrNoRows) {
-		err = q.createNsfwPicUserRate(ctx, fileUid, userID, newRate)
+	if errors.Is(err, pgx.ErrNoRows) {
+		err = q.createNsfwPicUserRate(ctx, fileUid, userID, newRate32)
 		return false, 0, err
 	} else if err != nil {
 		return false, 0, err
 	}
-	if rate == newRate {
-		return true, rate, nil
+	if rate == newRate32 {
+		return true, int64(rate), nil
 	}
-	err = q.updateNsfwPicUserRate(ctx, newRate, fileUid, userID)
-	return true, rate, err
+	err = q.updateNsfwPicUserRate(ctx, newRate32, fileUid, userID)
+	return true, int64(rate), err
 }

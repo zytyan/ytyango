@@ -6,6 +6,8 @@ package msgs
 
 import (
 	"database/sql"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type EditHistory struct {
@@ -16,24 +18,24 @@ type EditHistory struct {
 }
 
 type RawUpdate struct {
-	ID        int64         `json:"id"`
-	ChatID    sql.NullInt64 `json:"chat_id"`
-	MessageID sql.NullInt64 `json:"message_id"`
-	RawUpdate []byte        `json:"raw_update"`
+	ID        int64       `json:"id"`
+	ChatID    pgtype.Int8 `json:"chat_id"`
+	MessageID pgtype.Int8 `json:"message_id"`
+	RawUpdate []byte      `json:"raw_update"`
 }
 
 type SavedMsg struct {
 	MessageID         int64              `json:"message_id"`
 	ChatID            int64              `json:"chat_id"`
-	FromUserID        sql.NullInt64      `json:"from_user_id"`
-	SenderChatID      sql.NullInt64      `json:"sender_chat_id"`
+	FromUserID        pgtype.Int8        `json:"from_user_id"`
+	SenderChatID      pgtype.Int8        `json:"sender_chat_id"`
 	Date              UnixTime           `json:"date"`
 	ForwardOriginName sql.NullString     `json:"forward_origin_name"`
-	ForwardOriginID   sql.NullInt64      `json:"forward_origin_id"`
-	MessageThreadID   sql.NullInt64      `json:"message_thread_id"`
-	ReplyToMessageID  sql.NullInt64      `json:"reply_to_message_id"`
-	ReplyToChatID     sql.NullInt64      `json:"reply_to_chat_id"`
-	ViaBotID          sql.NullInt64      `json:"via_bot_id"`
+	ForwardOriginID   pgtype.Int8        `json:"forward_origin_id"`
+	MessageThreadID   pgtype.Int8        `json:"message_thread_id"`
+	ReplyToMessageID  pgtype.Int8        `json:"reply_to_message_id"`
+	ReplyToChatID     pgtype.Int8        `json:"reply_to_chat_id"`
+	ViaBotID          pgtype.Int8        `json:"via_bot_id"`
 	EditDate          sql.Null[UnixTime] `json:"edit_date"`
 	MediaGroupID      sql.NullString     `json:"media_group_id"`
 	Text              sql.NullString     `json:"text"`

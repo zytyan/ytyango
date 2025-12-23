@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgtype"
 	"go.uber.org/zap"
 )
 
@@ -28,6 +29,13 @@ func (u *UnixTime) Scan(value any) error {
 	case time.Time:
 		// MySQL / Postgres
 		u.Time = val
+		return nil
+	case pgtype.Timestamptz:
+		if !val.Valid {
+			u.Time = time.Time{}
+			return nil
+		}
+		u.Time = val.Time
 		return nil
 
 	case []byte:
@@ -53,7 +61,7 @@ func (u *UnixTime) Scan(value any) error {
 }
 
 func (u UnixTime) Value() (driver.Value, error) {
-	return u.Unix(), nil
+	return u.Time, nil
 }
 
 func (u UnixTime) ZapObject(name string) zap.Field {

@@ -2,7 +2,6 @@ package backend
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"image"
@@ -12,6 +11,7 @@ import (
 	g "main/globalcfg"
 	api "main/http/backend/ogen"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/kolesa-team/go-webp/encoder"
 	"github.com/kolesa-team/go-webp/webp"
 )
@@ -46,7 +46,7 @@ func (h *Handler) GetUserAvatar(ctx context.Context, params api.GetUserAvatarPar
 func (h *Handler) getUserProfilePhotoWebp(ctx context.Context, userId int64) (string, error) {
 	user, err := g.Q.GetUserById(ctx, userId)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return "", errUserNoPhoto
 		}
 		return "", errUserNotFound

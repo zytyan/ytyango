@@ -7,23 +7,18 @@ plugins:
 overrides:
   go:
     overrides:
-      - db_type: "INT_UNIX_SEC"
-        engine: "sqlite"
+      - db_type: "timestamptz"
+        engine: "postgresql"
         go_type:
           type: "UnixTime"
-      - db_type: "INT_BOOL"
-        engine: "sqlite"
-        nullable: false
-        go_type:
-          type: "bool"
-      - db_type: "JSON_TEXT"
-        engine: "sqlite"
+      - db_type: "timestamptz"
+        engine: "postgresql"
         nullable: true
         go_type:
-          type: "NullString"
+          type: "Null[UnixTime]"
           import: "database/sql"
 sql:
-  - engine: "sqlite"
+  - engine: "postgresql"
     queries:
       - "sql/query_bilibili.sql"
       - "sql/query_chat.sql"
@@ -41,58 +36,13 @@ sql:
       - "sql/schema_user.sql"
       - "sql/schema_ytdl.sql"
     codegen:
-    - out: globalcfg/q
-      plugin: mygen
-      options:
-        package: "q"
-        out: "globalcfg/q"
-        output_files_suffix: "_gen"
-        output_db_file_name: "db_gen.go"
-        output_models_file_name: "models_gen.go"
-        output_batch_file_name: "batch_gen.go"
-        output_querier_file_name: "querier_gen.go"
-        emit_json_tags: true
-        query_parameter_limit: 4
-        emit_prepared_queries: true
-        rename:
-          chat_cfg: chatCfg
-        overrides:
-        - db_type: "INT_UNIX_SEC"
-          engine: "sqlite"
-          zap_field_method: true
-          go_type:
-            type: "UnixTime"
-        - db_type: "INT_BOOL"
-          engine: "sqlite"
-          nullable: false
-          go_type:
-            type: "bool"
-        - db_type: "JSON_TEXT"
-          engine: "sqlite"
-          nullable: true
-          go_type:
-            type: "NullString"
-            import: "database/sql"
-        - db_type: "BLOB_USER_TO_CNT"
-          engine: "sqlite"
-          go_type:
-            type: UserMsgStatMap
-        - db_type: "BLOB_TEN_MINUTE_STAT"
-          engine: "sqlite"
-          go_type:
-            type: TenMinuteStats
-  - engine: "sqlite"
-    queries:
-     - "sql/query_saved_msg.sql"
-    schema:
-     - "sql/schema_saved_msg.sql"
-    codegen:
-      - out: globalcfg/msgs
+      - out: globalcfg/q
         plugin: mygen
         options:
-          package: "msgs"
-          out: "globalcfg/msgs"
+          package: "q"
+          out: "globalcfg/q"
           output_files_suffix: "_gen"
+          sql_package: "pgx/v5"
           output_db_file_name: "db_gen.go"
           output_models_file_name: "models_gen.go"
           output_batch_file_name: "batch_gen.go"
@@ -103,24 +53,92 @@ sql:
           rename:
             chat_cfg: chatCfg
           overrides:
-            - db_type: "INT_UNIX_SEC"
-              engine: "sqlite"
+            - db_type: "timestamptz"
+              engine: "postgresql"
               zap_field_method: true
               go_type:
                 type: "UnixTime"
-            - db_type: "INT_UNIX_SEC"
-              engine: "sqlite"
+            - db_type: "timestamptz"
+              engine: "postgresql"
               nullable: true
               zap_field_method: true
               go_type:
                 type: "Null[UnixTime]"
                 import: "database/sql"
-            - db_type: "JSON_TEXT"
-              engine: "sqlite"
-              go_type:
-                type: "[]byte"
-            - db_type: "JSON_TEXT"
-              engine: "sqlite"
+            - db_type: "text"
+              engine: "postgresql"
               nullable: true
               go_type:
-                type: '[]byte'
+                type: "NullString"
+                import: "database/sql"
+            - db_type: "bigint"
+              engine: "postgresql"
+              nullable: true
+              go_type:
+                type: "sql.NullInt64"
+                import: "database/sql"
+            - column: "chat_stat_daily.user_msg_stat"
+              go_type:
+                type: UserMsgStatMap
+            - column: "chat_stat_daily.msg_count_by_time"
+              go_type:
+                type: TenMinuteStats
+            - column: "chat_stat_daily.msg_id_at_time_start"
+              go_type:
+                type: TenMinuteStats
+  - engine: "postgresql"
+    queries:
+      - "sql/query_saved_msg.sql"
+    schema:
+      - "sql/schema_saved_msg.sql"
+    codegen:
+      - out: globalcfg/msgs
+        plugin: mygen
+        options:
+          package: "msgs"
+          out: "globalcfg/msgs"
+          output_files_suffix: "_gen"
+          sql_package: "pgx/v5"
+          output_db_file_name: "db_gen.go"
+          output_models_file_name: "models_gen.go"
+          output_batch_file_name: "batch_gen.go"
+          output_querier_file_name: "querier_gen.go"
+          emit_json_tags: true
+          query_parameter_limit: 4
+          emit_prepared_queries: true
+          rename:
+            chat_cfg: chatCfg
+          overrides:
+            - db_type: "timestamptz"
+              engine: "postgresql"
+              zap_field_method: true
+              go_type:
+                type: "UnixTime"
+            - db_type: "timestamptz"
+              engine: "postgresql"
+              nullable: true
+              zap_field_method: true
+              go_type:
+                type: "Null[UnixTime]"
+                import: "database/sql"
+            - db_type: "text"
+              engine: "postgresql"
+              nullable: true
+              go_type:
+                type: "NullString"
+                import: "database/sql"
+            - db_type: "bigint"
+              engine: "postgresql"
+              nullable: true
+              go_type:
+                type: "sql.NullInt64"
+                import: "database/sql"
+            - db_type: "jsonb"
+              engine: "postgresql"
+              go_type:
+                type: "[]byte"
+            - db_type: "jsonb"
+              engine: "postgresql"
+              nullable: true
+              go_type:
+                type: "[]byte"

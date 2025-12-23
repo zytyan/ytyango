@@ -8,6 +8,7 @@ import (
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
+	"github.com/jackc/pgx/v5/pgtype"
 	"go.uber.org/zap"
 )
 
@@ -30,11 +31,15 @@ func marshalJSON(v any) ([]byte, error) {
 
 func (q *Queries) marshalWithWarn(v any, field string) []byte {
 	js, err := marshalJSON(v)
-	if err != nil && q.logger != nil {
-		q.logger.Warn("marshal json failed", zap.String("field", field), zap.Error(err))
+	if err != nil {
+		zap.L().Warn("marshal json failed", zap.String("field", field), zap.Error(err))
 		return nil
 	}
 	return js
+}
+
+func toInt8(v sql.NullInt64) pgtype.Int8 {
+	return pgtype.Int8{Int64: v.Int64, Valid: v.Valid}
 }
 
 // SaveRawUpdate stores the raw update payload. JSON marshal failure returns an error.
@@ -56,7 +61,7 @@ func (q *Queries) SaveRawUpdate(ctx *ext.Context) error {
 	}
 	c, cancel := context.WithTimeout(context.Background(), defaultDBTimeout)
 	defer cancel()
-	return q.InsertRawUpdate(c, chatID, msgID, raw)
+	return q.InsertRawUpdate(c, toInt8(chatID), toInt8(msgID), raw)
 }
 
 func forwardInfo(msg *gotgbot.Message) (sql.NullString, sql.NullInt64) {
@@ -223,15 +228,15 @@ func (q *Queries) SaveNewMsg(msg *gotgbot.Message) error {
 	err := q.InsertSavedMessage(c, InsertSavedMessageParams{
 		MessageID:         msg.MessageId,
 		ChatID:            msg.Chat.Id,
-		FromUserID:        fromUser,
-		SenderChatID:      senderChat,
+		FromUserID:        toInt8(fromUser),
+		SenderChatID:      toInt8(senderChat),
 		Date:              UnixTime{time.Unix(msg.Date, 0)},
 		ForwardOriginName: forwardName,
-		ForwardOriginID:   forwardID,
-		MessageThreadID:   sql.NullInt64{Int64: msg.MessageThreadId, Valid: msg.MessageThreadId != 0},
-		ReplyToMessageID:  replyMsgID,
-		ReplyToChatID:     replyChatID,
-		ViaBotID:          viaBot,
+		ForwardOriginID:   toInt8(forwardID),
+		MessageThreadID:   toInt8(sql.NullInt64{Int64: msg.MessageThreadId, Valid: msg.MessageThreadId != 0}),
+		ReplyToMessageID:  toInt8(replyMsgID),
+		ReplyToChatID:     toInt8(replyChatID),
+		ViaBotID:          toInt8(viaBot),
 		EditDate:          sql.Null[UnixTime]{Valid: false},
 		MediaGroupID:      nullString(msg.MediaGroupId),
 		Text:              nullString(msg.GetText()),

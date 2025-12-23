@@ -9,6 +9,7 @@ import (
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"go.uber.org/zap"
 )
 
@@ -121,13 +122,13 @@ func persistSavedMessage(ctx *ext.Context, msg *gotgbot.Message) error {
 	if g.Msgs == nil {
 		return errors.New("msgs querier is nil")
 	}
-	tx, err := g.RawMsgsDb().BeginTx(context.Background(), nil)
+	tx, err := g.RawMsgsDb().BeginTx(context.Background(), pgx.TxOptions{})
 	if err != nil {
 		return err
 	}
 	defer func() {
 		if err != nil {
-			_ = tx.Rollback()
+			_ = tx.Rollback(context.Background())
 		}
 	}()
 	mdb := g.Msgs.WithTx(tx)
@@ -136,7 +137,7 @@ func persistSavedMessage(ctx *ext.Context, msg *gotgbot.Message) error {
 	if err != nil {
 		return err
 	}
-	return tx.Commit()
+	return tx.Commit(context.Background())
 }
 
 func persistRawUpdate(ctx *ext.Context, mdb *msgs.Queries) {

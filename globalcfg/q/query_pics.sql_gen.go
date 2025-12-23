@@ -7,32 +7,18 @@ package q
 
 import (
 	"context"
-	"time"
 
-	"go.uber.org/zap"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const getNsfwPicByFileUid = `-- name: GetNsfwPicByFileUid :one
 SELECT file_uid, file_id, bot_rate, rand_key, user_rate, user_rating_sum, rate_user_count
 FROM saved_pics
-WHERE file_uid = ?
+WHERE file_uid = $1
 `
 
 func (q *Queries) GetNsfwPicByFileUid(ctx context.Context, fileUid string) (SavedPic, error) {
-	var logFields []zap.Field
-	var start time.Time
-	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 8)
-		start = time.Now()
-		if q.LogArgument {
-			logFields = append(logFields,
-				zap.Dict("fields",
-					zap.String("file_uid", fileUid),
-				),
-			)
-		}
-	}
-	row := q.queryRow(ctx, q.getNsfwPicByFileUidStmt, getNsfwPicByFileUid, fileUid)
+	row := q.db.QueryRow(ctx, getNsfwPicByFileUid, fileUid)
 	var i SavedPic
 	err := row.Scan(
 		&i.FileUid,
@@ -43,40 +29,23 @@ func (q *Queries) GetNsfwPicByFileUid(ctx context.Context, fileUid string) (Save
 		&i.UserRatingSum,
 		&i.RateUserCount,
 	)
-	q.logQuery(getNsfwPicByFileUid, "GetNsfwPicByFileUid", logFields, err, start)
 	return i, err
 }
 
 const listNsfwPicUserRatesByFileUid = `-- name: ListNsfwPicUserRatesByFileUid :many
 SELECT rating, COUNT(*)
 FROM saved_pics_rating
-WHERE file_uid = ?
+WHERE file_uid = $1
 GROUP BY rating
 `
 
 type ListNsfwPicUserRatesByFileUidRow struct {
-	Rating int64 `json:"rating"`
+	Rating int32 `json:"rating"`
 	Count  int64 `json:"count"`
 }
 
 func (q *Queries) ListNsfwPicUserRatesByFileUid(ctx context.Context, fileUid string) ([]ListNsfwPicUserRatesByFileUidRow, error) {
-	var logFields []zap.Field
-	var start time.Time
-	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 8)
-		start = time.Now()
-		if q.LogArgument {
-			logFields = append(logFields,
-				zap.Dict("fields",
-					zap.String("file_uid", fileUid),
-				),
-			)
-		}
-	}
-	rows, err := q.query(ctx, q.listNsfwPicUserRatesByFileUidStmt, listNsfwPicUserRatesByFileUid, fileUid)
-	defer func() {
-		q.logQuery(listNsfwPicUserRatesByFileUid, "ListNsfwPicUserRatesByFileUid", logFields, err, start)
-	}()
+	rows, err := q.db.Query(ctx, listNsfwPicUserRatesByFileUid, fileUid)
 	if err != nil {
 		return nil, err
 	}
@@ -84,15 +53,12 @@ func (q *Queries) ListNsfwPicUserRatesByFileUid(ctx context.Context, fileUid str
 	var items []ListNsfwPicUserRatesByFileUidRow
 	for rows.Next() {
 		var i ListNsfwPicUserRatesByFileUidRow
-		if err = rows.Scan(&i.Rating, &i.Count); err != nil {
+		if err := rows.Scan(&i.Rating, &i.Count); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
 	}
-	if err = rows.Close(); err != nil {
-		return nil, err
-	}
-	if err = rows.Err(); err != nil {
+	if err := rows.Err(); err != nil {
 		return nil, err
 	}
 	return items, nil
@@ -100,56 +66,24 @@ func (q *Queries) ListNsfwPicUserRatesByFileUid(ctx context.Context, fileUid str
 
 const createNsfwPicUserRate = `-- name: createNsfwPicUserRate :exec
 INSERT INTO saved_pics_rating (file_uid, user_id, rating)
-VALUES (?, ?, ?)
+VALUES ($1, $2, $3)
 `
 
-func (q *Queries) createNsfwPicUserRate(ctx context.Context, fileUid string, userID int64, rating int64) error {
-	var logFields []zap.Field
-	var start time.Time
-	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 8)
-		start = time.Now()
-		if q.LogArgument {
-			logFields = append(logFields,
-				zap.Dict("fields",
-					zap.String("file_uid", fileUid),
-					zap.Int64("user_id", userID),
-					zap.Int64("rating", rating),
-				),
-			)
-		}
-	}
-	_, err := q.exec(ctx, q.createNsfwPicUserRateStmt, createNsfwPicUserRate, fileUid, userID, rating)
-	q.logQuery(createNsfwPicUserRate, "createNsfwPicUserRate", logFields, err, start)
+func (q *Queries) createNsfwPicUserRate(ctx context.Context, fileUid string, userID int64, rating int32) error {
+	_, err := q.db.Exec(ctx, createNsfwPicUserRate, fileUid, userID, rating)
 	return err
 }
 
 const createOrUpdateNsfwPic = `-- name: createOrUpdateNsfwPic :one
 INSERT INTO saved_pics (file_uid, file_id, bot_rate, rand_key)
-VALUES (?, ?, ?, ?)
+VALUES ($1, $2, $3, $4)
 ON CONFLICT(file_uid) DO UPDATE SET file_id   = excluded.file_id,
                                     bot_rate  = excluded.bot_rate
 RETURNING file_uid, file_id, bot_rate, rand_key, user_rate, user_rating_sum, rate_user_count
 `
 
-func (q *Queries) createOrUpdateNsfwPic(ctx context.Context, fileUid string, fileID string, botRate int64, randKey int64) (SavedPic, error) {
-	var logFields []zap.Field
-	var start time.Time
-	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 8)
-		start = time.Now()
-		if q.LogArgument {
-			logFields = append(logFields,
-				zap.Dict("fields",
-					zap.String("file_uid", fileUid),
-					zap.String("file_id", fileID),
-					zap.Int64("bot_rate", botRate),
-					zap.Int64("rand_key", randKey),
-				),
-			)
-		}
-	}
-	row := q.queryRow(ctx, q.createOrUpdateNsfwPicStmt, createOrUpdateNsfwPic,
+func (q *Queries) createOrUpdateNsfwPic(ctx context.Context, fileUid string, fileID string, botRate int32, randKey int64) (SavedPic, error) {
+	row := q.db.QueryRow(ctx, createOrUpdateNsfwPic,
 		fileUid,
 		fileID,
 		botRate,
@@ -165,7 +99,6 @@ func (q *Queries) createOrUpdateNsfwPic(ctx context.Context, fileUid string, fil
 		&i.UserRatingSum,
 		&i.RateUserCount,
 	)
-	q.logQuery(createOrUpdateNsfwPic, "createOrUpdateNsfwPic", logFields, err, start)
 	return i, err
 }
 
@@ -173,28 +106,14 @@ const getNsfwPicByRateAndRandKey = `-- name: getNsfwPicByRateAndRandKey :one
 
 SELECT file_uid, file_id, bot_rate, rand_key, user_rate, user_rating_sum, rate_user_count
 FROM saved_pics
-WHERE user_rate = ?
-  AND rand_key > ?
+WHERE user_rate = $1
+  AND rand_key > $2
 LIMIT 1
 `
 
 // encoding: utf-8
-func (q *Queries) getNsfwPicByRateAndRandKey(ctx context.Context, userRate int64, randKey int64) (SavedPic, error) {
-	var logFields []zap.Field
-	var start time.Time
-	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 8)
-		start = time.Now()
-		if q.LogArgument {
-			logFields = append(logFields,
-				zap.Dict("fields",
-					zap.Int64("user_rate", userRate),
-					zap.Int64("rand_key", randKey),
-				),
-			)
-		}
-	}
-	row := q.queryRow(ctx, q.getNsfwPicByRateAndRandKeyStmt, getNsfwPicByRateAndRandKey, userRate, randKey)
+func (q *Queries) getNsfwPicByRateAndRandKey(ctx context.Context, userRate pgtype.Int4, randKey int64) (SavedPic, error) {
+	row := q.db.QueryRow(ctx, getNsfwPicByRateAndRandKey, userRate, randKey)
 	var i SavedPic
 	err := row.Scan(
 		&i.FileUid,
@@ -205,33 +124,19 @@ func (q *Queries) getNsfwPicByRateAndRandKey(ctx context.Context, userRate int64
 		&i.UserRatingSum,
 		&i.RateUserCount,
 	)
-	q.logQuery(getNsfwPicByRateAndRandKey, "getNsfwPicByRateAndRandKey", logFields, err, start)
 	return i, err
 }
 
 const getNsfwPicByRateFirst = `-- name: getNsfwPicByRateFirst :one
 SELECT file_uid, file_id, bot_rate, rand_key, user_rate, user_rating_sum, rate_user_count
 FROM saved_pics
-WHERE user_rate = ?
+WHERE user_rate = $1
 ORDER BY rand_key
 LIMIT 1
 `
 
-func (q *Queries) getNsfwPicByRateFirst(ctx context.Context, userRate int64) (SavedPic, error) {
-	var logFields []zap.Field
-	var start time.Time
-	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 8)
-		start = time.Now()
-		if q.LogArgument {
-			logFields = append(logFields,
-				zap.Dict("fields",
-					zap.Int64("user_rate", userRate),
-				),
-			)
-		}
-	}
-	row := q.queryRow(ctx, q.getNsfwPicByRateFirstStmt, getNsfwPicByRateFirst, userRate)
+func (q *Queries) getNsfwPicByRateFirst(ctx context.Context, userRate pgtype.Int4) (SavedPic, error) {
+	row := q.db.QueryRow(ctx, getNsfwPicByRateFirst, userRate)
 	var i SavedPic
 	err := row.Scan(
 		&i.FileUid,
@@ -242,36 +147,20 @@ func (q *Queries) getNsfwPicByRateFirst(ctx context.Context, userRate int64) (Sa
 		&i.UserRatingSum,
 		&i.RateUserCount,
 	)
-	q.logQuery(getNsfwPicByRateFirst, "getNsfwPicByRateFirst", logFields, err, start)
 	return i, err
 }
 
 const getNsfwPicRateByUserId = `-- name: getNsfwPicRateByUserId :one
 SELECT rating
 FROM saved_pics_rating
-WHERE file_uid = ?
-  AND user_id = ?
+WHERE file_uid = $1
+  AND user_id = $2
 `
 
-func (q *Queries) getNsfwPicRateByUserId(ctx context.Context, fileUid string, userID int64) (int64, error) {
-	var logFields []zap.Field
-	var start time.Time
-	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 8)
-		start = time.Now()
-		if q.LogArgument {
-			logFields = append(logFields,
-				zap.Dict("fields",
-					zap.String("file_uid", fileUid),
-					zap.Int64("user_id", userID),
-				),
-			)
-		}
-	}
-	row := q.queryRow(ctx, q.getNsfwPicRateByUserIdStmt, getNsfwPicRateByUserId, fileUid, userID)
-	var rating int64
+func (q *Queries) getNsfwPicRateByUserId(ctx context.Context, fileUid string, userID int64) (int32, error) {
+	row := q.db.QueryRow(ctx, getNsfwPicRateByUserId, fileUid, userID)
+	var rating int32
 	err := row.Scan(&rating)
-	q.logQuery(getNsfwPicRateByUserId, "getNsfwPicRateByUserId", logFields, err, start)
 	return rating, err
 }
 
@@ -282,19 +171,7 @@ ORDER BY rate
 `
 
 func (q *Queries) listNsfwPicRateCounter(ctx context.Context) ([]PicRateCounter, error) {
-	var logFields []zap.Field
-	var start time.Time
-	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 8)
-		start = time.Now()
-		if q.LogArgument {
-			logFields = append(logFields, zap.Dict("fields"))
-		}
-	}
-	rows, err := q.query(ctx, q.listNsfwPicRateCounterStmt, listNsfwPicRateCounter)
-	defer func() {
-		q.logQuery(listNsfwPicRateCounter, "listNsfwPicRateCounter", logFields, err, start)
-	}()
+	rows, err := q.db.Query(ctx, listNsfwPicRateCounter)
 	if err != nil {
 		return nil, err
 	}
@@ -302,15 +179,12 @@ func (q *Queries) listNsfwPicRateCounter(ctx context.Context) ([]PicRateCounter,
 	var items []PicRateCounter
 	for rows.Next() {
 		var i PicRateCounter
-		if err = rows.Scan(&i.Rate, &i.Count); err != nil {
+		if err := rows.Scan(&i.Rate, &i.Count); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
 	}
-	if err = rows.Close(); err != nil {
-		return nil, err
-	}
-	if err = rows.Err(); err != nil {
+	if err := rows.Err(); err != nil {
 		return nil, err
 	}
 	return items, nil
@@ -318,28 +192,12 @@ func (q *Queries) listNsfwPicRateCounter(ctx context.Context) ([]PicRateCounter,
 
 const updateNsfwPicUserRate = `-- name: updateNsfwPicUserRate :exec
 UPDATE saved_pics_rating
-SET rating=?
-WHERE file_uid = ?
-  AND user_id = ?
+SET rating=$1
+WHERE file_uid = $2
+  AND user_id = $3
 `
 
-func (q *Queries) updateNsfwPicUserRate(ctx context.Context, rating int64, fileUid string, userID int64) error {
-	var logFields []zap.Field
-	var start time.Time
-	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 8)
-		start = time.Now()
-		if q.LogArgument {
-			logFields = append(logFields,
-				zap.Dict("fields",
-					zap.Int64("rating", rating),
-					zap.String("file_uid", fileUid),
-					zap.Int64("user_id", userID),
-				),
-			)
-		}
-	}
-	_, err := q.exec(ctx, q.updateNsfwPicUserRateStmt, updateNsfwPicUserRate, rating, fileUid, userID)
-	q.logQuery(updateNsfwPicUserRate, "updateNsfwPicUserRate", logFields, err, start)
+func (q *Queries) updateNsfwPicUserRate(ctx context.Context, rating int32, fileUid string, userID int64) error {
+	_, err := q.db.Exec(ctx, updateNsfwPicUserRate, rating, fileUid, userID)
 	return err
 }

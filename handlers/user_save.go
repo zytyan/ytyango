@@ -10,6 +10,7 @@ import (
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
+	"github.com/jackc/pgx/v5"
 )
 
 const profileRefreshInterval = time.Hour
@@ -34,7 +35,7 @@ func UpdateUser(bot *gotgbot.Bot, ctx *ext.Context) error {
 		return nil
 	}
 	user, err := g.Q.GetOrCreateUserByTg(context.Background(), ctx.EffectiveUser)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return err
 	}
 	if err = user.TryUpdate(g.Q, ctx.EffectiveUser); err != nil {

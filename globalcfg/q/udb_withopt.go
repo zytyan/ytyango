@@ -11,11 +11,9 @@ import (
 )
 
 func PrepareWithLogger(ctx context.Context, db DBTX, logger *zap.Logger) (*Queries, error) {
-	query, err := Prepare(ctx, db)
-	if err != nil {
-		return nil, err
-	}
-	query.logger = logger
+	_ = ctx
+	_ = logger
+	query := New(db)
 	InitCache(query)
 	return query, nil
 }

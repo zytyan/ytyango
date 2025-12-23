@@ -236,9 +236,9 @@ func (q *Queries) FlushChatStats(ctx context.Context) error {
 }
 
 func (q *Queries) getOrCreateChatStat(ctx context.Context, chatId int64, day int64) (ChatStatDaily, error) {
-	daily, err := q.getChatStat(ctx, chatId, day)
+	daily, err := q.getChatStat(ctx, chatId, int32(day))
 	if err != nil {
-		return q.createChatStatDaily(ctx, chatId, day)
+		return q.createChatStatDaily(ctx, chatId, int32(day))
 	}
 	return daily, err
 
@@ -266,7 +266,7 @@ func (q *Queries) chatStatAtWithTimezone(ctx context.Context, chatId, unixTime, 
 func (q *Queries) ChatStatAt(chatId, unixTime int64) *ChatStat {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
 	defer cancel()
-	timezone := q.GetChatCfgByIdOrDefault(chatId).Timezone
+	timezone := int64(q.GetChatCfgByIdOrDefault(chatId).Timezone)
 	stat, _ := q.chatStatAtWithTimezone(ctx, chatId, unixTime, timezone)
 	return stat
 }
@@ -281,9 +281,10 @@ func (q *Queries) ChatStatOfDay(ctx context.Context, chatId, unixTime int64) (Ch
 	if err != nil {
 		return ChatStatDaily{}, 0, err
 	}
-	daily, err := q.chatStatAtWithTimezone(ctx, chatId, unixTime, cfg.Timezone)
+	timezone := int64(cfg.Timezone)
+	daily, err := q.chatStatAtWithTimezone(ctx, chatId, unixTime, timezone)
 	if err != nil {
 		return ChatStatDaily{}, 0, err
 	}
-	return daily.ChatStatDaily, cfg.Timezone, err
+	return daily.ChatStatDaily, timezone, err
 }

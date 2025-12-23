@@ -1,8 +1,8 @@
 - [ ] 确认配置方案：定义 `DATABASE_URL` / `MSG_DATABASE_URL`、连接池参数、TLS 选项，更新 README 示例。
-- [ ] 重写 DDL：为主库与 `saved_msgs` 提供 PostgreSQL 版本（类型映射为 timestamptz/bytea/jsonb/boolean 等，触发器/生成列/索引同步）。
-- [ ] 更新 `sqlc.yaml`：切换 `engine: postgresql`、占位符 `$n`、pgx/v5 生成选项与类型 overrides，重新生成 `q` 与 `msgs`。
-- [ ] 应用初始化改造：`globalcfg` 使用 `pgxpool`，移除 sqlite3 注册；慢查询/健康检查适配 pgx。
-- [ ] 业务差异修复：替换 sqlite3 约束错误处理为 `pgconn.PgError`，确保 `saved_pics` 插入/重试与前缀和缓存等逻辑一致。
+- [x] 重写 DDL：为主库与 `saved_msgs` 提供 PostgreSQL 版本（类型映射为 timestamptz/bytea/jsonb/boolean 等，触发器/生成列/索引同步）。
+- [x] 更新 `sqlc.yaml`：切换 `engine: postgresql`、占位符 `$n`、pgx/v5 生成选项与类型 overrides，重新生成 `q` 与 `msgs`。
+- [x] 应用初始化改造：`globalcfg` 使用 `pgxpool`，移除 sqlite3 注册；慢查询/健康检查适配 pgx。
+- [x] 业务差异修复：替换 sqlite3 约束错误处理为 `pgconn.PgError`，确保 `saved_pics` 插入/重试与前缀和缓存等逻辑一致。
 - [ ] 测试方案：提供 PG 测试库初始化（Docker/CI），重写 `initForTests`，确保 `go test ./...` 可运行。
 - [ ] 数据迁移工具：实现 SQLite → PG 流式迁移（主库+可选 `saved_msgs`），支持批量、冲突策略与行数校验报告。
 - [ ] 文档与上线预案：迁移步骤、校验/回滚指引，配置变更清单。

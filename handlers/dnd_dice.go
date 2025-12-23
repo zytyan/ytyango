@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"main/globalcfg"
@@ -14,6 +13,7 @@ import (
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"golang.org/x/text/width"
 )
 
@@ -78,7 +78,7 @@ func SetDndAttr(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
 		matches := setAttrRe.FindStringSubmatch(line)
 		name := matches[1]
 		val, err1 := g.Q.GetCocCharAttr(context.Background(), userId, name)
-		if val == "" || errors.Is(err1, sql.ErrNoRows) {
+		if val == "" || errors.Is(err1, pgx.ErrNoRows) {
 			val = "empty"
 		} else if err1 != nil {
 			continue

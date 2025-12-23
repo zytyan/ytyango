@@ -7,42 +7,24 @@ package q
 
 import (
 	"context"
-	"time"
-
-	"go.uber.org/zap"
 )
 
 const delCocCharAttr = `-- name: DelCocCharAttr :exec
 DELETE
 FROM character_attrs
-WHERE user_id = ?
-  AND attr_name = ?
+WHERE user_id = $1
+  AND attr_name = $2
 `
 
 func (q *Queries) DelCocCharAttr(ctx context.Context, userID int64, attrName string) error {
-	var logFields []zap.Field
-	var start time.Time
-	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 8)
-		start = time.Now()
-		if q.LogArgument {
-			logFields = append(logFields,
-				zap.Dict("fields",
-					zap.Int64("user_id", userID),
-					zap.String("attr_name", attrName),
-				),
-			)
-		}
-	}
-	_, err := q.exec(ctx, q.delCocCharAttrStmt, delCocCharAttr, userID, attrName)
-	q.logQuery(delCocCharAttr, "DelCocCharAttr", logFields, err, start)
+	_, err := q.db.Exec(ctx, delCocCharAttr, userID, attrName)
 	return err
 }
 
 const getCocCharAllAttr = `-- name: GetCocCharAllAttr :many
 SELECT attr_name, attr_value
 FROM character_attrs
-WHERE user_id = ?
+WHERE user_id = $1
 `
 
 type GetCocCharAllAttrRow struct {
@@ -51,23 +33,7 @@ type GetCocCharAllAttrRow struct {
 }
 
 func (q *Queries) GetCocCharAllAttr(ctx context.Context, userID int64) ([]GetCocCharAllAttrRow, error) {
-	var logFields []zap.Field
-	var start time.Time
-	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 8)
-		start = time.Now()
-		if q.LogArgument {
-			logFields = append(logFields,
-				zap.Dict("fields",
-					zap.Int64("user_id", userID),
-				),
-			)
-		}
-	}
-	rows, err := q.query(ctx, q.getCocCharAllAttrStmt, getCocCharAllAttr, userID)
-	defer func() {
-		q.logQuery(getCocCharAllAttr, "GetCocCharAllAttr", logFields, err, start)
-	}()
+	rows, err := q.db.Query(ctx, getCocCharAllAttr, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -75,15 +41,12 @@ func (q *Queries) GetCocCharAllAttr(ctx context.Context, userID int64) ([]GetCoc
 	var items []GetCocCharAllAttrRow
 	for rows.Next() {
 		var i GetCocCharAllAttrRow
-		if err = rows.Scan(&i.AttrName, &i.AttrValue); err != nil {
+		if err := rows.Scan(&i.AttrName, &i.AttrValue); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
 	}
-	if err = rows.Close(); err != nil {
-		return nil, err
-	}
-	if err = rows.Err(); err != nil {
+	if err := rows.Err(); err != nil {
 		return nil, err
 	}
 	return items, nil
@@ -93,57 +56,26 @@ const getCocCharAttr = `-- name: GetCocCharAttr :one
 
 SELECT attr_value
 FROM character_attrs
-WHERE user_id = ?
-  AND attr_name = ?
+WHERE user_id = $1
+  AND attr_name = $2
 `
 
 // encoding: utf-8
 func (q *Queries) GetCocCharAttr(ctx context.Context, userID int64, attrName string) (string, error) {
-	var logFields []zap.Field
-	var start time.Time
-	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 8)
-		start = time.Now()
-		if q.LogArgument {
-			logFields = append(logFields,
-				zap.Dict("fields",
-					zap.Int64("user_id", userID),
-					zap.String("attr_name", attrName),
-				),
-			)
-		}
-	}
-	row := q.queryRow(ctx, q.getCocCharAttrStmt, getCocCharAttr, userID, attrName)
+	row := q.db.QueryRow(ctx, getCocCharAttr, userID, attrName)
 	var attr_value string
 	err := row.Scan(&attr_value)
-	q.logQuery(getCocCharAttr, "GetCocCharAttr", logFields, err, start)
 	return attr_value, err
 }
 
 const setCocCharAttr = `-- name: SetCocCharAttr :exec
 INSERT INTO character_attrs
     (user_id, attr_name, attr_value)
-VALUES (?, ?, ?)
+VALUES ($1, $2, $3)
 ON CONFLICT DO UPDATE SET attr_value=excluded.attr_value
 `
 
 func (q *Queries) SetCocCharAttr(ctx context.Context, userID int64, attrName string, attrValue string) error {
-	var logFields []zap.Field
-	var start time.Time
-	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 8)
-		start = time.Now()
-		if q.LogArgument {
-			logFields = append(logFields,
-				zap.Dict("fields",
-					zap.Int64("user_id", userID),
-					zap.String("attr_name", attrName),
-					zap.String("attr_value", attrValue),
-				),
-			)
-		}
-	}
-	_, err := q.exec(ctx, q.setCocCharAttrStmt, setCocCharAttr, userID, attrName, attrValue)
-	q.logQuery(setCocCharAttr, "SetCocCharAttr", logFields, err, start)
+	_, err := q.db.Exec(ctx, setCocCharAttr, userID, attrName, attrValue)
 	return err
 }

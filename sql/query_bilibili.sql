@@ -3,7 +3,7 @@
 -- name: GetBiliInlineData :one
 SELECT text, chat_id, msg_id
 FROM bili_inline_results
-WHERE uid = ?;
+WHERE uid = $1;
 
 
 -- name: CreateBiliInlineData :one
@@ -14,7 +14,7 @@ RETURNING uid;
 
 -- name: UpdateBiliInlineMsgId :exec
 UPDATE bili_inline_results
-SET text    = ?,
-    chat_id = ?,
-    msg_id  = ?
-WHERE uid = ?;
+SET text    = $1,
+    chat_id = $2,
+    msg_id  = $3
+WHERE uid = $4;

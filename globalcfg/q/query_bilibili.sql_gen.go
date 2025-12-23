@@ -7,9 +7,6 @@ package q
 
 import (
 	"context"
-	"time"
-
-	"go.uber.org/zap"
 )
 
 const createBiliInlineData = `-- name: CreateBiliInlineData :one
@@ -20,19 +17,9 @@ RETURNING uid
 `
 
 func (q *Queries) CreateBiliInlineData(ctx context.Context) (int64, error) {
-	var logFields []zap.Field
-	var start time.Time
-	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 8)
-		start = time.Now()
-		if q.LogArgument {
-			logFields = append(logFields, zap.Dict("fields"))
-		}
-	}
-	row := q.queryRow(ctx, q.createBiliInlineDataStmt, createBiliInlineData)
+	row := q.db.QueryRow(ctx, createBiliInlineData)
 	var uid int64
 	err := row.Scan(&uid)
-	q.logQuery(createBiliInlineData, "CreateBiliInlineData", logFields, err, start)
 	return uid, err
 }
 
@@ -40,7 +27,7 @@ const getBiliInlineData = `-- name: GetBiliInlineData :one
 
 SELECT text, chat_id, msg_id
 FROM bili_inline_results
-WHERE uid = ?
+WHERE uid = $1
 `
 
 type GetBiliInlineDataRow struct {
@@ -51,57 +38,26 @@ type GetBiliInlineDataRow struct {
 
 // encoding: utf-8
 func (q *Queries) GetBiliInlineData(ctx context.Context, uid int64) (GetBiliInlineDataRow, error) {
-	var logFields []zap.Field
-	var start time.Time
-	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 8)
-		start = time.Now()
-		if q.LogArgument {
-			logFields = append(logFields,
-				zap.Dict("fields",
-					zap.Int64("uid", uid),
-				),
-			)
-		}
-	}
-	row := q.queryRow(ctx, q.getBiliInlineDataStmt, getBiliInlineData, uid)
+	row := q.db.QueryRow(ctx, getBiliInlineData, uid)
 	var i GetBiliInlineDataRow
 	err := row.Scan(&i.Text, &i.ChatID, &i.MsgID)
-	q.logQuery(getBiliInlineData, "GetBiliInlineData", logFields, err, start)
 	return i, err
 }
 
 const updateBiliInlineMsgId = `-- name: UpdateBiliInlineMsgId :exec
 UPDATE bili_inline_results
-SET text    = ?,
-    chat_id = ?,
-    msg_id  = ?
-WHERE uid = ?
+SET text    = $1,
+    chat_id = $2,
+    msg_id  = $3
+WHERE uid = $4
 `
 
 func (q *Queries) UpdateBiliInlineMsgId(ctx context.Context, text string, chatID int64, msgID int64, uid int64) error {
-	var logFields []zap.Field
-	var start time.Time
-	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 8)
-		start = time.Now()
-		if q.LogArgument {
-			logFields = append(logFields,
-				zap.Dict("fields",
-					zap.String("text", text),
-					zap.Int64("chat_id", chatID),
-					zap.Int64("msg_id", msgID),
-					zap.Int64("uid", uid),
-				),
-			)
-		}
-	}
-	_, err := q.exec(ctx, q.updateBiliInlineMsgIdStmt, updateBiliInlineMsgId,
+	_, err := q.db.Exec(ctx, updateBiliInlineMsgId,
 		text,
 		chatID,
 		msgID,
 		uid,
 	)
-	q.logQuery(updateBiliInlineMsgId, "UpdateBiliInlineMsgId", logFields, err, start)
 	return err
 }
