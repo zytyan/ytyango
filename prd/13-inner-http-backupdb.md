@@ -107,3 +107,14 @@
 | Day 1 | 完成 PRD 与接口设计讨论 |
 | Day 2 | 完成 handler 实现与测试（含错误场景） |
 | Day 3 | 内网验证下载、更新 TODO、准备合并 |
+
+---
+
+## **11. 使用说明（How to Use）**
+
+* 默认监听：`GET http://127.0.0.1:4019/backupdb`
+  * 返回 `application/zip`，文件名格式 `backup-YYYYMMDD-HHMMSSZ.zip`，包含 `main.db`、`msg.db` 与 `manifest.json`。
+* 选择备份范围：`/backupdb?db=main` 或 `/backupdb?db=msg`，非法值 400。
+* Token 保护（可选）：设置环境变量 `GOYTYAN_BACKUP_TOKEN=xxx` 后访问需携带
+  * Header `X-Backup-Token: xxx` 或 Query `?token=xxx`，否则 401。
+* 日志：成功记录耗时、文件大小；失败记录 error。临时目录自动清理。
