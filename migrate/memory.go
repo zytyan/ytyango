@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"strings"
 	"time"
-
-	"go.uber.org/zap"
 )
 
 type SampleConfig struct {
@@ -15,7 +13,7 @@ type SampleConfig struct {
 	Rows int
 }
 
-func copyToMemory(ctx context.Context, sourcePath string, sample SampleConfig, logger *zap.SugaredLogger) (*sql.DB, error) {
+func copyToMemory(ctx context.Context, sourcePath string, sample SampleConfig, logf func(string, ...any)) (*sql.DB, error) {
 	if sourcePath == "" {
 		return nil, fmt.Errorf("source path is empty")
 	}
@@ -53,13 +51,13 @@ func copyToMemory(ctx context.Context, sourcePath string, sample SampleConfig, l
 		}
 	}
 
-	if err := attachAndCopyData(ctx, dst, sourcePath, sample, logger); err != nil {
+	if err := attachAndCopyData(ctx, dst, sourcePath, sample, logf); err != nil {
 		_ = dst.Close()
 		return nil, err
 	}
 
-	if _, err := dst.ExecContext(ctx, "PRAGMA foreign_keys=ON;"); err != nil {
-		logger.Warnf("re-enable foreign keys in memory db: %v", err)
+	if _, err := dst.ExecContext(ctx, "PRAGMA foreign_keys=ON;"); err != nil && logf != nil {
+		logf("re-enable foreign keys in memory db: %v\n", err)
 	}
 	return dst, nil
 }
@@ -89,7 +87,7 @@ func loadSchemaObjects(ctx context.Context, db *sql.DB, typ string) ([]schemaObj
 	return objs, nil
 }
 
-func attachAndCopyData(ctx context.Context, dst *sql.DB, sourcePath string, sample SampleConfig, logger *zap.SugaredLogger) error {
+func attachAndCopyData(ctx context.Context, dst *sql.DB, sourcePath string, sample SampleConfig, logf func(string, ...any)) error {
 	if _, err := dst.ExecContext(ctx, "ATTACH DATABASE ? AS diskdb;", sourcePath); err != nil {
 		return fmt.Errorf("attach source database: %w", err)
 	}
@@ -106,8 +104,8 @@ func attachAndCopyData(ctx context.Context, dst *sql.DB, sourcePath string, samp
 			continue
 		}
 		sqlStmt := fmt.Sprintf("INSERT INTO %s SELECT * FROM diskdb.%s%s;", quoteIdent(tbl.Name), quoteIdent(tbl.Name), sampleClause)
-		if logger != nil {
-			logger.Infof("[memory-run] copy table %s %s", tbl.Name, strings.TrimSpace(sampleClause))
+		if logf != nil {
+			logf("[memory-run] copy table %s %s\n", tbl.Name, strings.TrimSpace(sampleClause))
 		}
 		if _, err := dst.ExecContext(ctx, sqlStmt); err != nil {
 			return fmt.Errorf("copy table %s: %w", tbl.Name, err)

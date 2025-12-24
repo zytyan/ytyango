@@ -3,10 +3,9 @@ package migrate
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"path/filepath"
 	"testing"
-
-	"go.uber.org/zap"
 )
 
 func TestEnsureMetadataAndCheckVersion(t *testing.T) {
@@ -55,7 +54,7 @@ func TestDryRunDoesNotMutate(t *testing.T) {
 		Registry: Registry{Name: "main", Migrations: migs, ExpectedVersion: 1},
 		DBPath:   dbPath,
 	}
-	opts := ExecOptions{DryRun: true, Logger: zap.NewNop().Sugar()}
+	opts := ExecOptions{DryRun: true, Logf: func(string, ...any) {}}
 	if err := runCommand(ctx, target, Command{Type: "up"}, opts); err != nil {
 		t.Fatalf("dry-run migrate: %v", err)
 	}
@@ -71,7 +70,7 @@ func TestDryRunDoesNotMutate(t *testing.T) {
 	if err == nil {
 		t.Fatalf("table should not exist on dry-run, found %s", name)
 	}
-	if err != sql.ErrNoRows {
+	if !errors.Is(err, sql.ErrNoRows) {
 		t.Fatalf("unexpected error checking table: %v", err)
 	}
 	state, err := ReadState(ctx, db)
@@ -119,7 +118,7 @@ func TestMemoryRunSamplingDoesNotTouchDisk(t *testing.T) {
 	opts := ExecOptions{
 		MemoryRun:  true,
 		SampleRate: 0.2,
-		Logger:     zap.NewNop().Sugar(),
+		Logf:       func(string, ...any) {},
 	}
 	if err := runCommand(ctx, target, Command{Type: "up"}, opts); err != nil {
 		t.Fatalf("memory-run migrate: %v", err)

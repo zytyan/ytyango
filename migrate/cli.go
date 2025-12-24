@@ -4,12 +4,9 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	g "main/globalcfg"
 	"os"
 	"strings"
-
-	g "main/globalcfg"
-
-	"go.uber.org/zap"
 )
 
 type cliPaths struct {
@@ -29,12 +26,9 @@ type commonFlags struct {
 }
 
 // RunCLI executes the migrate subcommand flow.
-func RunCLI(ctx context.Context, args []string, logger *zap.SugaredLogger) error {
-	if logger == nil {
-		logger = g.GetLogger("migrate", zap.InfoLevel)
-	}
+func RunCLI(ctx context.Context, args []string) error {
 	if len(args) == 0 {
-		printUsage(logger)
+		printUsage()
 		return nil
 	}
 	cmdName := strings.ToLower(args[0])
@@ -42,29 +36,29 @@ func RunCLI(ctx context.Context, args []string, logger *zap.SugaredLogger) error
 
 	switch cmdName {
 	case "up":
-		return handleUp(ctx, cmdArgs, logger)
+		return handleUp(ctx, cmdArgs)
 	case "down":
-		return handleDown(ctx, cmdArgs, logger)
+		return handleDown(ctx, cmdArgs)
 	case "to":
-		return handleTo(ctx, cmdArgs, logger)
+		return handleTo(ctx, cmdArgs)
 	case "status":
-		return handleStatus(ctx, cmdArgs, logger)
+		return handleStatus(ctx, cmdArgs)
 	case "help":
-		printUsage(logger)
+		printUsage()
 		return nil
 	default:
-		printUsage(logger)
+		printUsage()
 		return fmt.Errorf("unknown migrate subcommand %q", cmdName)
 	}
 }
 
-func handleUp(ctx context.Context, args []string, logger *zap.SugaredLogger) error {
+func handleUp(ctx context.Context, args []string) error {
 	fs, cf := newFlagSet("up")
 	to := fs.Int("to", 0, "Target version (default latest)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	targets, opts, err := resolveTargets(cf, logger)
+	targets, opts, err := resolveTargets(cf)
 	if err != nil {
 		return err
 	}
@@ -76,14 +70,14 @@ func handleUp(ctx context.Context, args []string, logger *zap.SugaredLogger) err
 	return nil
 }
 
-func handleDown(ctx context.Context, args []string, logger *zap.SugaredLogger) error {
+func handleDown(ctx context.Context, args []string) error {
 	fs, cf := newFlagSet("down")
 	to := fs.Int("to", -1, "Target version (optional)")
 	step := fs.Int("step", 1, "Number of versions to roll back (default 1)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	targets, opts, err := resolveTargets(cf, logger)
+	targets, opts, err := resolveTargets(cf)
 	if err != nil {
 		return err
 	}
@@ -95,7 +89,7 @@ func handleDown(ctx context.Context, args []string, logger *zap.SugaredLogger) e
 	return nil
 }
 
-func handleTo(ctx context.Context, args []string, logger *zap.SugaredLogger) error {
+func handleTo(ctx context.Context, args []string) error {
 	fs, cf := newFlagSet("to")
 	to := fs.Int("to", 0, "Required target version")
 	if err := fs.Parse(args); err != nil {
@@ -104,7 +98,7 @@ func handleTo(ctx context.Context, args []string, logger *zap.SugaredLogger) err
 	if *to < 0 {
 		return fmt.Errorf("--to must be non-negative")
 	}
-	targets, opts, err := resolveTargets(cf, logger)
+	targets, opts, err := resolveTargets(cf)
 	if err != nil {
 		return err
 	}
@@ -116,12 +110,12 @@ func handleTo(ctx context.Context, args []string, logger *zap.SugaredLogger) err
 	return nil
 }
 
-func handleStatus(ctx context.Context, args []string, logger *zap.SugaredLogger) error {
+func handleStatus(ctx context.Context, args []string) error {
 	fs, cf := newFlagSet("status")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	targets, opts, err := resolveTargets(cf, logger)
+	targets, opts, err := resolveTargets(cf)
 	if err != nil {
 		return err
 	}
@@ -148,7 +142,7 @@ func newFlagSet(name string) (*flag.FlagSet, commonFlags) {
 	return fs, cf
 }
 
-func resolveTargets(cf commonFlags, logger *zap.SugaredLogger) ([]Target, ExecOptions, error) {
+func resolveTargets(cf commonFlags) ([]Target, ExecOptions, error) {
 	target := strings.ToLower(cf.target)
 	regs := registrySet()
 	opts := ExecOptions{
@@ -156,7 +150,9 @@ func resolveTargets(cf commonFlags, logger *zap.SugaredLogger) ([]Target, ExecOp
 		MemoryRun:  cf.memoryRun,
 		SampleRate: cf.sampleRate,
 		SampleRows: cf.sampleRows,
-		Logger:     logger,
+		Logf: func(format string, args ...any) {
+			fmt.Printf(format, args...)
+		},
 	}
 	paths := cliPaths{
 		Main: g.GetConfig().DatabasePath,
@@ -210,8 +206,8 @@ func resolveTargets(cf commonFlags, logger *zap.SugaredLogger) ([]Target, ExecOp
 	}
 }
 
-func printUsage(logger *zap.SugaredLogger) {
-	logger.Infof(`Usage: ytyango migrate <command> [options]
+func printUsage() {
+	fmt.Println(`Usage: ytyango migrate <command> [options]
 
 Commands:
   up        Apply migrations up to latest or --to version

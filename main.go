@@ -199,8 +199,9 @@ func main() {
 				os.Exit(1)
 			}
 			log = g.GetLogger("main", zap.InfoLevel)
-			if err := migrate.RunCLI(context.Background(), args[1:], log); err != nil {
-				log.Fatalf("migrate failed: %s", err)
+			if err := migrate.RunCLI(context.Background(), args[1:]); err != nil {
+				fmt.Fprintf(os.Stderr, "migrate failed: %v\n", err)
+				os.Exit(1)
 			}
 			return
 		case "help", "-h", "--help":
@@ -212,7 +213,7 @@ func main() {
 		}
 	}
 	if err := g.Init(false); err != nil {
-		fmt.Fprintf(os.Stderr, "init failed: %v\n", err)
+		_, _ = fmt.Fprintf(os.Stderr, "init failed: %v\n", err)
 		os.Exit(1)
 	}
 	log = g.GetLogger("main", zap.InfoLevel)

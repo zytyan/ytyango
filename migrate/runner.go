@@ -8,8 +8,6 @@ import (
 	"sort"
 	"strings"
 	"time"
-
-	"go.uber.org/zap"
 )
 
 type Registry struct {
@@ -29,7 +27,7 @@ type ExecOptions struct {
 	MemoryRun  bool
 	SampleRate float64
 	SampleRows int
-	Logger     *zap.SugaredLogger
+	Logf       func(string, ...any)
 }
 
 type Command struct {
@@ -39,6 +37,10 @@ type Command struct {
 }
 
 var ErrDirtyDatabase = errors.New("database is marked dirty")
+
+var defaultLogf = func(format string, args ...any) {
+	fmt.Printf(format, args...)
+}
 
 func registrySet() map[string]Registry {
 	return map[string]Registry{
@@ -96,6 +98,9 @@ func runCommand(ctx context.Context, target Target, cmd Command, opts ExecOption
 	if reg.Name == "" {
 		return errors.New("registry missing name")
 	}
+	if opts.Logf == nil {
+		opts.Logf = defaultLogf
+	}
 	if err := validateMigrations(reg.Migrations); err != nil {
 		return fmt.Errorf("validate migrations for %s: %w", reg.Name, err)
 	}
@@ -118,7 +123,7 @@ func runCommand(ctx context.Context, target Target, cmd Command, opts ExecOption
 
 	switch cmd.Type {
 	case "status":
-		printState(reg.Name, target.DBPath, state, reg.ExpectedVersion, opts.Logger)
+		printState(reg.Name, target.DBPath, state, reg.ExpectedVersion, opts.Logf)
 		return nil
 	case "up":
 		target := cmd.To
@@ -151,8 +156,8 @@ func runCommand(ctx context.Context, target Target, cmd Command, opts ExecOption
 
 func applyRange(ctx context.Context, db *sql.DB, reg Registry, current, target int, ascending bool, opts ExecOptions) error {
 	if current == target {
-		if opts.Logger != nil {
-			opts.Logger.Infof("[%s] already at version %d", reg.Name, current)
+		if opts.Logf != nil {
+			opts.Logf("[%s] already at version %d\n", reg.Name, current)
 		}
 		return nil
 	}
@@ -199,19 +204,19 @@ func applyMigration(ctx context.Context, db *sql.DB, name string, mig Migration,
 		return fmt.Errorf("[%s] migration %d (%s) has no %s steps", name, mig.Version, mig.Name, dir)
 	}
 
-	if opts.Logger != nil {
-		opts.Logger.Infof("[%s] %s migration %d (%s) -> version %d", name, strings.ToUpper(dir), mig.Version, mig.Name, targetVersion)
+	if opts.Logf != nil {
+		opts.Logf("[%s] %s migration %d (%s) -> version %d\n", name, strings.ToUpper(dir), mig.Version, mig.Name, targetVersion)
 	}
 
 	if opts.DryRun {
 		for _, step := range steps {
 			for _, stmt := range step.SQL {
-				if opts.Logger != nil {
-					opts.Logger.Infof("[dry-run][%s] SQL: %s", name, strings.TrimSpace(stmt))
+				if opts.Logf != nil {
+					opts.Logf("[dry-run][%s] SQL: %s\n", name, strings.TrimSpace(stmt))
 				}
 			}
-			if step.Go != nil && opts.Logger != nil {
-				opts.Logger.Infof("[dry-run][%s] Go step: %s", name, step.Description)
+			if step.Go != nil && opts.Logf != nil {
+				opts.Logf("[dry-run][%s] Go step: %s\n", name, step.Description)
 			}
 		}
 		return nil
@@ -227,8 +232,8 @@ func applyMigration(ctx context.Context, db *sql.DB, name string, mig Migration,
 	}
 	for _, step := range steps {
 		for _, stmt := range step.SQL {
-			if opts.Logger != nil {
-				opts.Logger.Infof("[%s] exec SQL: %s", name, strings.TrimSpace(stmt))
+			if opts.Logf != nil {
+				opts.Logf("[%s] exec SQL: %s\n", name, strings.TrimSpace(stmt))
 			}
 			if _, err := tx.ExecContext(ctx, stmt); err != nil {
 				_ = tx.Rollback()
@@ -236,8 +241,8 @@ func applyMigration(ctx context.Context, db *sql.DB, name string, mig Migration,
 			}
 		}
 		if step.Go != nil {
-			if opts.Logger != nil && step.Description != "" {
-				opts.Logger.Infof("[%s] Go step: %s", name, step.Description)
+			if opts.Logf != nil && step.Description != "" {
+				opts.Logf("[%s] Go step: %s\n", name, step.Description)
 			}
 			if err := step.Go(ctx, tx); err != nil {
 				_ = tx.Rollback()
@@ -257,7 +262,7 @@ func applyMigration(ctx context.Context, db *sql.DB, name string, mig Migration,
 
 func openForRun(ctx context.Context, path string, opts ExecOptions) (*sql.DB, func(), error) {
 	if opts.MemoryRun {
-		mem, err := copyToMemory(ctx, path, SampleConfig{Rate: opts.SampleRate, Rows: opts.SampleRows}, opts.Logger)
+		mem, err := copyToMemory(ctx, path, SampleConfig{Rate: opts.SampleRate, Rows: opts.SampleRows}, opts.Logf)
 		if err != nil {
 			return nil, func() {}, err
 		}
@@ -270,9 +275,9 @@ func openForRun(ctx context.Context, path string, opts ExecOptions) (*sql.DB, fu
 	return db, func() { _ = db.Close() }, nil
 }
 
-func printState(name, path string, st State, expected int, logger *zap.SugaredLogger) {
-	if logger == nil {
+func printState(name, path string, st State, expected int, logf func(string, ...any)) {
+	if logf == nil {
 		return
 	}
-	logger.Infof("[%s] path=%s version=%d dirty=%v expected=%d applied_at=%s", name, path, st.Version, st.Dirty, expected, st.AppliedAt.Format(time.RFC3339Nano))
+	logf("[%s] path=%s version=%d dirty=%v expected=%d applied_at=%s\n", name, path, st.Version, st.Dirty, expected, st.AppliedAt.Format(time.RFC3339Nano))
 }
