@@ -142,3 +142,52 @@ func TestMemoryRunSamplingDoesNotTouchDisk(t *testing.T) {
 		t.Fatalf("expected original table with 2 columns after memory-run, got %d", cols)
 	}
 }
+
+func TestMainMigrationsCreateGeminiContentV2(t *testing.T) {
+	ctx := context.Background()
+	dbPath := filepath.Join(t.TempDir(), "main_mig.db")
+	db, err := openSQLite(ctx, dbPath)
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	// Seed required dependency table for FK.
+	_, err = db.ExecContext(ctx, `CREATE TABLE gemini_sessions(
+id INTEGER PRIMARY KEY AUTOINCREMENT,
+chat_id INTEGER NOT NULL,
+chat_name TEXT NOT NULL,
+chat_type TEXT NOT NULL,
+frozen INTEGER NOT NULL DEFAULT 0
+) STRICT;`)
+	if err != nil {
+		t.Fatalf("create gemini_sessions: %v", err)
+	}
+
+	target := Target{
+		Registry: Registry{
+			Name:            "main",
+			Migrations:      MigrationsMain,
+			ExpectedVersion: ExpectedSchemaVersionMain,
+		},
+		DBPath: dbPath,
+	}
+	opts := ExecOptions{Logf: func(string, ...any) {}}
+	if err := runCommand(ctx, target, Command{Type: "up"}, opts); err != nil {
+		t.Fatalf("apply migrations: %v", err)
+	}
+
+	var name string
+	if err := db.QueryRowContext(ctx, `SELECT name FROM sqlite_master WHERE type='table' AND name='gemini_content_v2';`).Scan(&name); err != nil {
+		t.Fatalf("gemini_content_v2 not found: %v", err)
+	}
+	if err := db.QueryRowContext(ctx, `SELECT name FROM sqlite_master WHERE type='table' AND name='gemini_content_v2_parts';`).Scan(&name); err != nil {
+		t.Fatalf("gemini_content_v2_parts not found: %v", err)
+	}
+
+	state, err := ReadState(ctx, db)
+	if err != nil {
+		t.Fatalf("read state: %v", err)
+	}
+	if state.Version != ExpectedSchemaVersionMain || state.Dirty {
+		t.Fatalf("unexpected state: %+v", state)
+	}
+}
