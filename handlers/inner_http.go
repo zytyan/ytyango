@@ -410,7 +410,7 @@ func backupDBHandler(logger *zap.Logger) http.HandlerFunc {
 		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", filename))
 
 		counter := &countingWriter{w: w}
-		encoder, err := zstd.NewWriter(counter)
+		encoder, err := zstd.NewWriter(counter, zstd.WithEncoderLevel(zstd.SpeedBetterCompression))
 		if err != nil {
 			logger.Error("create zstd encoder", zap.Error(err))
 			http.Error(w, "failed to create encoder", http.StatusInternalServerError)
