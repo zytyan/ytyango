@@ -127,10 +127,10 @@ func handleStatus(ctx context.Context, args []string) error {
 	return nil
 }
 
-func newFlagSet(name string) (*flag.FlagSet, commonFlags) {
-	fs := flag.NewFlagSet(name, flag.ContinueOnError)
+func newFlagSet(name string) (*flag.FlagSet, *commonFlags) {
+	fs := flag.NewFlagSet(name, flag.ExitOnError)
 	fs.SetOutput(os.Stdout)
-	cf := commonFlags{}
+	cf := &commonFlags{}
 	fs.StringVar(&cf.target, "target", "main", "Target database: main|msg|all")
 	fs.StringVar(&cf.db, "db", "", "Database path override (single target only)")
 	fs.StringVar(&cf.dbMain, "db-main", "", "Main database path override (when target=all)")
@@ -142,7 +142,7 @@ func newFlagSet(name string) (*flag.FlagSet, commonFlags) {
 	return fs, cf
 }
 
-func resolveTargets(cf commonFlags) ([]Target, ExecOptions, error) {
+func resolveTargets(cf *commonFlags) ([]Target, ExecOptions, error) {
 	target := strings.ToLower(cf.target)
 	regs := registrySet()
 	opts := ExecOptions{
