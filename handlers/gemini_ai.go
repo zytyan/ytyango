@@ -76,9 +76,6 @@ type:%s
 	textPart := &genai.Part{
 		Text: label,
 	}
-	if content.ThoughtSignature.Valid {
-		textPart.ThoughtSignature = content.ThoughtSignature.String
-	}
 	out.Parts = append(out.Parts, textPart)
 	if content.Text.Valid {
 		out.Parts = append(out.Parts, &genai.Part{Text: content.Text.String})
