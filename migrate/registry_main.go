@@ -22,10 +22,11 @@ var MigrationsMain = []Migration{
     chat_id INTEGER NOT NULL,
     chat_name TEXT NOT NULL,
     chat_type TEXT NOT NULL,
+    tools     JSON_TEXT,
     cache_name TEXT,
     cache_ttl INTEGER,
     cache_expired INTEGER
-) STRICT;`,
+);`,
 					`INSERT INTO gemini_sessions_new (id, chat_id, chat_name, chat_type, cache_name, cache_ttl, cache_expired)
 SELECT id, chat_id, chat_name, chat_type, NULL, NULL, NULL FROM gemini_sessions;`,
 					`DROP TABLE gemini_sessions;`,
