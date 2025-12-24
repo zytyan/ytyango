@@ -48,6 +48,8 @@
 2. **作为维护者，我可以使用 `--dry-run` 看到将执行的 SQL 和 Go 变更列表，确认后再正式执行。**
 3. **作为开发者，我运行主程序时，如果数据库版本滞后，程序会 panic 并提示运行 migrate。**
 4. **作为维护者，当迁移失败时，数据库保持在先前版本或自动回滚，不出现部分完成状态。**
+5. **作为维护者，在不传 `--db` 时，命令会读取 config.yaml（globalconfig）中的数据库路径并提示目标库。**
+6. **作为维护者，我可以对 main 与 msg 两个数据库分别迁移或同时迁移。**
 
 ---
 
@@ -58,12 +60,15 @@
 | FR-1 | 新增 `migrate` 子命令，支持 `up`、`down`、`to <version>`，目标版本可通过 flag 传入 | 高 |
 | FR-2 | 支持 `--dry-run` 模式，仅打印将执行的 SQL/步骤，不对数据库写入 | 高 |
 | FR-3 | 主程序启动时读取迁移元数据表（版本、dirty 状态），若与编译时预期版本不一致则 panic，提示运行 `migrate` | 高 |
-| FR-4 | 迁移定义以连续版本号存放于 `migrate/` 目录，包含 Up/Down SQL 与可选 Go 回调，不依赖 sqlc | 高 |
-| FR-5 | 默认在单事务内执行一个版本的迁移步骤，确保原子性；对 SQLite 不支持的 DDL 需给出分步安全策略并标记 dirty | 中 |
-| FR-6 | 迁移步骤可包含 Go 数据处理（如类型转换、重建索引、填充默认值），并参与 DRY RUN 说明 | 中 |
-| FR-7 | 迁移元数据表记录当前版本、目标版本、执行时间、dirty 标记与日志摘要，失败时可安全重试 | 中 |
-| FR-8 | 命令行输出详细日志（执行 SQL、耗时、dry-run 展示），并返回非 0 退出码于失败 | 中 |
-| FR-9 | 仅内置 SQLite 驱动，避免引入其他数据库依赖以控制二进制体积 | 低 |
+| FR-4 | 迁移定义按数据库拆分存放于 `migrate/main/` 与 `migrate/msg/` 目录，包含 Up/Down SQL 与可选 Go 回调，不依赖 sqlc | 高 |
+| FR-5 | 支持 main/msg 双库迁移，命令可通过 flag 选择目标（如 `--target main|msg|all`），版本号与 dirty 状态分别管理 | 高 |
+| FR-6 | 当未显式传入数据库路径时，默认从 `config.yaml`（globalconfig）读取 main/msg 路径，命令行参数可覆盖，缺失时给出友好错误 | 高 |
+| FR-7 | 默认在单事务内执行一个版本的迁移步骤，确保原子性；对 SQLite 不支持的 DDL 需给出分步安全策略并标记 dirty | 中 |
+| FR-8 | 迁移步骤可包含 Go 数据处理（如类型转换、重建索引、填充默认值），并参与 DRY RUN 说明 | 中 |
+| FR-9 | 迁移元数据表记录当前版本、目标版本、执行时间、dirty 标记与日志摘要，失败时可安全重试 | 中 |
+| FR-10 | 命令行输出详细日志（执行 SQL、耗时、dry-run 展示），并返回非 0 退出码于失败 | 中 |
+| FR-11 | 仅内置 SQLite 驱动，避免引入其他数据库依赖以控制二进制体积 | 低 |
+| FR-12 | 裸 `ytyango migrate` 或缺少子命令时输出帮助/子命令列表，提示默认配置来源与示例用法 | 低 |
 
 ---
 
@@ -79,13 +84,14 @@
 
 ## **8. 技术方案（Tech Design Summary）**
 
-* 目录：新增 `migrate/`，包含迁移注册表、版本常量、执行器、CLI 入口。
-* 版本管理：创建 `schema_migrations`（或同名表）记录 `version`、`dirty`、`applied_at`、`log`；版本号为递增整数。
-* 启动校验：主程序读取元数据表，若不存在则初始化为版本 0；若与内置 `ExpectedSchemaVersion` 不一致则 panic，并输出迁移命令提示。
+* 目录：新增 `migrate/`，包含公共执行器/CLI 与 `main/`、`msg/` 两个子目录，分别存放各自的迁移注册表、版本常量与测试。
+* 版本管理：每个数据库创建独立的 `schema_migrations`（或同名表）记录 `version`、`dirty`、`applied_at`、`log`；版本号为递增整数，并提供 `ExpectedSchemaVersionMain`/`Msg`。
+* 配置加载：CLI 在未传入路径时使用 globalconfig 读取 `config.yaml` 中的 `database-path`、`msg-db-path`，缺失时提示错误；手动 flag 可覆盖。
+* 启动校验：主程序启动时分别读取 main/msg 元数据表，若不存在则初始化为版本 0；若与内置预期版本不一致则 panic，并输出迁移命令提示。
 * 迁移定义：使用 Go 结构体切片维护每个版本的 Up/Down，Up/Down 可包含 SQL 字符串列表和可选 Go 函数；SQL 直接通过 `database/sql` 执行。
 * 原子性策略：默认单事务执行一个版本的所有 Up/Down SQL；遇到 SQLite 不支持的多语句事务变更（如某些 `ALTER TABLE`）时，使用可回滚的临时表方案，并在 dirty 记录中注明。
 * DRY RUN：执行器在 dry-run 时不写库，打印执行顺序、SQL、预估影响表，并标记将写入的版本变化。
-* CLI：在 `cmd` 或主入口中新增 `migrate` 子命令，支持 `--db`（路径）、`--to`、`--step`、`--dry-run`、`--force-down` 等 flag；输出 JSON/文本日志。
+* CLI：在 `cmd` 或主入口中新增 `migrate` 子命令，支持 `--target main|msg|all`、`--db`（路径，覆盖配置）、`--to`、`--step`、`--dry-run`、`--force-down` 等 flag；裸命令输出帮助。
 * 扩展性：保留接口以按需引入其他数据库实现，但默认仅构建 SQLite，避免体积膨胀。
 
 ---
@@ -103,6 +109,8 @@ CREATE TABLE schema_migrations (
 );
 CREATE UNIQUE INDEX idx_schema_migrations_version ON schema_migrations(version);
 ```
+
+main/msg 数据库各自维护上述表，版本号独立递增，互不影响。
 
 迁移定义结构（Go 草案）：
 
@@ -134,8 +142,10 @@ type Migration struct {
 
 ## **11. 使用说明（How to Use）**
 
-* 升级到最新：`./ytyango migrate up --db ./data/main.db`
-* 指定目标版本：`./ytyango migrate to --to 5 --db ./data/main.db`
-* 回滚一步：`./ytyango migrate down --step 1 --db ./data/main.db`
-* 预览：`./ytyango migrate up --to 5 --dry-run --db ./data/main.db`
-* 主程序校验：运行主程序时若报版本不一致，按提示运行上述命令完成迁移。
+* 升级 main（默认使用 config.yaml 中的 `database-path`）：`./ytyango migrate up --target main`
+* 升级 msg（默认使用 config.yaml 中的 `msg-db-path`，可被 `--db` 覆盖）：`./ytyango migrate up --target msg --db ./data/msg.db`
+* 同时迁移两个库：`./ytyango migrate up --target all`
+* 指定目标版本：`./ytyango migrate to --to 5 --target main --db ./data/main.db`
+* 回滚一步：`./ytyango migrate down --step 1 --target msg`
+* 预览：`./ytyango migrate up --to 5 --dry-run --target main`
+* 裸命令：`./ytyango migrate` 输出子命令帮助与默认路径来源说明；主程序报版本不一致时按提示运行对应命令完成迁移。
