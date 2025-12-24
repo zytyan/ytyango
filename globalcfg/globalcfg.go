@@ -109,6 +109,9 @@ type LoggerWithLevel struct {
 func GetLogger(name string, level zapcore.Level) *zap.SugaredLogger {
 	gLoggerMu.Lock()
 	defer gLoggerMu.Unlock()
+	if gWriteSyncer == nil {
+		gWriteSyncer = initWriteSyncer()
+	}
 	if logger, ok := loggers[name]; ok {
 		return logger.Logger
 	}

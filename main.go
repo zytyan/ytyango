@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	g "main/globalcfg"
 	hdrs "main/handlers"
 	"main/http/backend"
@@ -26,7 +27,7 @@ import (
 	"go.uber.org/zap"
 )
 
-var log = g.GetLogger("main", zap.InfoLevel)
+var log *zap.SugaredLogger
 var compileTime = "unknown"
 
 type GroupedDispatcher struct {
@@ -181,13 +182,40 @@ func zapLogFields(b *gotgbot.Bot, ctx *ext.Context) []zap.Field {
 	return fields
 }
 
+func printMainUsage() {
+	fmt.Println("Usage: ytyango [migrate|help]")
+	fmt.Println("  (no args)   start bot and HTTP services")
+	fmt.Println("  migrate     run database migrations (use 'migrate help' for subcommands)")
+	fmt.Println("  help        show this message")
+}
+
 func main() {
-	if len(os.Args) > 1 && os.Args[1] == "migrate" {
-		if err := migrate.RunCLI(context.Background(), os.Args[2:], log); err != nil {
-			log.Fatalf("migrate failed: %s", err)
+	args := os.Args[1:]
+	if len(args) > 0 {
+		switch args[0] {
+		case "migrate":
+			if err := g.Init(true); err != nil {
+				fmt.Fprintf(os.Stderr, "init config for migrate failed: %v\n", err)
+				os.Exit(1)
+			}
+			log = g.GetLogger("main", zap.InfoLevel)
+			if err := migrate.RunCLI(context.Background(), args[1:], log); err != nil {
+				log.Fatalf("migrate failed: %s", err)
+			}
+			return
+		case "help", "-h", "--help":
+			printMainUsage()
+			return
+		default:
+			printMainUsage()
+			os.Exit(1)
 		}
-		return
 	}
+	if err := g.Init(false); err != nil {
+		fmt.Fprintf(os.Stderr, "init failed: %v\n", err)
+		os.Exit(1)
+	}
+	log = g.GetLogger("main", zap.InfoLevel)
 	log.Infof("compile time: %s", compileTime)
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
