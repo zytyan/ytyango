@@ -27,7 +27,7 @@
 
 ## **3. 非目标（Out of Scope）**
 
-* 不做旧 `gemini_contents` 数据向 v2 的迁移清洗；历史对话可放弃或仅供只读。
+* 不做旧 `gemini_contents` 数据向 v2 的迁移清洗；历史对话直接放弃，旧表保留但不再使用。
 * 不兼容旧的 “frozen” 会话或 `gemini_session_migrations` / `gemini_memories` 逻辑。
 * 不新增跨平台入口（仅保持 Telegram 机器人），不实现多模型路由或多租户。
 
