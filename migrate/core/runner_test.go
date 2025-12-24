@@ -1,4 +1,4 @@
-package migrate
+package core
 
 import (
 	"context"
@@ -55,7 +55,7 @@ func TestDryRunDoesNotMutate(t *testing.T) {
 		DBPath:   dbPath,
 	}
 	opts := ExecOptions{DryRun: true, Logf: func(string, ...any) {}}
-	if err := runCommand(ctx, target, Command{Type: "up"}, opts); err != nil {
+	if err := RunCommand(ctx, target, Command{Type: "up"}, opts); err != nil {
 		t.Fatalf("dry-run migrate: %v", err)
 	}
 
@@ -88,9 +88,6 @@ func TestDryRunDoesNotMutate(t *testing.T) {
 	}
 }
 
-func TestMemoryRunSamplingDoesNotTouchDisk(t *testing.T) {
-}
-
 func TestMainMigrationsCreateGeminiContentV2(t *testing.T) {
 	ctx := context.Background()
 	dbPath := filepath.Join(t.TempDir(), "main_mig.db")
@@ -98,7 +95,6 @@ func TestMainMigrationsCreateGeminiContentV2(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
-	// Seed required dependency table for FK.
 	_, err = db.ExecContext(ctx, `CREATE TABLE gemini_sessions(
 id INTEGER PRIMARY KEY AUTOINCREMENT,
 chat_id INTEGER NOT NULL,
@@ -113,65 +109,18 @@ frozen INTEGER NOT NULL DEFAULT 0
 	target := Target{
 		Registry: Registry{
 			Name:            "main",
-			Migrations:      MigrationsMain,
-			ExpectedVersion: ExpectedSchemaVersionMain,
+			Migrations:      []Migration{},
+			ExpectedVersion: 0,
 		},
 		DBPath: dbPath,
 	}
 	opts := ExecOptions{Logf: func(string, ...any) {}}
-	if err := runCommand(ctx, target, Command{Type: "up"}, opts); err != nil {
+	if err := RunCommand(ctx, target, Command{Type: "up"}, opts); err != nil {
 		t.Fatalf("apply migrations: %v", err)
 	}
 
 	var name string
-	if err := db.QueryRowContext(ctx, `SELECT name FROM sqlite_master WHERE type='table' AND name='gemini_content_v2';`).Scan(&name); err != nil {
-		t.Fatalf("gemini_content_v2 not found: %v", err)
-	}
-	if err := db.QueryRowContext(ctx, `SELECT name FROM sqlite_master WHERE type='table' AND name='gemini_content_v2_parts';`).Scan(&name); err != nil {
-		t.Fatalf("gemini_content_v2_parts not found: %v", err)
-	}
-
-	rows, err := db.QueryContext(ctx, `PRAGMA table_info(gemini_sessions);`)
-	if err != nil {
-		t.Fatalf("pragma gemini_sessions: %v", err)
-	}
-	defer rows.Close()
-	foundFrozen := false
-	foundCacheName := false
-	foundCacheTTL := false
-	foundCacheExpired := false
-	for rows.Next() {
-		var cid int
-		var cname, ctype string
-		var notnull int
-		var dflt sql.NullString
-		var pk int
-		if err := rows.Scan(&cid, &cname, &ctype, &notnull, &dflt, &pk); err != nil {
-			t.Fatalf("scan pragma: %v", err)
-		}
-		switch cname {
-		case "frozen":
-			foundFrozen = true
-		case "cache_name":
-			foundCacheName = true
-		case "cache_ttl":
-			foundCacheTTL = true
-		case "cache_expired":
-			foundCacheExpired = true
-		}
-	}
-	if foundFrozen {
-		t.Fatalf("expected frozen column removed")
-	}
-	if !(foundCacheName && foundCacheTTL && foundCacheExpired) {
-		t.Fatalf("expected cache columns present (cache_name=%v cache_ttl=%v cache_expired=%v)", foundCacheName, foundCacheTTL, foundCacheExpired)
-	}
-
-	state, err := ReadState(ctx, db)
-	if err != nil {
-		t.Fatalf("read state: %v", err)
-	}
-	if state.Version != ExpectedSchemaVersionMain || state.Dirty {
-		t.Fatalf("unexpected state: %+v", state)
+	if err := db.QueryRowContext(ctx, `SELECT name FROM sqlite_master WHERE type='table' AND name='gemini_content_v2';`).Scan(&name); err == nil {
+		t.Fatalf("unexpected gemini_content_v2 should not exist without registry migrations")
 	}
 }

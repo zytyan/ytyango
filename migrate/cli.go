@@ -60,7 +60,7 @@ func handleUp(ctx context.Context, args []string) error {
 		return err
 	}
 	for _, t := range targets {
-		if err := runCommand(ctx, t, Command{Type: "up", To: *to}, opts); err != nil {
+		if err := RunCommand(ctx, t, Command{Type: "up", To: *to}, opts); err != nil {
 			return err
 		}
 	}
@@ -79,7 +79,7 @@ func handleDown(ctx context.Context, args []string) error {
 		return err
 	}
 	for _, t := range targets {
-		if err := runCommand(ctx, t, Command{Type: "down", To: *to, Step: *step}, opts); err != nil {
+		if err := RunCommand(ctx, t, Command{Type: "down", To: *to, Step: *step}, opts); err != nil {
 			return err
 		}
 	}
@@ -100,7 +100,7 @@ func handleTo(ctx context.Context, args []string) error {
 		return err
 	}
 	for _, t := range targets {
-		if err := runCommand(ctx, t, Command{Type: "to", To: *to}, opts); err != nil {
+		if err := RunCommand(ctx, t, Command{Type: "to", To: *to}, opts); err != nil {
 			return err
 		}
 	}
@@ -117,7 +117,7 @@ func handleStatus(ctx context.Context, args []string) error {
 		return err
 	}
 	for _, t := range targets {
-		if err := runCommand(ctx, t, Command{Type: "status"}, opts); err != nil {
+		if err := RunCommand(ctx, t, Command{Type: "status"}, opts); err != nil {
 			return err
 		}
 	}

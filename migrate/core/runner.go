@@ -1,4 +1,4 @@
-package migrate
+package core
 
 import (
 	"context"
@@ -10,39 +10,14 @@ import (
 	"time"
 )
 
-type Registry struct {
-	Name            string
-	Migrations      []Migration
-	ExpectedVersion int
-}
-
-// Target bundles a registry with its concrete DB path.
-type Target struct {
-	Registry Registry
-	DBPath   string
-}
-
-type ExecOptions struct {
-	DryRun bool
-	Logf   func(string, ...any)
-}
-
-type Command struct {
-	Type string // up, down, to, status
-	To   int
-	Step int
-}
-
-var ErrDirtyDatabase = errors.New("database is marked dirty")
-
 var defaultLogf = func(format string, args ...any) {
 	fmt.Printf(format, args...)
 }
 
-func registrySet() map[string]Registry {
+func RegistrySet(mainMigs []Migration, mainVer int, msgMigs []Migration, msgVer int) map[string]Registry {
 	return map[string]Registry{
-		"main": {Name: "main", Migrations: MigrationsMain, ExpectedVersion: ExpectedSchemaVersionMain},
-		"msg":  {Name: "msg", Migrations: MigrationsMsg, ExpectedVersion: ExpectedSchemaVersionMsg},
+		"main": {Name: "main", Migrations: mainMigs, ExpectedVersion: mainVer},
+		"msg":  {Name: "msg", Migrations: msgMigs, ExpectedVersion: msgVer},
 	}
 }
 
@@ -90,7 +65,7 @@ func findMigration(migs []Migration, version int) (Migration, bool) {
 	return Migration{}, false
 }
 
-func runCommand(ctx context.Context, target Target, cmd Command, opts ExecOptions) error {
+func RunCommand(ctx context.Context, target Target, cmd Command, opts ExecOptions) error {
 	reg := target.Registry
 	if reg.Name == "" {
 		return errors.New("registry missing name")
@@ -171,7 +146,6 @@ func applyRange(ctx context.Context, db *sql.DB, reg Registry, current, target i
 		}
 		return nil
 	}
-	// descending
 	for v := current; v > target; v-- {
 		mig, ok := findMigration(reg.Migrations, v)
 		if !ok {

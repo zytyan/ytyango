@@ -7,6 +7,13 @@ var MigrationsMain = []Migration{
 		Name:    "add gemini content v2 tables and extend gemini_sessions",
 		Up: []Step{
 			{
+				Description: "drop deprecated gemini tables",
+				SQL: []string{
+					`DROP TABLE IF EXISTS gemini_session_migrations;`,
+					`DROP TABLE IF EXISTS gemini_memories;`,
+				},
+			},
+			{
 				Description: "rebuild gemini_sessions without frozen and add cache fields",
 				SQL: []string{
 					"PRAGMA foreign_keys=OFF;",
@@ -72,6 +79,27 @@ SELECT id, chat_id, chat_name, chat_type, NULL, NULL, NULL FROM gemini_sessions;
 				"PRAGMA foreign_keys=OFF;",
 				`DROP TABLE IF EXISTS gemini_content_v2_parts;`,
 				`DROP TABLE IF EXISTS gemini_content_v2;`,
+				`CREATE TABLE IF NOT EXISTS gemini_session_migrations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    old_session_id INTEGER NOT NULL,
+    new_session_id INTEGER NOT NULL,
+    migrated_msg_ids TEXT NOT NULL,
+    reason TEXT,
+    requested_by TEXT,
+    created_at INT_UNIX_SEC NOT NULL
+);`,
+				`CREATE TABLE IF NOT EXISTS gemini_memories (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    chat_id INTEGER NOT NULL,
+    user_id INTEGER,
+    type TEXT NOT NULL,
+    content TEXT NOT NULL,
+    importance INTEGER NOT NULL DEFAULT 0,
+    expires_at INT_UNIX_SEC,
+    created_at INT_UNIX_SEC NOT NULL,
+    updated_at INT_UNIX_SEC NOT NULL,
+    created_by TEXT
+);`,
 				`CREATE TABLE gemini_sessions_old (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     chat_id INTEGER NOT NULL,
