@@ -195,12 +195,12 @@ func main() {
 		switch args[0] {
 		case "migrate":
 			if err := g.Init(true); err != nil {
-				fmt.Fprintf(os.Stderr, "init config for migrate failed: %v\n", err)
+				_, _ = fmt.Fprintf(os.Stderr, "init config for migrate failed: %v\n", err)
 				os.Exit(1)
 			}
 			log = g.GetLogger("main", zap.InfoLevel)
 			if err := migrate.RunCLI(context.Background(), args[1:]); err != nil {
-				fmt.Fprintf(os.Stderr, "migrate failed: %v\n", err)
+				_, _ = fmt.Fprintf(os.Stderr, "migrate failed: %v\n", err)
 				os.Exit(1)
 			}
 			return

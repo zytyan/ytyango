@@ -55,7 +55,7 @@ func initConfig() *Config {
 	var cfg Config
 	configFile, exists := os.LookupEnv("GOYTYAN_CONFIG")
 	if !exists {
-		return &cfg
+		configFile = "config.yaml"
 	}
 	data, err := os.ReadFile(configFile)
 	if err != nil {
