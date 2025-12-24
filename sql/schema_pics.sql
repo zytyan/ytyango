@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS saved_pics_rating
     user_id  INTEGER NOT NULL,
     rating   INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (file_uid, user_id),
-    FOREIGN KEY (file_uid) REFERENCES saved_pics (file_uid)
+    FOREIGN KEY (file_uid) REFERENCES saved_pics_old (file_uid)
 ) WITHOUT ROWID, STRICT;
 
 

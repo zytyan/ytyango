@@ -4,7 +4,8 @@ CREATE TABLE gemini_sessions
     id        INTEGER PRIMARY KEY AUTOINCREMENT,
     chat_id   INTEGER NOT NULL,
     chat_name TEXT    NOT NULL,
-    chat_type TEXT    NOT NULL
+    chat_type TEXT    NOT NULL,
+    frozen    INTEGER NOT NULL DEFAULT 0
 ) STRICT;
 
 -- Contents（消息内容表）
@@ -38,3 +39,58 @@ CREATE TABLE gemini_contents
         (blob IS NOT NULL AND mime_type IS NOT NULL)
         )
 ) WITHOUT ROWID;
+
+-- Messages（上下文消息表）
+CREATE TABLE gemini_messages
+(
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id    INTEGER      NOT NULL REFERENCES gemini_sessions (id) ON DELETE CASCADE,
+    chat_id       INTEGER      NOT NULL,
+    tg_message_id INTEGER      NOT NULL,
+    from_id       INTEGER      NOT NULL,
+    role          TEXT         NOT NULL,
+    content       TEXT         NOT NULL,
+    seq           INTEGER      NOT NULL,
+    reply_to_seq  INTEGER,
+    created_at    INT_UNIX_SEC NOT NULL,
+    UNIQUE (chat_id, tg_message_id),
+    UNIQUE (session_id, seq)
+);
+
+CREATE INDEX idx_gemini_messages_session_seq
+    ON gemini_messages (session_id, seq);
+
+CREATE INDEX idx_gemini_messages_chat_tg
+    ON gemini_messages (chat_id, tg_message_id);
+
+-- Session Migrations（会话合并/迁移记录）
+CREATE TABLE gemini_session_migrations
+(
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    old_session_id   INTEGER      NOT NULL,
+    new_session_id   INTEGER      NOT NULL,
+    migrated_msg_ids TEXT         NOT NULL, -- comma separated msg_id list
+    reason           TEXT,
+    requested_by     TEXT,
+    created_at       INT_UNIX_SEC NOT NULL,
+    FOREIGN KEY (old_session_id) REFERENCES gemini_sessions (id),
+    FOREIGN KEY (new_session_id) REFERENCES gemini_sessions (id)
+);
+
+-- Memories（记忆表）
+CREATE TABLE gemini_memories
+(
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    chat_id    INTEGER      NOT NULL,
+    user_id    INTEGER,
+    type       TEXT         NOT NULL,
+    content    TEXT         NOT NULL,
+    importance INTEGER      NOT NULL DEFAULT 0,
+    expires_at INT_UNIX_SEC,
+    created_at INT_UNIX_SEC NOT NULL,
+    updated_at INT_UNIX_SEC NOT NULL,
+    created_by TEXT
+);
+
+CREATE INDEX idx_gemini_memories_chat_user ON gemini_memories (chat_id, user_id);
+CREATE INDEX idx_gemini_memories_expires ON gemini_memories (expires_at);
