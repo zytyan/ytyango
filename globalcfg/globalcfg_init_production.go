@@ -6,6 +6,7 @@ import (
 	"context"
 	"main/globalcfg/msgs"
 	"main/globalcfg/q"
+	"os"
 	"testing"
 	"time"
 
@@ -16,6 +17,13 @@ func initByConfig() {
 	var err error
 	config = initConfig()
 	gWriteSyncer = initWriteSyncer()
+
+	skipDBInit := len(os.Args) > 1 && os.Args[1] == "migrate"
+	if skipDBInit {
+		// In migrate CLI mode we only need config values; avoid preparing DB/schema to allow running before schema exists.
+		return
+	}
+
 	db = initDatabase(config.DatabasePath)
 	logger := GetLogger("database", zap.WarnLevel)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
