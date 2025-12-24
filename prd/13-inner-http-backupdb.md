@@ -75,7 +75,7 @@
 ## **8. 技术方案（Tech Design Summary）**
 
 * 路由：inner_http `buildHandler` 新增 `/backupdb` GET。
-* 备份：通过 `database/sql` 获取 `*sql.DB` 后使用 sqlite3 Backup/VACUUM INTO 将 main/msg 复制到 `os.CreateTemp` 生成的快照文件，完成后打包 zip，边读边写响应。
+* 备份：通过 `database/sql` 获取 `*sql.DB` 后使用 sqlite3 Backup API 将 main/msg 复制到 `os.CreateTemp` 生成的快照文件，完成后打包 zip，边读边写响应。
 * 输出：zip 内含 `main.db`、`msg.db`（按选择）与 `manifest.json`（时间戳、源路径、文件大小、选择范围）。
 * 安全：支持可选环境变量 token（如 `GOYTYAN_BACKUP_TOKEN`），通过 Header `X-Backup-Token` 或 query `token` 校验；默认不强制。
 * 清理：使用 `defer` 删除临时文件与临时目录，错误时中断响应。

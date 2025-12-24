@@ -1,6 +1,9 @@
 package handlers
 
 import (
+	"archive/zip"
+	"bytes"
+	"encoding/json"
 	"io"
 	g "main/globalcfg"
 	"net/http"
@@ -16,6 +19,43 @@ import (
 func newTestServer() *httptest.Server {
 	logger := g.GetLogger("inner-http-test", zap.InfoLevel)
 	return httptest.NewServer(buildHandler(logger.Desugar()))
+}
+
+func zipEntries(t *testing.T, data []byte) map[string]*zip.File {
+	t.Helper()
+	reader, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
+	if err != nil {
+		t.Fatalf("open zip: %v", err)
+	}
+	entries := make(map[string]*zip.File, len(reader.File))
+	for _, f := range reader.File {
+		entries[f.Name] = f
+	}
+	return entries
+}
+
+func readZipFile(t *testing.T, f *zip.File) []byte {
+	t.Helper()
+	rc, err := f.Open()
+	if err != nil {
+		t.Fatalf("open zip file %s: %v", f.Name, err)
+	}
+	defer rc.Close()
+	data, err := io.ReadAll(rc)
+	if err != nil {
+		t.Fatalf("read zip file %s: %v", f.Name, err)
+	}
+	return data
+}
+
+func parseManifest(t *testing.T, f *zip.File) backupManifest {
+	t.Helper()
+	data := readZipFile(t, f)
+	var manifest backupManifest
+	if err := json.Unmarshal(data, &manifest); err != nil {
+		t.Fatalf("unmarshal manifest: %v", err)
+	}
+	return manifest
 }
 
 func TestMarsCounterSuccess(t *testing.T) {
@@ -170,5 +210,121 @@ func TestRootListsRoutesForAnyMethod(t *testing.T) {
 	body, _ := io.ReadAll(resp.Body)
 	if !strings.Contains(string(body), "GET /loggers") {
 		t.Fatalf("unexpected body: %s", string(body))
+	}
+}
+
+func TestBackupDBSuccessAll(t *testing.T) {
+	server := newTestServer()
+	defer server.Close()
+
+	resp, err := http.Get(server.URL + "/backupdb")
+	if err != nil {
+		t.Fatalf("get backupdb: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200 got %d", resp.StatusCode)
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("read body: %v", err)
+	}
+	entries := zipEntries(t, body)
+	if _, ok := entries["main.db"]; !ok {
+		t.Fatalf("expected main.db in zip")
+	}
+	if _, ok := entries["msg.db"]; !ok {
+		t.Fatalf("expected msg.db in zip")
+	}
+	manifestFile, ok := entries["manifest.json"]
+	if !ok {
+		t.Fatalf("manifest missing")
+	}
+	manifest := parseManifest(t, manifestFile)
+	if len(manifest.Databases) != 2 {
+		t.Fatalf("expected 2 databases, got %d", len(manifest.Databases))
+	}
+	if manifest.Options["db"] != "all" {
+		t.Fatalf("expected manifest option db=all, got %s", manifest.Options["db"])
+	}
+}
+
+func TestBackupDBScopeMain(t *testing.T) {
+	server := newTestServer()
+	defer server.Close()
+
+	resp, err := http.Get(server.URL + "/backupdb?db=main")
+	if err != nil {
+		t.Fatalf("get backupdb: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200 got %d", resp.StatusCode)
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("read body: %v", err)
+	}
+	entries := zipEntries(t, body)
+	if _, ok := entries["msg.db"]; ok {
+		t.Fatalf("did not expect msg.db in scoped backup")
+	}
+	manifestFile, ok := entries["manifest.json"]
+	if !ok {
+		t.Fatalf("manifest missing")
+	}
+	manifest := parseManifest(t, manifestFile)
+	if len(manifest.Databases) != 1 {
+		t.Fatalf("expected 1 database, got %d", len(manifest.Databases))
+	}
+	if manifest.Databases[0].Name != "main" {
+		t.Fatalf("expected main in manifest, got %s", manifest.Databases[0].Name)
+	}
+	if manifest.Options["db"] != "main" {
+		t.Fatalf("expected manifest option db=main, got %s", manifest.Options["db"])
+	}
+}
+
+func TestBackupDBInvalidSelection(t *testing.T) {
+	server := newTestServer()
+	defer server.Close()
+
+	resp, err := http.Get(server.URL + "/backupdb?db=unknown")
+	if err != nil {
+		t.Fatalf("get backupdb: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected 400 got %d", resp.StatusCode)
+	}
+}
+
+func TestBackupDBToken(t *testing.T) {
+	t.Setenv(backupTokenEnvKey, "secret-token")
+
+	server := newTestServer()
+	defer server.Close()
+
+	resp, err := http.Get(server.URL + "/backupdb")
+	if err != nil {
+		t.Fatalf("get backupdb without token: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("expected 401 got %d", resp.StatusCode)
+	}
+
+	req, err := http.NewRequest(http.MethodGet, server.URL+"/backupdb", nil)
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+	req.Header.Set("X-Backup-Token", "secret-token")
+	resp, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("get backupdb with token: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200 got %d", resp.StatusCode)
 	}
 }
