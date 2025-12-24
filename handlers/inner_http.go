@@ -271,7 +271,7 @@ func addFileToZip(zipWriter *zip.Writer, name, srcPath string) error {
 		Name:   name,
 		Method: zip.Deflate,
 	}
-	header.SetModTime(time.Now())
+	header.Modified = time.Now()
 
 	writer, err := zipWriter.CreateHeader(header)
 	if err != nil {
@@ -290,7 +290,7 @@ func writeManifest(zipWriter *zip.Writer, manifest backupManifest) error {
 		Name:   "manifest.json",
 		Method: zip.Deflate,
 	}
-	header.SetModTime(time.Now())
+	header.Modified = time.Now()
 	writer, err := zipWriter.CreateHeader(header)
 	if err != nil {
 		return err
