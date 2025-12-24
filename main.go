@@ -5,6 +5,7 @@ import (
 	g "main/globalcfg"
 	hdrs "main/handlers"
 	"main/http/backend"
+	"main/migrate"
 	"net/http"
 	"os"
 	"os/signal"
@@ -181,9 +182,21 @@ func zapLogFields(b *gotgbot.Bot, ctx *ext.Context) []zap.Field {
 }
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "migrate" {
+		if err := migrate.RunCLI(context.Background(), os.Args[2:], log); err != nil {
+			log.Fatalf("migrate failed: %s", err)
+		}
+		return
+	}
 	log.Infof("compile time: %s", compileTime)
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	if err := migrate.CheckVersion(ctx, g.RawMainDb(), migrate.ExpectedSchemaVersionMain, "main"); err != nil {
+		panic(err)
+	}
+	if err := migrate.CheckVersion(ctx, g.RawMsgsDb(), migrate.ExpectedSchemaVersionMsg, "msg"); err != nil {
+		panic(err)
+	}
 	defer func() {
 		if err := g.Q.FlushChatStats(context.Background()); err != nil {
 			log.Errorf("flush chat stats: %s", err)
