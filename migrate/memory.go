@@ -17,14 +17,14 @@ func copyToMemory(ctx context.Context, sourcePath string, sample SampleConfig, l
 	if sourcePath == "" {
 		return nil, fmt.Errorf("source path is empty")
 	}
-	src, err := openSQLite(ctx, sourcePath)
+	src, err := openSQLite(ctx, sourcePath, false)
 	if err != nil {
 		return nil, fmt.Errorf("open source db: %w", err)
 	}
 	defer src.Close()
 
 	memDSN := fmt.Sprintf("file:migrate_mem_%d?mode=memory&cache=shared", time.Now().UnixNano())
-	dst, err := openSQLite(ctx, memDSN)
+	dst, err := openSQLite(ctx, memDSN, false)
 	if err != nil {
 		return nil, fmt.Errorf("open memory db: %w", err)
 	}

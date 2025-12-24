@@ -98,12 +98,6 @@ func runCommand(ctx context.Context, target Target, cmd Command, opts ExecOption
 	if reg.Name == "" {
 		return errors.New("registry missing name")
 	}
-	if opts.DryRun && !opts.MemoryRun {
-		// Run dry-run against an in-memory copy to avoid mutating the real database.
-		opts.MemoryRun = true
-		opts.SampleRate = 0
-		opts.SampleRows = 0
-	}
 	if opts.Logf == nil {
 		opts.Logf = defaultLogf
 	}
@@ -275,7 +269,7 @@ func openForRun(ctx context.Context, path string, opts ExecOptions) (*sql.DB, fu
 		}
 		return mem, func() { _ = mem.Close() }, nil
 	}
-	db, err := openSQLite(ctx, path)
+	db, err := openSQLite(ctx, path, opts.DryRun)
 	if err != nil {
 		return nil, func() {}, err
 	}

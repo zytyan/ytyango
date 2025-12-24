@@ -11,7 +11,7 @@ import (
 func TestEnsureMetadataAndCheckVersion(t *testing.T) {
 	ctx := context.Background()
 	dbPath := filepath.Join(t.TempDir(), "meta.db")
-	db, err := openSQLite(ctx, dbPath)
+	db, err := openSQLite(ctx, dbPath, false)
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
@@ -32,7 +32,7 @@ func TestEnsureMetadataAndCheckVersion(t *testing.T) {
 func TestDryRunDoesNotMutate(t *testing.T) {
 	ctx := context.Background()
 	dbPath := filepath.Join(t.TempDir(), "dry.db")
-	db, err := openSQLite(ctx, dbPath)
+	db, err := openSQLite(ctx, dbPath, false)
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
@@ -59,7 +59,7 @@ func TestDryRunDoesNotMutate(t *testing.T) {
 		t.Fatalf("dry-run migrate: %v", err)
 	}
 
-	db, err = openSQLite(ctx, dbPath)
+	db, err = openSQLite(ctx, dbPath, false)
 	if err != nil {
 		t.Fatalf("reopen db: %v", err)
 	}
@@ -91,7 +91,7 @@ func TestDryRunDoesNotMutate(t *testing.T) {
 func TestMemoryRunSamplingDoesNotTouchDisk(t *testing.T) {
 	ctx := context.Background()
 	dbPath := filepath.Join(t.TempDir(), "memrun.db")
-	db, err := openSQLite(ctx, dbPath)
+	db, err := openSQLite(ctx, dbPath, false)
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
@@ -130,7 +130,7 @@ func TestMemoryRunSamplingDoesNotTouchDisk(t *testing.T) {
 		t.Fatalf("memory-run migrate: %v", err)
 	}
 
-	db, err = openSQLite(ctx, dbPath)
+	db, err = openSQLite(ctx, dbPath, false)
 	if err != nil {
 		t.Fatalf("reopen db: %v", err)
 	}
@@ -152,7 +152,7 @@ func TestMemoryRunSamplingDoesNotTouchDisk(t *testing.T) {
 func TestMainMigrationsCreateGeminiContentV2(t *testing.T) {
 	ctx := context.Background()
 	dbPath := filepath.Join(t.TempDir(), "main_mig.db")
-	db, err := openSQLite(ctx, dbPath)
+	db, err := openSQLite(ctx, dbPath, false)
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
