@@ -1,7 +1,7 @@
 package handlers
 
 import (
-	"archive/zip"
+	"archive/tar"
 	"context"
 	"database/sql"
 	"errors"
@@ -18,6 +18,7 @@ import (
 	"time"
 
 	json "github.com/json-iterator/go"
+	"github.com/klauspost/compress/zstd"
 	sqlite3 "github.com/mattn/go-sqlite3"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -51,6 +52,17 @@ type DioBanUser struct {
 type statusRecorder struct {
 	http.ResponseWriter
 	status int
+}
+
+type countingWriter struct {
+	w       io.Writer
+	written int64
+}
+
+func (c *countingWriter) Write(p []byte) (int, error) {
+	n, err := c.w.Write(p)
+	c.written += int64(n)
+	return n, err
 }
 
 type backupSelection struct {
@@ -260,42 +272,45 @@ func backupSQLiteDB(ctx context.Context, src *sql.DB, dstPath string) error {
 	})
 }
 
-func addFileToZip(zipWriter *zip.Writer, name, srcPath string) error {
+func addFileToTar(tw *tar.Writer, name, srcPath string) error {
 	file, err := os.Open(srcPath)
 	if err != nil {
 		return err
 	}
 	defer file.Close()
 
-	header := &zip.FileHeader{
-		Name:   name,
-		Method: zip.Deflate,
-	}
-	header.Modified = time.Now()
-
-	writer, err := zipWriter.CreateHeader(header)
+	info, err := file.Stat()
 	if err != nil {
 		return err
 	}
-	_, err = io.Copy(writer, file)
+	header := &tar.Header{
+		Name:    name,
+		Mode:    0600,
+		Size:    info.Size(),
+		ModTime: time.Now(),
+	}
+	if err := tw.WriteHeader(header); err != nil {
+		return err
+	}
+	_, err = io.Copy(tw, file)
 	return err
 }
 
-func writeManifest(zipWriter *zip.Writer, manifest backupManifest) error {
+func writeManifest(tw *tar.Writer, manifest backupManifest) error {
 	data, err := json.Marshal(manifest)
 	if err != nil {
 		return err
 	}
-	header := &zip.FileHeader{
-		Name:   "manifest.json",
-		Method: zip.Deflate,
+	header := &tar.Header{
+		Name:    "manifest.json",
+		Mode:    0600,
+		Size:    int64(len(data)),
+		ModTime: time.Now(),
 	}
-	header.Modified = time.Now()
-	writer, err := zipWriter.CreateHeader(header)
-	if err != nil {
+	if err := tw.WriteHeader(header); err != nil {
 		return err
 	}
-	_, err = writer.Write(data)
+	_, err = tw.Write(data)
 	return err
 }
 
@@ -390,28 +405,42 @@ func backupDBHandler(logger *zap.Logger) http.HandlerFunc {
 			})
 		}
 
-		filename := fmt.Sprintf("backup-%s.zip", manifest.Timestamp.Format("20060102-150405Z"))
-		w.Header().Set("Content-Type", "application/zip")
+		filename := fmt.Sprintf("backup-%s.tar.zst", manifest.Timestamp.Format("20060102-150405Z"))
+		w.Header().Set("Content-Type", "application/zstd")
 		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", filename))
 
-		zipWriter := zip.NewWriter(w)
+		counter := &countingWriter{w: w}
+		encoder, err := zstd.NewWriter(counter)
+		if err != nil {
+			logger.Error("create zstd encoder", zap.Error(err))
+			http.Error(w, "failed to create encoder", http.StatusInternalServerError)
+			return
+		}
+
+		tarWriter := tar.NewWriter(encoder)
 		for _, target := range targets {
-			if err := addFileToZip(zipWriter, target.name+".db", target.destPath); err != nil {
-				logger.Error("write backup zip entry", zap.String("db", target.name), zap.Error(err))
+			if err := addFileToTar(tarWriter, target.name+".db", target.destPath); err != nil {
+				logger.Error("write backup tar entry", zap.String("db", target.name), zap.Error(err))
 				return
 			}
 		}
-		if err := writeManifest(zipWriter, manifest); err != nil {
+		if err := writeManifest(tarWriter, manifest); err != nil {
 			logger.Error("write backup manifest", zap.Error(err))
 			return
 		}
-		if err := zipWriter.Close(); err != nil {
-			logger.Error("close backup zip", zap.Error(err))
+		if err := tarWriter.Close(); err != nil {
+			logger.Error("close backup tar", zap.Error(err))
+			return
+		}
+		if err := encoder.Close(); err != nil {
+			logger.Error("close zstd encoder", zap.Error(err))
+			return
 		}
 
 		logger.Info("backup completed",
 			zap.String("filename", filename),
 			zap.Duration("duration", time.Since(start)),
+			zap.Int64("compressed_bytes", counter.written),
 			zap.Any("databases", manifest.Databases),
 		)
 	}

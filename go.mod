@@ -10,6 +10,7 @@ require (
 	github.com/go-faster/jx v1.2.0
 	github.com/google/uuid v1.6.0
 	github.com/json-iterator/go v1.1.12
+	github.com/klauspost/compress v1.18.1
 	github.com/kolesa-team/go-webp v1.0.5
 	github.com/mattn/go-sqlite3 v1.14.32
 	github.com/ogen-go/ogen v1.18.0

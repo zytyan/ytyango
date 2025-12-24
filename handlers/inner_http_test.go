@@ -1,7 +1,7 @@
 package handlers
 
 import (
-	"archive/zip"
+	"archive/tar"
 	"bytes"
 	"encoding/json"
 	"io"
@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/klauspost/compress/zstd"
 	"go.uber.org/zap"
 )
 
@@ -21,36 +22,34 @@ func newTestServer() *httptest.Server {
 	return httptest.NewServer(buildHandler(logger.Desugar()))
 }
 
-func zipEntries(t *testing.T, data []byte) map[string]*zip.File {
+func tarZstdEntries(t *testing.T, data []byte) map[string][]byte {
 	t.Helper()
-	reader, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
+	decoder, err := zstd.NewReader(bytes.NewReader(data))
 	if err != nil {
-		t.Fatalf("open zip: %v", err)
+		t.Fatalf("open zstd: %v", err)
 	}
-	entries := make(map[string]*zip.File, len(reader.File))
-	for _, f := range reader.File {
-		entries[f.Name] = f
+	defer decoder.Close()
+	tarReader := tar.NewReader(decoder)
+	entries := make(map[string][]byte)
+	for {
+		header, err := tarReader.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			t.Fatalf("iterate tar: %v", err)
+		}
+		content, err := io.ReadAll(tarReader)
+		if err != nil {
+			t.Fatalf("read tar file %s: %v", header.Name, err)
+		}
+		entries[header.Name] = content
 	}
 	return entries
 }
 
-func readZipFile(t *testing.T, f *zip.File) []byte {
+func parseManifest(t *testing.T, data []byte) backupManifest {
 	t.Helper()
-	rc, err := f.Open()
-	if err != nil {
-		t.Fatalf("open zip file %s: %v", f.Name, err)
-	}
-	defer rc.Close()
-	data, err := io.ReadAll(rc)
-	if err != nil {
-		t.Fatalf("read zip file %s: %v", f.Name, err)
-	}
-	return data
-}
-
-func parseManifest(t *testing.T, f *zip.File) backupManifest {
-	t.Helper()
-	data := readZipFile(t, f)
 	var manifest backupManifest
 	if err := json.Unmarshal(data, &manifest); err != nil {
 		t.Fatalf("unmarshal manifest: %v", err)
@@ -225,22 +224,28 @@ func TestBackupDBSuccessAll(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200 got %d", resp.StatusCode)
 	}
+	if ct := resp.Header.Get("Content-Type"); ct != "application/zstd" {
+		t.Fatalf("expected content-type application/zstd, got %s", ct)
+	}
+	if cd := resp.Header.Get("Content-Disposition"); !strings.Contains(cd, ".tar.zst") {
+		t.Fatalf("expected .tar.zst filename, got %s", cd)
+	}
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		t.Fatalf("read body: %v", err)
 	}
-	entries := zipEntries(t, body)
+	entries := tarZstdEntries(t, body)
 	if _, ok := entries["main.db"]; !ok {
 		t.Fatalf("expected main.db in zip")
 	}
 	if _, ok := entries["msg.db"]; !ok {
 		t.Fatalf("expected msg.db in zip")
 	}
-	manifestFile, ok := entries["manifest.json"]
+	manifestData, ok := entries["manifest.json"]
 	if !ok {
 		t.Fatalf("manifest missing")
 	}
-	manifest := parseManifest(t, manifestFile)
+	manifest := parseManifest(t, manifestData)
 	if len(manifest.Databases) != 2 {
 		t.Fatalf("expected 2 databases, got %d", len(manifest.Databases))
 	}
@@ -265,15 +270,15 @@ func TestBackupDBScopeMain(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read body: %v", err)
 	}
-	entries := zipEntries(t, body)
+	entries := tarZstdEntries(t, body)
 	if _, ok := entries["msg.db"]; ok {
 		t.Fatalf("did not expect msg.db in scoped backup")
 	}
-	manifestFile, ok := entries["manifest.json"]
+	manifestData, ok := entries["manifest.json"]
 	if !ok {
 		t.Fatalf("manifest missing")
 	}
-	manifest := parseManifest(t, manifestFile)
+	manifest := parseManifest(t, manifestData)
 	if len(manifest.Databases) != 1 {
 		t.Fatalf("expected 1 database, got %d", len(manifest.Databases))
 	}

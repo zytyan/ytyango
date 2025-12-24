@@ -113,7 +113,8 @@
 ## **11. 使用说明（How to Use）**
 
 * 默认监听：`GET http://127.0.0.1:4019/backupdb`
-  * 返回 `application/zip`，文件名格式 `backup-YYYYMMDD-HHMMSSZ.zip`，包含 `main.db`、`msg.db` 与 `manifest.json`。
+  * 返回 zstd 压缩的 tar 包（`application/zstd`），文件名 `backup-YYYYMMDD-HHMMSSZ.tar.zst`，包含 `main.db`、`msg.db` 与 `manifest.json`。
+  * 解压示例：`curl -sS http://127.0.0.1:4019/backupdb -o backup.tar.zst && tar --zstd -xf backup.tar.zst`
 * 选择备份范围：`/backupdb?db=main` 或 `/backupdb?db=msg`，非法值 400。
 * Token 保护（可选）：设置环境变量 `GOYTYAN_BACKUP_TOKEN=xxx` 后访问需携带
   * Header `X-Backup-Token: xxx` 或 Query `?token=xxx`，否则 401。
