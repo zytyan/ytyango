@@ -4,8 +4,12 @@ CREATE TABLE gemini_sessions
     id        INTEGER PRIMARY KEY AUTOINCREMENT,
     chat_id   INTEGER NOT NULL,
     chat_name TEXT    NOT NULL,
-    chat_type TEXT    NOT NULL
-) STRICT;
+    chat_type TEXT    NOT NULL,
+    tools     JSON_TEXT,
+    cache_name TEXT,
+    cache_ttl INTEGER,
+    cache_expired INTEGER
+);
 
 -- Contents（消息内容表）
 CREATE TABLE gemini_contents
@@ -38,3 +42,69 @@ CREATE TABLE gemini_contents
         (blob IS NOT NULL AND mime_type IS NOT NULL)
         )
 ) WITHOUT ROWID;
+
+-- Messages（上下文消息表）
+CREATE TABLE gemini_messages
+(
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id    INTEGER      NOT NULL REFERENCES gemini_sessions (id) ON DELETE CASCADE,
+    chat_id       INTEGER      NOT NULL,
+    tg_message_id INTEGER      NOT NULL,
+    from_id       INTEGER      NOT NULL,
+    role          TEXT         NOT NULL,
+    content       TEXT         NOT NULL,
+    seq           INTEGER      NOT NULL,
+    reply_to_seq  INTEGER,
+    created_at    INT_UNIX_SEC NOT NULL,
+    UNIQUE (chat_id, tg_message_id),
+    UNIQUE (session_id, seq)
+);
+
+CREATE INDEX idx_gemini_messages_session_seq
+    ON gemini_messages (session_id, seq);
+
+CREATE INDEX idx_gemini_messages_chat_tg
+    ON gemini_messages (chat_id, tg_message_id);
+
+-- Session Migrations（会话合并/迁移记录）
+-- Content V2 (structured genai content/parts)
+CREATE TABLE IF NOT EXISTS gemini_content_v2
+(
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id   INTEGER      NOT NULL REFERENCES gemini_sessions (id) ON DELETE CASCADE,
+    role         TEXT         NOT NULL,
+    seq          INTEGER      NOT NULL,
+    x_user_extra JSON_TEXT,
+    UNIQUE (session_id, seq)
+);
+
+CREATE INDEX IF NOT EXISTS idx_gemini_content_v2_session ON gemini_content_v2 (session_id);
+
+CREATE TABLE IF NOT EXISTS gemini_content_v2_parts
+(
+    id                        INTEGER PRIMARY KEY AUTOINCREMENT,
+    content_id                INTEGER      NOT NULL REFERENCES gemini_content_v2 (id) ON DELETE CASCADE,
+    part_index                INTEGER      NOT NULL,
+    text                      TEXT,
+    thought                   INT_BOOL     NOT NULL DEFAULT 0 CHECK (thought IN (0, 1)),
+    thought_signature         BLOB,
+    inline_data               BLOB,
+    inline_data_mime          TEXT,
+    file_uri                  TEXT,
+    file_mime                 TEXT,
+    function_call_name        TEXT,
+    function_call_args        JSON_TEXT,
+    function_response_name    TEXT,
+    function_response         JSON_TEXT,
+    executable_code           TEXT,
+    executable_code_language  TEXT,
+    code_execution_outcome    TEXT,
+    code_execution_output     TEXT,
+    video_start_offset        TEXT,
+    video_end_offset          TEXT,
+    video_fps                 REAL,
+    x_user_extra              JSON_TEXT,
+    UNIQUE (content_id, part_index)
+);
+
+CREATE INDEX IF NOT EXISTS idx_gemini_content_v2_parts_content ON gemini_content_v2_parts (content_id);

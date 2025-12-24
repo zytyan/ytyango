@@ -34,11 +34,11 @@ CREATE TABLE IF NOT EXISTS raw_update
     id         INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     chat_id    INTEGER,
     message_id INTEGER,
-    raw_update JSON_TEXT CHECK (raw_update IS NULL OR json_valid(raw_update))
+    raw_update BLOB_JSONB
 );
 
 CREATE INDEX IF NOT EXISTS idx_raw_update_chat_message_id
-    ON raw_update (chat_id, message_id);
+    ON raw_update (id, chat_id);
 
 CREATE TABLE IF NOT EXISTS edit_history
 (
