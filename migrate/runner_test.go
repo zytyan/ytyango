@@ -73,12 +73,18 @@ func TestDryRunDoesNotMutate(t *testing.T) {
 	if !errors.Is(err, sql.ErrNoRows) {
 		t.Fatalf("unexpected error checking table: %v", err)
 	}
-	state, err := ReadState(ctx, db)
+	state, err := readState(ctx, db, false)
 	if err != nil {
 		t.Fatalf("read state: %v", err)
 	}
 	if state.Version != 0 || state.Dirty {
 		t.Fatalf("expected state unchanged, got %+v", state)
+	}
+	var metaName string
+	if err := db.QueryRowContext(ctx, `SELECT name FROM sqlite_master WHERE type='table' AND name='schema_migrations';`).Scan(&metaName); err == nil {
+		t.Fatalf("expected no schema_migrations table on dry-run")
+	} else if !errors.Is(err, sql.ErrNoRows) {
+		t.Fatalf("unexpected error checking schema_migrations: %v", err)
 	}
 }
 

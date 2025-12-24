@@ -98,6 +98,12 @@ func runCommand(ctx context.Context, target Target, cmd Command, opts ExecOption
 	if reg.Name == "" {
 		return errors.New("registry missing name")
 	}
+	if opts.DryRun && !opts.MemoryRun {
+		// Run dry-run against an in-memory copy to avoid mutating the real database.
+		opts.MemoryRun = true
+		opts.SampleRate = 0
+		opts.SampleRows = 0
+	}
 	if opts.Logf == nil {
 		opts.Logf = defaultLogf
 	}
@@ -113,7 +119,8 @@ func runCommand(ctx context.Context, target Target, cmd Command, opts ExecOption
 	}
 	defer cleanup()
 
-	state, err := ReadState(ctx, db)
+	ensureMeta := !(opts.DryRun || cmd.Type == "status")
+	state, err := readState(ctx, db, ensureMeta)
 	if err != nil {
 		return fmt.Errorf("read %s state: %w", reg.Name, err)
 	}

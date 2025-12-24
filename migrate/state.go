@@ -42,14 +42,42 @@ func EnsureMetadata(ctx context.Context, db *sql.DB) error {
 	return nil
 }
 
-// ReadState reads the current migration state. If none exists, returns version 0 and dirty=false.
+// ReadState reads the current migration state, creating metadata table if needed.
+// If none exists, returns version 0 and dirty=false.
 func ReadState(ctx context.Context, db *sql.DB) (State, error) {
+	return readState(ctx, db, true)
+}
+
+func metadataExists(ctx context.Context, db *sql.DB) (bool, error) {
+	row := db.QueryRowContext(ctx, `SELECT 1 FROM sqlite_master WHERE type='table' AND name=?;`, metadataTable)
+	var v int
+	switch err := row.Scan(&v); err {
+	case sql.ErrNoRows:
+		return false, nil
+	case nil:
+		return true, nil
+	default:
+		return false, err
+	}
+}
+
+func readState(ctx context.Context, db *sql.DB, ensure bool) (State, error) {
 	var st State
 	if db == nil {
 		return st, errors.New("nil db")
 	}
-	if err := EnsureMetadata(ctx, db); err != nil {
-		return st, err
+	if ensure {
+		if err := EnsureMetadata(ctx, db); err != nil {
+			return st, err
+		}
+	} else {
+		exists, err := metadataExists(ctx, db)
+		if err != nil {
+			return st, err
+		}
+		if !exists {
+			return State{Version: 0, Dirty: false, AppliedAt: time.Time{}}, nil
+		}
 	}
 	row := db.QueryRowContext(ctx, fmt.Sprintf(`SELECT version, dirty, applied_at, log FROM %s LIMIT 1;`, metadataTable))
 	var appliedAt string
