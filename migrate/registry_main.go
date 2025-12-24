@@ -4,8 +4,28 @@ package migrate
 var MigrationsMain = []Migration{
 	{
 		Version: 1,
-		Name:    "add gemini content v2 tables",
+		Name:    "add gemini content v2 tables and extend gemini_sessions",
 		Up: []Step{
+			{
+				Description: "rebuild gemini_sessions without frozen and add cache fields",
+				SQL: []string{
+					"PRAGMA foreign_keys=OFF;",
+					`CREATE TABLE IF NOT EXISTS gemini_sessions_new (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    chat_id INTEGER NOT NULL,
+    chat_name TEXT NOT NULL,
+    chat_type TEXT NOT NULL,
+    cache_name TEXT,
+    cache_ttl INTEGER,
+    cache_expired INTEGER
+) STRICT;`,
+					`INSERT INTO gemini_sessions_new (id, chat_id, chat_name, chat_type, cache_name, cache_ttl, cache_expired)
+SELECT id, chat_id, chat_name, chat_type, NULL, NULL, NULL FROM gemini_sessions;`,
+					`DROP TABLE gemini_sessions;`,
+					`ALTER TABLE gemini_sessions_new RENAME TO gemini_sessions;`,
+					"PRAGMA foreign_keys=ON;",
+				},
+			},
 			{
 				Description: "create gemini_content_v2 and gemini_content_v2_parts",
 				SQL: []string{
@@ -49,8 +69,21 @@ var MigrationsMain = []Migration{
 		},
 		Down: []Step{
 			{SQL: []string{
+				"PRAGMA foreign_keys=OFF;",
 				`DROP TABLE IF EXISTS gemini_content_v2_parts;`,
 				`DROP TABLE IF EXISTS gemini_content_v2;`,
+				`CREATE TABLE gemini_sessions_old (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    chat_id INTEGER NOT NULL,
+    chat_name TEXT NOT NULL,
+    chat_type TEXT NOT NULL,
+    frozen INTEGER NOT NULL DEFAULT 0
+) STRICT;`,
+				`INSERT INTO gemini_sessions_old (id, chat_id, chat_name, chat_type, frozen)
+SELECT id, chat_id, chat_name, chat_type, 0 FROM gemini_sessions;`,
+				`DROP TABLE gemini_sessions;`,
+				`ALTER TABLE gemini_sessions_old RENAME TO gemini_sessions;`,
+				"PRAGMA foreign_keys=ON;",
 			}},
 		},
 	},

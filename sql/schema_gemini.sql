@@ -5,7 +5,9 @@ CREATE TABLE gemini_sessions
     chat_id   INTEGER NOT NULL,
     chat_name TEXT    NOT NULL,
     chat_type TEXT    NOT NULL,
-    frozen    INTEGER NOT NULL DEFAULT 0
+    cache_name TEXT,
+    cache_ttl INTEGER,
+    cache_expired INTEGER
 ) STRICT;
 
 -- Contents（消息内容表）

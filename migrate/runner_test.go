@@ -183,6 +183,42 @@ frozen INTEGER NOT NULL DEFAULT 0
 		t.Fatalf("gemini_content_v2_parts not found: %v", err)
 	}
 
+	rows, err := db.QueryContext(ctx, `PRAGMA table_info(gemini_sessions);`)
+	if err != nil {
+		t.Fatalf("pragma gemini_sessions: %v", err)
+	}
+	defer rows.Close()
+	foundFrozen := false
+	foundCacheName := false
+	foundCacheTTL := false
+	foundCacheExpired := false
+	for rows.Next() {
+		var cid int
+		var cname, ctype string
+		var notnull int
+		var dflt sql.NullString
+		var pk int
+		if err := rows.Scan(&cid, &cname, &ctype, &notnull, &dflt, &pk); err != nil {
+			t.Fatalf("scan pragma: %v", err)
+		}
+		switch cname {
+		case "frozen":
+			foundFrozen = true
+		case "cache_name":
+			foundCacheName = true
+		case "cache_ttl":
+			foundCacheTTL = true
+		case "cache_expired":
+			foundCacheExpired = true
+		}
+	}
+	if foundFrozen {
+		t.Fatalf("expected frozen column removed")
+	}
+	if !(foundCacheName && foundCacheTTL && foundCacheExpired) {
+		t.Fatalf("expected cache columns present (cache_name=%v cache_ttl=%v cache_expired=%v)", foundCacheName, foundCacheTTL, foundCacheExpired)
+	}
+
 	state, err := ReadState(ctx, db)
 	if err != nil {
 		t.Fatalf("read state: %v", err)
