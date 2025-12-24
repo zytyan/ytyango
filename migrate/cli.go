@@ -15,14 +15,11 @@ type cliPaths struct {
 }
 
 type commonFlags struct {
-	target     string
-	db         string
-	dbMain     string
-	dbMsg      string
-	dryRun     bool
-	memoryRun  bool
-	sampleRate float64
-	sampleRows int
+	target string
+	db     string
+	dbMain string
+	dbMsg  string
+	dryRun bool
 }
 
 // RunCLI executes the migrate subcommand flow.
@@ -136,9 +133,6 @@ func newFlagSet(name string) (*flag.FlagSet, *commonFlags) {
 	fs.StringVar(&cf.dbMain, "db-main", "", "Main database path override (when target=all)")
 	fs.StringVar(&cf.dbMsg, "db-msg", "", "Msg database path override (when target=all)")
 	fs.BoolVar(&cf.dryRun, "dry-run", false, "Print steps without applying")
-	fs.BoolVar(&cf.memoryRun, "memory-run", false, "Run on in-memory copy with sampling; does not touch disk")
-	fs.Float64Var(&cf.sampleRate, "sample-rate", 0.1, "Row sampling rate for --memory-run (0-1, default 0.1)")
-	fs.IntVar(&cf.sampleRows, "sample-rows", 0, "Row sampling limit per table for --memory-run (overrides sample-rate when >0)")
 	return fs, cf
 }
 
@@ -146,10 +140,7 @@ func resolveTargets(cf *commonFlags) ([]Target, ExecOptions, error) {
 	target := strings.ToLower(cf.target)
 	regs := registrySet()
 	opts := ExecOptions{
-		DryRun:     cf.dryRun,
-		MemoryRun:  cf.memoryRun,
-		SampleRate: cf.sampleRate,
-		SampleRows: cf.sampleRows,
+		DryRun: cf.dryRun,
 		Logf: func(format string, args ...any) {
 			fmt.Printf(format, args...)
 		},
@@ -221,9 +212,6 @@ Common options:
   --db-main PATH          override main DB when target=all
   --db-msg PATH           override msg DB when target=all
   --dry-run               print planned steps only
-  --memory-run            run on in-memory copy (all tables) with sampling; no disk writes
-  --sample-rate float     row sampling rate for memory-run (0-1, default 0.1)
-  --sample-rows int       row limit per table for memory-run (overrides sample-rate)
 
 Defaults:
   Paths load from config.yaml (globalcfg) when flags are absent.

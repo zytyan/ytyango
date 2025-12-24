@@ -11,14 +11,7 @@ import (
 
 var (
 	defaultPragmas = []string{
-		"PRAGMA journal_mode=WAL;",
-		"PRAGMA wal_autocheckpoint=1000;",
-		"PRAGMA synchronous=NORMAL;",
-		"PRAGMA mmap_size=67108864; -- 64MB",
-		"PRAGMA cache_size=-32768; -- 32MB page cache",
-		"PRAGMA busy_timeout=5000;",
 		"PRAGMA foreign_keys=ON;",
-		"PRAGMA optimize;",
 	}
 	readonlyPragmas = []string{
 		"PRAGMA foreign_keys=ON;",

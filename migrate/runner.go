@@ -23,11 +23,8 @@ type Target struct {
 }
 
 type ExecOptions struct {
-	DryRun     bool
-	MemoryRun  bool
-	SampleRate float64
-	SampleRows int
-	Logf       func(string, ...any)
+	DryRun bool
+	Logf   func(string, ...any)
 }
 
 type Command struct {
@@ -262,13 +259,6 @@ func applyMigration(ctx context.Context, db *sql.DB, name string, mig Migration,
 }
 
 func openForRun(ctx context.Context, path string, opts ExecOptions) (*sql.DB, func(), error) {
-	if opts.MemoryRun {
-		mem, err := copyToMemory(ctx, path, SampleConfig{Rate: opts.SampleRate, Rows: opts.SampleRows}, opts.Logf)
-		if err != nil {
-			return nil, func() {}, err
-		}
-		return mem, func() { _ = mem.Close() }, nil
-	}
 	db, err := openSQLite(ctx, path, opts.DryRun)
 	if err != nil {
 		return nil, func() {}, err
