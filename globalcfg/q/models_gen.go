@@ -58,11 +58,61 @@ type GeminiContent struct {
 	ThoughtSignature sql.NullString `json:"thought_signature"`
 }
 
+type GeminiContentV2 struct {
+	ID         int64          `json:"id"`
+	SessionID  int64          `json:"session_id"`
+	Role       string         `json:"role"`
+	Seq        int64          `json:"seq"`
+	XUserExtra sql.NullString `json:"x_user_extra"`
+}
+
+type GeminiContentV2Part struct {
+	ID                     int64           `json:"id"`
+	ContentID              int64           `json:"content_id"`
+	PartIndex              int64           `json:"part_index"`
+	Text                   sql.NullString  `json:"text"`
+	Thought                bool            `json:"thought"`
+	ThoughtSignature       []byte          `json:"thought_signature"`
+	InlineData             []byte          `json:"inline_data"`
+	InlineDataMime         sql.NullString  `json:"inline_data_mime"`
+	FileUri                sql.NullString  `json:"file_uri"`
+	FileMime               sql.NullString  `json:"file_mime"`
+	FunctionCallName       sql.NullString  `json:"function_call_name"`
+	FunctionCallArgs       sql.NullString  `json:"function_call_args"`
+	FunctionResponseName   sql.NullString  `json:"function_response_name"`
+	FunctionResponse       sql.NullString  `json:"function_response"`
+	ExecutableCode         sql.NullString  `json:"executable_code"`
+	ExecutableCodeLanguage sql.NullString  `json:"executable_code_language"`
+	CodeExecutionOutcome   sql.NullString  `json:"code_execution_outcome"`
+	CodeExecutionOutput    sql.NullString  `json:"code_execution_output"`
+	VideoStartOffset       sql.NullString  `json:"video_start_offset"`
+	VideoEndOffset         sql.NullString  `json:"video_end_offset"`
+	VideoFps               sql.NullFloat64 `json:"video_fps"`
+	XUserExtra             sql.NullString  `json:"x_user_extra"`
+}
+
+type GeminiMessage struct {
+	ID          int64         `json:"id"`
+	SessionID   int64         `json:"session_id"`
+	ChatID      int64         `json:"chat_id"`
+	TgMessageID int64         `json:"tg_message_id"`
+	FromID      int64         `json:"from_id"`
+	Role        string        `json:"role"`
+	Content     string        `json:"content"`
+	Seq         int64         `json:"seq"`
+	ReplyToSeq  sql.NullInt64 `json:"reply_to_seq"`
+	CreatedAt   UnixTime      `json:"created_at"`
+}
+
 type GeminiSession struct {
-	ID       int64  `json:"id"`
-	ChatID   int64  `json:"chat_id"`
-	ChatName string `json:"chat_name"`
-	ChatType string `json:"chat_type"`
+	ID           int64          `json:"id"`
+	ChatID       int64          `json:"chat_id"`
+	ChatName     string         `json:"chat_name"`
+	ChatType     string         `json:"chat_type"`
+	Tools        sql.NullString `json:"tools"`
+	CacheName    sql.NullString `json:"cache_name"`
+	CacheTtl     sql.NullInt64  `json:"cache_ttl"`
+	CacheExpired sql.NullInt64  `json:"cache_expired"`
 }
 
 type PicRateCounter struct {
