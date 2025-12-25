@@ -28,8 +28,11 @@ func New(db DBTX) *Queries {
 func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	q := Queries{db: db}
 	var err error
-	if q.addGeminiMessageStmt, err = db.PrepareContext(ctx, addGeminiMessage); err != nil {
-		return nil, fmt.Errorf("error preparing query AddGeminiMessage: %w", err)
+	if q.addGeminiContentV2Stmt, err = db.PrepareContext(ctx, addGeminiContentV2); err != nil {
+		return nil, fmt.Errorf("error preparing query AddGeminiContentV2: %w", err)
+	}
+	if q.addGeminiContentV2PartStmt, err = db.PrepareContext(ctx, addGeminiContentV2Part); err != nil {
+		return nil, fmt.Errorf("error preparing query AddGeminiContentV2Part: %w", err)
 	}
 	if q.createBiliInlineDataStmt, err = db.PrepareContext(ctx, createBiliInlineData); err != nil {
 		return nil, fmt.Errorf("error preparing query CreateBiliInlineData: %w", err)
@@ -37,8 +40,8 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.createChatCfgStmt, err = db.PrepareContext(ctx, createChatCfg); err != nil {
 		return nil, fmt.Errorf("error preparing query CreateChatCfg: %w", err)
 	}
-	if q.createNewGeminiSessionStmt, err = db.PrepareContext(ctx, createNewGeminiSession); err != nil {
-		return nil, fmt.Errorf("error preparing query CreateNewGeminiSession: %w", err)
+	if q.createGeminiSessionStmt, err = db.PrepareContext(ctx, createGeminiSession); err != nil {
+		return nil, fmt.Errorf("error preparing query CreateGeminiSession: %w", err)
 	}
 	if q.delCocCharAttrStmt, err = db.PrepareContext(ctx, delCocCharAttr); err != nil {
 		return nil, fmt.Errorf("error preparing query DelCocCharAttr: %w", err)
@@ -52,23 +55,32 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.getCocCharAttrStmt, err = db.PrepareContext(ctx, getCocCharAttr); err != nil {
 		return nil, fmt.Errorf("error preparing query GetCocCharAttr: %w", err)
 	}
+	if q.getGeminiSessionByChatStmt, err = db.PrepareContext(ctx, getGeminiSessionByChat); err != nil {
+		return nil, fmt.Errorf("error preparing query GetGeminiSessionByChat: %w", err)
+	}
+	if q.getGeminiSessionByIdStmt, err = db.PrepareContext(ctx, getGeminiSessionById); err != nil {
+		return nil, fmt.Errorf("error preparing query GetGeminiSessionById: %w", err)
+	}
+	if q.getNextGeminiSeqStmt, err = db.PrepareContext(ctx, getNextGeminiSeq); err != nil {
+		return nil, fmt.Errorf("error preparing query GetNextGeminiSeq: %w", err)
+	}
 	if q.getNsfwPicByFileUidStmt, err = db.PrepareContext(ctx, getNsfwPicByFileUid); err != nil {
 		return nil, fmt.Errorf("error preparing query GetNsfwPicByFileUid: %w", err)
 	}
 	if q.getPrprCacheStmt, err = db.PrepareContext(ctx, getPrprCache); err != nil {
 		return nil, fmt.Errorf("error preparing query GetPrprCache: %w", err)
 	}
-	if q.getSessionByIdStmt, err = db.PrepareContext(ctx, getSessionById); err != nil {
-		return nil, fmt.Errorf("error preparing query GetSessionById: %w", err)
-	}
-	if q.getSessionIdByMessageStmt, err = db.PrepareContext(ctx, getSessionIdByMessage); err != nil {
-		return nil, fmt.Errorf("error preparing query GetSessionIdByMessage: %w", err)
-	}
 	if q.getYtDlpDbCacheStmt, err = db.PrepareContext(ctx, getYtDlpDbCache); err != nil {
 		return nil, fmt.Errorf("error preparing query GetYtDlpDbCache: %w", err)
 	}
 	if q.incYtDlUploadCountStmt, err = db.PrepareContext(ctx, incYtDlUploadCount); err != nil {
 		return nil, fmt.Errorf("error preparing query IncYtDlUploadCount: %w", err)
+	}
+	if q.listGeminiContentV2Stmt, err = db.PrepareContext(ctx, listGeminiContentV2); err != nil {
+		return nil, fmt.Errorf("error preparing query ListGeminiContentV2: %w", err)
+	}
+	if q.listGeminiContentV2PartsStmt, err = db.PrepareContext(ctx, listGeminiContentV2Parts); err != nil {
+		return nil, fmt.Errorf("error preparing query ListGeminiContentV2Parts: %w", err)
 	}
 	if q.listNsfwPicUserRatesByFileUidStmt, err = db.PrepareContext(ctx, listNsfwPicUserRatesByFileUid); err != nil {
 		return nil, fmt.Errorf("error preparing query ListNsfwPicUserRatesByFileUid: %w", err)
@@ -85,6 +97,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.updateChatStatDailyStmt, err = db.PrepareContext(ctx, updateChatStatDaily); err != nil {
 		return nil, fmt.Errorf("error preparing query UpdateChatStatDaily: %w", err)
 	}
+	if q.updateGeminiSessionCacheStmt, err = db.PrepareContext(ctx, updateGeminiSessionCache); err != nil {
+		return nil, fmt.Errorf("error preparing query UpdateGeminiSessionCache: %w", err)
+	}
 	if q.updateYtDlpCacheStmt, err = db.PrepareContext(ctx, updateYtDlpCache); err != nil {
 		return nil, fmt.Errorf("error preparing query UpdateYtDlpCache: %w", err)
 	}
@@ -99,9 +114,6 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	}
 	if q.createOrUpdateNsfwPicStmt, err = db.PrepareContext(ctx, createOrUpdateNsfwPic); err != nil {
 		return nil, fmt.Errorf("error preparing query createOrUpdateNsfwPic: %w", err)
-	}
-	if q.getAllMsgInSessionReversedStmt, err = db.PrepareContext(ctx, getAllMsgInSessionReversed); err != nil {
-		return nil, fmt.Errorf("error preparing query getAllMsgInSessionReversed: %w", err)
 	}
 	if q.getChatCfgByIdStmt, err = db.PrepareContext(ctx, getChatCfgById); err != nil {
 		return nil, fmt.Errorf("error preparing query getChatCfgById: %w", err)
@@ -147,9 +159,14 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 
 func (q *Queries) Close() error {
 	var err error
-	if q.addGeminiMessageStmt != nil {
-		if cerr := q.addGeminiMessageStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing addGeminiMessageStmt: %w", cerr)
+	if q.addGeminiContentV2Stmt != nil {
+		if cerr := q.addGeminiContentV2Stmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing addGeminiContentV2Stmt: %w", cerr)
+		}
+	}
+	if q.addGeminiContentV2PartStmt != nil {
+		if cerr := q.addGeminiContentV2PartStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing addGeminiContentV2PartStmt: %w", cerr)
 		}
 	}
 	if q.createBiliInlineDataStmt != nil {
@@ -162,9 +179,9 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing createChatCfgStmt: %w", cerr)
 		}
 	}
-	if q.createNewGeminiSessionStmt != nil {
-		if cerr := q.createNewGeminiSessionStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing createNewGeminiSessionStmt: %w", cerr)
+	if q.createGeminiSessionStmt != nil {
+		if cerr := q.createGeminiSessionStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing createGeminiSessionStmt: %w", cerr)
 		}
 	}
 	if q.delCocCharAttrStmt != nil {
@@ -187,6 +204,21 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing getCocCharAttrStmt: %w", cerr)
 		}
 	}
+	if q.getGeminiSessionByChatStmt != nil {
+		if cerr := q.getGeminiSessionByChatStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getGeminiSessionByChatStmt: %w", cerr)
+		}
+	}
+	if q.getGeminiSessionByIdStmt != nil {
+		if cerr := q.getGeminiSessionByIdStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getGeminiSessionByIdStmt: %w", cerr)
+		}
+	}
+	if q.getNextGeminiSeqStmt != nil {
+		if cerr := q.getNextGeminiSeqStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getNextGeminiSeqStmt: %w", cerr)
+		}
+	}
 	if q.getNsfwPicByFileUidStmt != nil {
 		if cerr := q.getNsfwPicByFileUidStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing getNsfwPicByFileUidStmt: %w", cerr)
@@ -197,16 +229,6 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing getPrprCacheStmt: %w", cerr)
 		}
 	}
-	if q.getSessionByIdStmt != nil {
-		if cerr := q.getSessionByIdStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing getSessionByIdStmt: %w", cerr)
-		}
-	}
-	if q.getSessionIdByMessageStmt != nil {
-		if cerr := q.getSessionIdByMessageStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing getSessionIdByMessageStmt: %w", cerr)
-		}
-	}
 	if q.getYtDlpDbCacheStmt != nil {
 		if cerr := q.getYtDlpDbCacheStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing getYtDlpDbCacheStmt: %w", cerr)
@@ -215,6 +237,16 @@ func (q *Queries) Close() error {
 	if q.incYtDlUploadCountStmt != nil {
 		if cerr := q.incYtDlUploadCountStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing incYtDlUploadCountStmt: %w", cerr)
+		}
+	}
+	if q.listGeminiContentV2Stmt != nil {
+		if cerr := q.listGeminiContentV2Stmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing listGeminiContentV2Stmt: %w", cerr)
+		}
+	}
+	if q.listGeminiContentV2PartsStmt != nil {
+		if cerr := q.listGeminiContentV2PartsStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing listGeminiContentV2PartsStmt: %w", cerr)
 		}
 	}
 	if q.listNsfwPicUserRatesByFileUidStmt != nil {
@@ -242,6 +274,11 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing updateChatStatDailyStmt: %w", cerr)
 		}
 	}
+	if q.updateGeminiSessionCacheStmt != nil {
+		if cerr := q.updateGeminiSessionCacheStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing updateGeminiSessionCacheStmt: %w", cerr)
+		}
+	}
 	if q.updateYtDlpCacheStmt != nil {
 		if cerr := q.updateYtDlpCacheStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing updateYtDlpCacheStmt: %w", cerr)
@@ -265,11 +302,6 @@ func (q *Queries) Close() error {
 	if q.createOrUpdateNsfwPicStmt != nil {
 		if cerr := q.createOrUpdateNsfwPicStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing createOrUpdateNsfwPicStmt: %w", cerr)
-		}
-	}
-	if q.getAllMsgInSessionReversedStmt != nil {
-		if cerr := q.getAllMsgInSessionReversedStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing getAllMsgInSessionReversedStmt: %w", cerr)
 		}
 	}
 	if q.getChatCfgByIdStmt != nil {
@@ -381,31 +413,35 @@ type Queries struct {
 	LogRawSqlString                   bool
 	LogArgument                       bool
 	tx                                *sql.Tx
-	addGeminiMessageStmt              *sql.Stmt
+	addGeminiContentV2Stmt            *sql.Stmt
+	addGeminiContentV2PartStmt        *sql.Stmt
 	createBiliInlineDataStmt          *sql.Stmt
 	createChatCfgStmt                 *sql.Stmt
-	createNewGeminiSessionStmt        *sql.Stmt
+	createGeminiSessionStmt           *sql.Stmt
 	delCocCharAttrStmt                *sql.Stmt
 	getBiliInlineDataStmt             *sql.Stmt
 	getCocCharAllAttrStmt             *sql.Stmt
 	getCocCharAttrStmt                *sql.Stmt
+	getGeminiSessionByChatStmt        *sql.Stmt
+	getGeminiSessionByIdStmt          *sql.Stmt
+	getNextGeminiSeqStmt              *sql.Stmt
 	getNsfwPicByFileUidStmt           *sql.Stmt
 	getPrprCacheStmt                  *sql.Stmt
-	getSessionByIdStmt                *sql.Stmt
-	getSessionIdByMessageStmt         *sql.Stmt
 	getYtDlpDbCacheStmt               *sql.Stmt
 	incYtDlUploadCountStmt            *sql.Stmt
+	listGeminiContentV2Stmt           *sql.Stmt
+	listGeminiContentV2PartsStmt      *sql.Stmt
 	listNsfwPicUserRatesByFileUidStmt *sql.Stmt
 	setCocCharAttrStmt                *sql.Stmt
 	setPrprCacheStmt                  *sql.Stmt
 	updateBiliInlineMsgIdStmt         *sql.Stmt
 	updateChatStatDailyStmt           *sql.Stmt
+	updateGeminiSessionCacheStmt      *sql.Stmt
 	updateYtDlpCacheStmt              *sql.Stmt
 	createChatStatDailyStmt           *sql.Stmt
 	createNewUserStmt                 *sql.Stmt
 	createNsfwPicUserRateStmt         *sql.Stmt
 	createOrUpdateNsfwPicStmt         *sql.Stmt
-	getAllMsgInSessionReversedStmt    *sql.Stmt
 	getChatCfgByIdStmt                *sql.Stmt
 	getChatIdByWebIdStmt              *sql.Stmt
 	getChatStatStmt                   *sql.Stmt
@@ -430,31 +466,35 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		LogRawSqlString:                   q.LogRawSqlString,
 		LogArgument:                       q.LogArgument,
 		tx:                                tx,
-		addGeminiMessageStmt:              q.addGeminiMessageStmt,
+		addGeminiContentV2Stmt:            q.addGeminiContentV2Stmt,
+		addGeminiContentV2PartStmt:        q.addGeminiContentV2PartStmt,
 		createBiliInlineDataStmt:          q.createBiliInlineDataStmt,
 		createChatCfgStmt:                 q.createChatCfgStmt,
-		createNewGeminiSessionStmt:        q.createNewGeminiSessionStmt,
+		createGeminiSessionStmt:           q.createGeminiSessionStmt,
 		delCocCharAttrStmt:                q.delCocCharAttrStmt,
 		getBiliInlineDataStmt:             q.getBiliInlineDataStmt,
 		getCocCharAllAttrStmt:             q.getCocCharAllAttrStmt,
 		getCocCharAttrStmt:                q.getCocCharAttrStmt,
+		getGeminiSessionByChatStmt:        q.getGeminiSessionByChatStmt,
+		getGeminiSessionByIdStmt:          q.getGeminiSessionByIdStmt,
+		getNextGeminiSeqStmt:              q.getNextGeminiSeqStmt,
 		getNsfwPicByFileUidStmt:           q.getNsfwPicByFileUidStmt,
 		getPrprCacheStmt:                  q.getPrprCacheStmt,
-		getSessionByIdStmt:                q.getSessionByIdStmt,
-		getSessionIdByMessageStmt:         q.getSessionIdByMessageStmt,
 		getYtDlpDbCacheStmt:               q.getYtDlpDbCacheStmt,
 		incYtDlUploadCountStmt:            q.incYtDlUploadCountStmt,
+		listGeminiContentV2Stmt:           q.listGeminiContentV2Stmt,
+		listGeminiContentV2PartsStmt:      q.listGeminiContentV2PartsStmt,
 		listNsfwPicUserRatesByFileUidStmt: q.listNsfwPicUserRatesByFileUidStmt,
 		setCocCharAttrStmt:                q.setCocCharAttrStmt,
 		setPrprCacheStmt:                  q.setPrprCacheStmt,
 		updateBiliInlineMsgIdStmt:         q.updateBiliInlineMsgIdStmt,
 		updateChatStatDailyStmt:           q.updateChatStatDailyStmt,
+		updateGeminiSessionCacheStmt:      q.updateGeminiSessionCacheStmt,
 		updateYtDlpCacheStmt:              q.updateYtDlpCacheStmt,
 		createChatStatDailyStmt:           q.createChatStatDailyStmt,
 		createNewUserStmt:                 q.createNewUserStmt,
 		createNsfwPicUserRateStmt:         q.createNsfwPicUserRateStmt,
 		createOrUpdateNsfwPicStmt:         q.createOrUpdateNsfwPicStmt,
-		getAllMsgInSessionReversedStmt:    q.getAllMsgInSessionReversedStmt,
 		getChatCfgByIdStmt:                q.getChatCfgByIdStmt,
 		getChatIdByWebIdStmt:              q.getChatIdByWebIdStmt,
 		getChatStatStmt:                   q.getChatStatStmt,

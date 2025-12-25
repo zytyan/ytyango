@@ -22,6 +22,10 @@ overrides:
         go_type:
           type: "NullString"
           import: "database/sql"
+      - db_type: "BLOB_JSONB"
+        engine: "sqlite"
+        go_type:
+          type: "[]byte"
 sql:
   - engine: "sqlite"
     queries:
@@ -57,30 +61,34 @@ sql:
         rename:
           chat_cfg: chatCfg
         overrides:
-        - db_type: "INT_UNIX_SEC"
-          engine: "sqlite"
-          zap_field_method: true
-          go_type:
-            type: "UnixTime"
-        - db_type: "INT_BOOL"
-          engine: "sqlite"
-          nullable: false
-          go_type:
-            type: "bool"
-        - db_type: "JSON_TEXT"
-          engine: "sqlite"
-          nullable: true
-          go_type:
-            type: "NullString"
-            import: "database/sql"
-        - db_type: "BLOB_USER_TO_CNT"
-          engine: "sqlite"
-          go_type:
-            type: UserMsgStatMap
-        - db_type: "BLOB_TEN_MINUTE_STAT"
-          engine: "sqlite"
-          go_type:
-            type: TenMinuteStats
+          - db_type: "INT_UNIX_SEC"
+            engine: "sqlite"
+            zap_field_method: true
+            go_type:
+              type: "UnixTime"
+          - db_type: "INT_BOOL"
+            engine: "sqlite"
+            nullable: false
+            go_type:
+              type: "bool"
+          - db_type: "JSON_TEXT"
+            engine: "sqlite"
+            nullable: true
+            go_type:
+              type: "NullString"
+              import: "database/sql"
+          - db_type: "BLOB_JSONB"
+            engine: "sqlite"
+            go_type:
+              type: "[]byte"
+          - db_type: "BLOB_USER_TO_CNT"
+            engine: "sqlite"
+            go_type:
+              type: UserMsgStatMap
+          - db_type: "BLOB_TEN_MINUTE_STAT"
+            engine: "sqlite"
+            go_type:
+              type: TenMinuteStats
   - engine: "sqlite"
     queries:
      - "sql/query_saved_msg.sql"
@@ -124,3 +132,10 @@ sql:
               nullable: true
               go_type:
                 type: '[]byte'
+            - db_type: "BLOB_JSONB"
+              engine: "sqlite"
+              go_type:
+                type: "[]byte"
+            - column: "raw_update.raw_update"
+              go_type:
+                type: "[]byte"
