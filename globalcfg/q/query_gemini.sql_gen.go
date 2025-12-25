@@ -13,13 +13,40 @@ import (
 	"go.uber.org/zap"
 )
 
-const addGeminiContentV2 = `-- name: AddGeminiContentV2 :one
-INSERT INTO gemini_content_v2 (session_id, role, seq, x_user_extra)
-VALUES (?, ?, ?, ?)
-RETURNING id, session_id, role, seq, x_user_extra
+const addGeminiMessage = `-- name: AddGeminiMessage :exec
+INSERT INTO gemini_contents (session_id,
+                             chat_id,
+                             msg_id,
+                             role,
+                             sent_time,
+                             username,
+                             msg_type,
+                             reply_to_msg_id,
+                             text,
+                             blob,
+                             mime_type,
+                             quote_part,
+                             thought_signature)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
-func (q *Queries) AddGeminiContentV2(ctx context.Context, sessionID int64, role string, seq int64, xUserExtra sql.NullString) (GeminiContentV2, error) {
+type AddGeminiMessageParams struct {
+	SessionID        int64          `json:"session_id"`
+	ChatID           int64          `json:"chat_id"`
+	MsgID            int64          `json:"msg_id"`
+	Role             string         `json:"role"`
+	SentTime         UnixTime       `json:"sent_time"`
+	Username         string         `json:"username"`
+	MsgType          string         `json:"msg_type"`
+	ReplyToMsgID     sql.NullInt64  `json:"reply_to_msg_id"`
+	Text             sql.NullString `json:"text"`
+	Blob             []byte         `json:"blob"`
+	MimeType         sql.NullString `json:"mime_type"`
+	QuotePart        sql.NullString `json:"quote_part"`
+	ThoughtSignature sql.NullString `json:"thought_signature"`
+}
+
+func (q *Queries) AddGeminiMessage(ctx context.Context, arg AddGeminiMessageParams) error {
 	var logFields []zap.Field
 	var start time.Time
 	if q.logger != nil {
@@ -28,212 +55,51 @@ func (q *Queries) AddGeminiContentV2(ctx context.Context, sessionID int64, role 
 		if q.LogArgument {
 			logFields = append(logFields,
 				zap.Dict("fields",
-					zap.Int64("session_id", sessionID),
-					zap.String("role", role),
-					zap.Int64("seq", seq),
-					zapNullString("x_user_extra", xUserExtra),
-				),
-			)
-		}
-	}
-	row := q.queryRow(ctx, q.addGeminiContentV2Stmt, addGeminiContentV2,
-		sessionID,
-		role,
-		seq,
-		xUserExtra,
-	)
-	var i GeminiContentV2
-	err := row.Scan(
-		&i.ID,
-		&i.SessionID,
-		&i.Role,
-		&i.Seq,
-		&i.XUserExtra,
-	)
-	q.logQuery(addGeminiContentV2, "AddGeminiContentV2", logFields, err, start)
-	return i, err
-}
-
-const addGeminiContentV2Part = `-- name: AddGeminiContentV2Part :exec
-INSERT INTO gemini_content_v2_parts (
-    content_id,
-    part_index,
-    text,
-    thought,
-    thought_signature,
-    inline_data,
-    inline_data_mime,
-    file_uri,
-    file_mime,
-    function_call_name,
-    function_call_args,
-    function_response_name,
-    function_response,
-    executable_code,
-    executable_code_language,
-    code_execution_outcome,
-    code_execution_output,
-    video_start_offset,
-    video_end_offset,
-    video_fps,
-    x_user_extra
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-`
-
-type AddGeminiContentV2PartParams struct {
-	ContentID              int64           `json:"content_id"`
-	PartIndex              int64           `json:"part_index"`
-	Text                   sql.NullString  `json:"text"`
-	Thought                bool            `json:"thought"`
-	ThoughtSignature       []byte          `json:"thought_signature"`
-	InlineData             []byte          `json:"inline_data"`
-	InlineDataMime         sql.NullString  `json:"inline_data_mime"`
-	FileUri                sql.NullString  `json:"file_uri"`
-	FileMime               sql.NullString  `json:"file_mime"`
-	FunctionCallName       sql.NullString  `json:"function_call_name"`
-	FunctionCallArgs       sql.NullString  `json:"function_call_args"`
-	FunctionResponseName   sql.NullString  `json:"function_response_name"`
-	FunctionResponse       sql.NullString  `json:"function_response"`
-	ExecutableCode         sql.NullString  `json:"executable_code"`
-	ExecutableCodeLanguage sql.NullString  `json:"executable_code_language"`
-	CodeExecutionOutcome   sql.NullString  `json:"code_execution_outcome"`
-	CodeExecutionOutput    sql.NullString  `json:"code_execution_output"`
-	VideoStartOffset       sql.NullString  `json:"video_start_offset"`
-	VideoEndOffset         sql.NullString  `json:"video_end_offset"`
-	VideoFps               sql.NullFloat64 `json:"video_fps"`
-	XUserExtra             sql.NullString  `json:"x_user_extra"`
-}
-
-func (q *Queries) AddGeminiContentV2Part(ctx context.Context, arg AddGeminiContentV2PartParams) error {
-	var logFields []zap.Field
-	var start time.Time
-	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 8)
-		start = time.Now()
-		if q.LogArgument {
-			logFields = append(logFields,
-				zap.Dict("fields",
-					zap.Int64("content_id", arg.ContentID),
-					zap.Int64("part_index", arg.PartIndex),
+					zap.Int64("session_id", arg.SessionID),
+					zap.Int64("chat_id", arg.ChatID),
+					zap.Int64("msg_id", arg.MsgID),
+					zap.String("role", arg.Role),
+					arg.SentTime.ZapObject("sent_time"),
+					zap.String("username", arg.Username),
+					zap.String("msg_type", arg.MsgType),
+					zapNullInt64("reply_to_msg_id", arg.ReplyToMsgID),
 					zapNullString("text", arg.Text),
-					zap.Bool("thought", arg.Thought),
-					zap.ByteString("thought_signature", arg.ThoughtSignature),
-					zap.ByteString("inline_data", arg.InlineData),
-					zapNullString("inline_data_mime", arg.InlineDataMime),
-					zapNullString("file_uri", arg.FileUri),
-					zapNullString("file_mime", arg.FileMime),
-					zapNullString("function_call_name", arg.FunctionCallName),
-					zapNullString("function_call_args", arg.FunctionCallArgs),
-					zapNullString("function_response_name", arg.FunctionResponseName),
-					zapNullString("function_response", arg.FunctionResponse),
-					zapNullString("executable_code", arg.ExecutableCode),
-					zapNullString("executable_code_language", arg.ExecutableCodeLanguage),
-					zapNullString("code_execution_outcome", arg.CodeExecutionOutcome),
-					zapNullString("code_execution_output", arg.CodeExecutionOutput),
-					zapNullString("video_start_offset", arg.VideoStartOffset),
-					zapNullString("video_end_offset", arg.VideoEndOffset),
-					zapNullFloat64("video_fps", arg.VideoFps),
-					zapNullString("x_user_extra", arg.XUserExtra),
+					zap.ByteString("blob", arg.Blob),
+					zapNullString("mime_type", arg.MimeType),
+					zapNullString("quote_part", arg.QuotePart),
+					zapNullString("thought_signature", arg.ThoughtSignature),
 				),
 			)
 		}
 	}
-	_, err := q.exec(ctx, q.addGeminiContentV2PartStmt, addGeminiContentV2Part,
-		arg.ContentID,
-		arg.PartIndex,
+	_, err := q.exec(ctx, q.addGeminiMessageStmt, addGeminiMessage,
+		arg.SessionID,
+		arg.ChatID,
+		arg.MsgID,
+		arg.Role,
+		arg.SentTime,
+		arg.Username,
+		arg.MsgType,
+		arg.ReplyToMsgID,
 		arg.Text,
-		arg.Thought,
+		arg.Blob,
+		arg.MimeType,
+		arg.QuotePart,
 		arg.ThoughtSignature,
-		arg.InlineData,
-		arg.InlineDataMime,
-		arg.FileUri,
-		arg.FileMime,
-		arg.FunctionCallName,
-		arg.FunctionCallArgs,
-		arg.FunctionResponseName,
-		arg.FunctionResponse,
-		arg.ExecutableCode,
-		arg.ExecutableCodeLanguage,
-		arg.CodeExecutionOutcome,
-		arg.CodeExecutionOutput,
-		arg.VideoStartOffset,
-		arg.VideoEndOffset,
-		arg.VideoFps,
-		arg.XUserExtra,
 	)
-	q.logQuery(addGeminiContentV2Part, "AddGeminiContentV2Part", logFields, err, start)
+	q.logQuery(addGeminiMessage, "AddGeminiMessage", logFields, err, start)
 	return err
 }
 
-const createGeminiSession = `-- name: CreateGeminiSession :one
-INSERT INTO gemini_sessions (chat_id, chat_name, chat_type, tools, cache_name, cache_ttl, cache_expired)
-VALUES (?, ?, ?, ?, ?, ?, ?)
-RETURNING id, chat_id, chat_name, chat_type, tools, cache_name, cache_ttl, cache_expired
+const createNewGeminiSession = `-- name: CreateNewGeminiSession :one
+
+INSERT INTO gemini_sessions (chat_id, chat_name, chat_type)
+VALUES (?, ?, ?)
+RETURNING id, chat_id, chat_name, chat_type
 `
 
-type CreateGeminiSessionParams struct {
-	ChatID       int64          `json:"chat_id"`
-	ChatName     string         `json:"chat_name"`
-	ChatType     string         `json:"chat_type"`
-	Tools        sql.NullString `json:"tools"`
-	CacheName    sql.NullString `json:"cache_name"`
-	CacheTtl     sql.NullInt64  `json:"cache_ttl"`
-	CacheExpired sql.NullInt64  `json:"cache_expired"`
-}
-
-func (q *Queries) CreateGeminiSession(ctx context.Context, arg CreateGeminiSessionParams) (GeminiSession, error) {
-	var logFields []zap.Field
-	var start time.Time
-	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 8)
-		start = time.Now()
-		if q.LogArgument {
-			logFields = append(logFields,
-				zap.Dict("fields",
-					zap.Int64("chat_id", arg.ChatID),
-					zap.String("chat_name", arg.ChatName),
-					zap.String("chat_type", arg.ChatType),
-					zapNullString("tools", arg.Tools),
-					zapNullString("cache_name", arg.CacheName),
-					zapNullInt64("cache_ttl", arg.CacheTtl),
-					zapNullInt64("cache_expired", arg.CacheExpired),
-				),
-			)
-		}
-	}
-	row := q.queryRow(ctx, q.createGeminiSessionStmt, createGeminiSession,
-		arg.ChatID,
-		arg.ChatName,
-		arg.ChatType,
-		arg.Tools,
-		arg.CacheName,
-		arg.CacheTtl,
-		arg.CacheExpired,
-	)
-	var i GeminiSession
-	err := row.Scan(
-		&i.ID,
-		&i.ChatID,
-		&i.ChatName,
-		&i.ChatType,
-		&i.Tools,
-		&i.CacheName,
-		&i.CacheTtl,
-		&i.CacheExpired,
-	)
-	q.logQuery(createGeminiSession, "CreateGeminiSession", logFields, err, start)
-	return i, err
-}
-
-const getGeminiSessionByChat = `-- name: GetGeminiSessionByChat :one
-SELECT id, chat_id, chat_name, chat_type, tools, cache_name, cache_ttl, cache_expired
-FROM gemini_sessions
-WHERE chat_id = ?
-ORDER BY id DESC
-LIMIT 1
-`
-
-func (q *Queries) GetGeminiSessionByChat(ctx context.Context, chatID int64) (GeminiSession, error) {
+// encoding: utf-8
+func (q *Queries) CreateNewGeminiSession(ctx context.Context, chatID int64, chatName string, chatType string) (GeminiSession, error) {
 	var logFields []zap.Field
 	var start time.Time
 	if q.logger != nil {
@@ -243,33 +109,31 @@ func (q *Queries) GetGeminiSessionByChat(ctx context.Context, chatID int64) (Gem
 			logFields = append(logFields,
 				zap.Dict("fields",
 					zap.Int64("chat_id", chatID),
+					zap.String("chat_name", chatName),
+					zap.String("chat_type", chatType),
 				),
 			)
 		}
 	}
-	row := q.queryRow(ctx, q.getGeminiSessionByChatStmt, getGeminiSessionByChat, chatID)
+	row := q.queryRow(ctx, q.createNewGeminiSessionStmt, createNewGeminiSession, chatID, chatName, chatType)
 	var i GeminiSession
 	err := row.Scan(
 		&i.ID,
 		&i.ChatID,
 		&i.ChatName,
 		&i.ChatType,
-		&i.Tools,
-		&i.CacheName,
-		&i.CacheTtl,
-		&i.CacheExpired,
 	)
-	q.logQuery(getGeminiSessionByChat, "GetGeminiSessionByChat", logFields, err, start)
+	q.logQuery(createNewGeminiSession, "CreateNewGeminiSession", logFields, err, start)
 	return i, err
 }
 
-const getGeminiSessionById = `-- name: GetGeminiSessionById :one
-SELECT id, chat_id, chat_name, chat_type, tools, cache_name, cache_ttl, cache_expired
+const getSessionById = `-- name: GetSessionById :one
+SELECT id, chat_id, chat_name, chat_type
 FROM gemini_sessions
 WHERE id = ?
 `
 
-func (q *Queries) GetGeminiSessionById(ctx context.Context, id int64) (GeminiSession, error) {
+func (q *Queries) GetSessionById(ctx context.Context, id int64) (GeminiSession, error) {
 	var logFields []zap.Field
 	var start time.Time
 	if q.logger != nil {
@@ -283,29 +147,26 @@ func (q *Queries) GetGeminiSessionById(ctx context.Context, id int64) (GeminiSes
 			)
 		}
 	}
-	row := q.queryRow(ctx, q.getGeminiSessionByIdStmt, getGeminiSessionById, id)
+	row := q.queryRow(ctx, q.getSessionByIdStmt, getSessionById, id)
 	var i GeminiSession
 	err := row.Scan(
 		&i.ID,
 		&i.ChatID,
 		&i.ChatName,
 		&i.ChatType,
-		&i.Tools,
-		&i.CacheName,
-		&i.CacheTtl,
-		&i.CacheExpired,
 	)
-	q.logQuery(getGeminiSessionById, "GetGeminiSessionById", logFields, err, start)
+	q.logQuery(getSessionById, "GetSessionById", logFields, err, start)
 	return i, err
 }
 
-const getNextGeminiSeq = `-- name: GetNextGeminiSeq :one
-SELECT COALESCE(MAX(seq), 0) + 1
-FROM gemini_content_v2
-WHERE session_id = ?
+const getSessionIdByMessage = `-- name: GetSessionIdByMessage :one
+SELECT gemini_contents.session_id
+FROM gemini_contents
+WHERE chat_id = ?
+  AND msg_id = ?
 `
 
-func (q *Queries) GetNextGeminiSeq(ctx context.Context, sessionID int64) (int64, error) {
+func (q *Queries) GetSessionIdByMessage(ctx context.Context, chatID int64, msgID int64) (int64, error) {
 	var logFields []zap.Field
 	var start time.Time
 	if q.logger != nil {
@@ -314,27 +175,28 @@ func (q *Queries) GetNextGeminiSeq(ctx context.Context, sessionID int64) (int64,
 		if q.LogArgument {
 			logFields = append(logFields,
 				zap.Dict("fields",
-					zap.Int64("session_id", sessionID),
+					zap.Int64("chat_id", chatID),
+					zap.Int64("msg_id", msgID),
 				),
 			)
 		}
 	}
-	row := q.queryRow(ctx, q.getNextGeminiSeqStmt, getNextGeminiSeq, sessionID)
-	var column_1 int64
-	err := row.Scan(&column_1)
-	q.logQuery(getNextGeminiSeq, "GetNextGeminiSeq", logFields, err, start)
-	return column_1, err
+	row := q.queryRow(ctx, q.getSessionIdByMessageStmt, getSessionIdByMessage, chatID, msgID)
+	var session_id int64
+	err := row.Scan(&session_id)
+	q.logQuery(getSessionIdByMessage, "GetSessionIdByMessage", logFields, err, start)
+	return session_id, err
 }
 
-const listGeminiContentV2 = `-- name: ListGeminiContentV2 :many
-SELECT id, session_id, role, seq, x_user_extra
-FROM gemini_content_v2
+const getAllMsgInSessionReversed = `-- name: getAllMsgInSessionReversed :many
+SELECT session_id, chat_id, msg_id, role, sent_time, username, msg_type, reply_to_msg_id, text, blob, mime_type, quote_part, thought_signature
+FROM gemini_contents
 WHERE session_id = ?
-ORDER BY seq ASC
+ORDER BY msg_id DESC
 LIMIT ?
 `
 
-func (q *Queries) ListGeminiContentV2(ctx context.Context, sessionID int64, limit int64) ([]GeminiContentV2, error) {
+func (q *Queries) getAllMsgInSessionReversed(ctx context.Context, sessionID int64, limit int64) ([]GeminiContent, error) {
 	var logFields []zap.Field
 	var start time.Time
 	if q.logger != nil {
@@ -349,92 +211,31 @@ func (q *Queries) ListGeminiContentV2(ctx context.Context, sessionID int64, limi
 			)
 		}
 	}
-	rows, err := q.query(ctx, q.listGeminiContentV2Stmt, listGeminiContentV2, sessionID, limit)
+	rows, err := q.query(ctx, q.getAllMsgInSessionReversedStmt, getAllMsgInSessionReversed, sessionID, limit)
 	defer func() {
-		q.logQuery(listGeminiContentV2, "ListGeminiContentV2", logFields, err, start)
+		q.logQuery(getAllMsgInSessionReversed, "getAllMsgInSessionReversed", logFields, err, start)
 	}()
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []GeminiContentV2
+	var items []GeminiContent
 	for rows.Next() {
-		var i GeminiContentV2
+		var i GeminiContent
 		if err = rows.Scan(
-			&i.ID,
 			&i.SessionID,
+			&i.ChatID,
+			&i.MsgID,
 			&i.Role,
-			&i.Seq,
-			&i.XUserExtra,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err = rows.Close(); err != nil {
-		return nil, err
-	}
-	if err = rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listGeminiContentV2Parts = `-- name: ListGeminiContentV2Parts :many
-SELECT id, content_id, part_index, text, thought, thought_signature, inline_data, inline_data_mime, file_uri, file_mime, function_call_name, function_call_args, function_response_name, function_response, executable_code, executable_code_language, code_execution_outcome, code_execution_output, video_start_offset, video_end_offset, video_fps, x_user_extra
-FROM gemini_content_v2_parts
-WHERE content_id = ?
-ORDER BY part_index ASC
-`
-
-func (q *Queries) ListGeminiContentV2Parts(ctx context.Context, contentID int64) ([]GeminiContentV2Part, error) {
-	var logFields []zap.Field
-	var start time.Time
-	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 8)
-		start = time.Now()
-		if q.LogArgument {
-			logFields = append(logFields,
-				zap.Dict("fields",
-					zap.Int64("content_id", contentID),
-				),
-			)
-		}
-	}
-	rows, err := q.query(ctx, q.listGeminiContentV2PartsStmt, listGeminiContentV2Parts, contentID)
-	defer func() {
-		q.logQuery(listGeminiContentV2Parts, "ListGeminiContentV2Parts", logFields, err, start)
-	}()
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []GeminiContentV2Part
-	for rows.Next() {
-		var i GeminiContentV2Part
-		if err = rows.Scan(
-			&i.ID,
-			&i.ContentID,
-			&i.PartIndex,
+			&i.SentTime,
+			&i.Username,
+			&i.MsgType,
+			&i.ReplyToMsgID,
 			&i.Text,
-			&i.Thought,
+			&i.Blob,
+			&i.MimeType,
+			&i.QuotePart,
 			&i.ThoughtSignature,
-			&i.InlineData,
-			&i.InlineDataMime,
-			&i.FileUri,
-			&i.FileMime,
-			&i.FunctionCallName,
-			&i.FunctionCallArgs,
-			&i.FunctionResponseName,
-			&i.FunctionResponse,
-			&i.ExecutableCode,
-			&i.ExecutableCodeLanguage,
-			&i.CodeExecutionOutcome,
-			&i.CodeExecutionOutput,
-			&i.VideoStartOffset,
-			&i.VideoEndOffset,
-			&i.VideoFps,
-			&i.XUserExtra,
 		); err != nil {
 			return nil, err
 		}
@@ -447,50 +248,4 @@ func (q *Queries) ListGeminiContentV2Parts(ctx context.Context, contentID int64)
 		return nil, err
 	}
 	return items, nil
-}
-
-const updateGeminiSessionCache = `-- name: UpdateGeminiSessionCache :exec
-UPDATE gemini_sessions
-SET tools         = ?,
-    cache_name    = ?,
-    cache_ttl     = ?,
-    cache_expired = ?
-WHERE id = ?
-`
-
-type UpdateGeminiSessionCacheParams struct {
-	Tools        sql.NullString `json:"tools"`
-	CacheName    sql.NullString `json:"cache_name"`
-	CacheTtl     sql.NullInt64  `json:"cache_ttl"`
-	CacheExpired sql.NullInt64  `json:"cache_expired"`
-	ID           int64          `json:"id"`
-}
-
-func (q *Queries) UpdateGeminiSessionCache(ctx context.Context, arg UpdateGeminiSessionCacheParams) error {
-	var logFields []zap.Field
-	var start time.Time
-	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 8)
-		start = time.Now()
-		if q.LogArgument {
-			logFields = append(logFields,
-				zap.Dict("fields",
-					zapNullString("tools", arg.Tools),
-					zapNullString("cache_name", arg.CacheName),
-					zapNullInt64("cache_ttl", arg.CacheTtl),
-					zapNullInt64("cache_expired", arg.CacheExpired),
-					zap.Int64("id", arg.ID),
-				),
-			)
-		}
-	}
-	_, err := q.exec(ctx, q.updateGeminiSessionCacheStmt, updateGeminiSessionCache,
-		arg.Tools,
-		arg.CacheName,
-		arg.CacheTtl,
-		arg.CacheExpired,
-		arg.ID,
-	)
-	q.logQuery(updateGeminiSessionCache, "UpdateGeminiSessionCache", logFields, err, start)
-	return err
 }

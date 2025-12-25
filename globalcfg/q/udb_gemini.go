@@ -1,34 +1,28 @@
 package q
 
-import "context"
+import (
+	"context"
+	"slices"
+)
 
-// GeminiContentV2WithParts bundles a content row with its ordered parts.
-type GeminiContentV2WithParts struct {
-	Content GeminiContentV2
-	Parts   []GeminiContentV2Part
+func (q *Queries) GetAllMsgInSession(ctx context.Context, sessionID int64, limit int64) ([]GeminiContent, error) {
+	contents, err := q.getAllMsgInSessionReversed(ctx, sessionID, limit)
+	slices.Reverse(contents)
+	return contents, err
 }
-
-// ListGeminiHistory loads v2 contents (ascending seq) with their parts.
-func (q *Queries) ListGeminiHistory(ctx context.Context, sessionID int64, limit int64) ([]GeminiContentV2WithParts, error) {
-	rows, err := q.ListGeminiContentV2(ctx, sessionID, limit)
-	if err != nil {
-		return nil, err
-	}
-	out := make([]GeminiContentV2WithParts, len(rows))
-	for i := range rows {
-		parts, err := q.ListGeminiContentV2Parts(ctx, rows[i].ID)
-		if err != nil {
-			return nil, err
-		}
-		out[i] = GeminiContentV2WithParts{
-			Content: rows[i],
-			Parts:   parts,
-		}
-	}
-	return out, nil
-}
-
-// NextGeminiSeq returns the next available seq for the session.
-func (q *Queries) NextGeminiSeq(ctx context.Context, sessionID int64) (int64, error) {
-	return q.GetNextGeminiSeq(ctx, sessionID)
+func (g *GeminiContent) Save(ctx context.Context, q *Queries) error {
+	return q.AddGeminiMessage(ctx, AddGeminiMessageParams{
+		SessionID:    g.SessionID,
+		ChatID:       g.ChatID,
+		MsgID:        g.MsgID,
+		Role:         g.Role,
+		SentTime:     g.SentTime,
+		Username:     g.Username,
+		MsgType:      g.MsgType,
+		ReplyToMsgID: g.ReplyToMsgID,
+		Text:         g.Text,
+		Blob:         g.Blob,
+		MimeType:     g.MimeType,
+		QuotePart:    g.QuotePart,
+	})
 }
