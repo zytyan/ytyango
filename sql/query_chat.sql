@@ -59,3 +59,14 @@ SELECT *
 FROM chat_stat_daily
 WHERE chat_stat_daily.chat_id = ?
   AND chat_stat_daily.stat_date = ?;
+
+-- name: createOrUpdateChatAttr :exec
+INSERT INTO chat_attr (id, type, title, username, first_name, last_name, is_forum)
+VALUES (?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT DO UPDATE SET type=excluded.type,
+                          title=excluded.title,
+                          username=excluded.username,
+                          first_name=excluded.first_name,
+                          last_name=excluded.last_name,
+                          is_forum=excluded.is_forum
+;

@@ -97,6 +97,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.createNsfwPicUserRateStmt, err = db.PrepareContext(ctx, createNsfwPicUserRate); err != nil {
 		return nil, fmt.Errorf("error preparing query createNsfwPicUserRate: %w", err)
 	}
+	if q.createOrUpdateChatAttrStmt, err = db.PrepareContext(ctx, createOrUpdateChatAttr); err != nil {
+		return nil, fmt.Errorf("error preparing query createOrUpdateChatAttr: %w", err)
+	}
 	if q.createOrUpdateNsfwPicStmt, err = db.PrepareContext(ctx, createOrUpdateNsfwPic); err != nil {
 		return nil, fmt.Errorf("error preparing query createOrUpdateNsfwPic: %w", err)
 	}
@@ -262,6 +265,11 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing createNsfwPicUserRateStmt: %w", cerr)
 		}
 	}
+	if q.createOrUpdateChatAttrStmt != nil {
+		if cerr := q.createOrUpdateChatAttrStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing createOrUpdateChatAttrStmt: %w", cerr)
+		}
+	}
 	if q.createOrUpdateNsfwPicStmt != nil {
 		if cerr := q.createOrUpdateNsfwPicStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing createOrUpdateNsfwPicStmt: %w", cerr)
@@ -404,6 +412,7 @@ type Queries struct {
 	createChatStatDailyStmt           *sql.Stmt
 	createNewUserStmt                 *sql.Stmt
 	createNsfwPicUserRateStmt         *sql.Stmt
+	createOrUpdateChatAttrStmt        *sql.Stmt
 	createOrUpdateNsfwPicStmt         *sql.Stmt
 	getAllMsgInSessionReversedStmt    *sql.Stmt
 	getChatCfgByIdStmt                *sql.Stmt
@@ -453,6 +462,7 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		createChatStatDailyStmt:           q.createChatStatDailyStmt,
 		createNewUserStmt:                 q.createNewUserStmt,
 		createNsfwPicUserRateStmt:         q.createNsfwPicUserRateStmt,
+		createOrUpdateChatAttrStmt:        q.createOrUpdateChatAttrStmt,
 		createOrUpdateNsfwPicStmt:         q.createOrUpdateNsfwPicStmt,
 		getAllMsgInSessionReversedStmt:    q.getAllMsgInSessionReversedStmt,
 		getChatCfgByIdStmt:                q.getChatCfgByIdStmt,

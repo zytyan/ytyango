@@ -47,3 +47,14 @@ CREATE TABLE chat_stat_daily
 
     PRIMARY KEY (chat_id, stat_date)
 ) WITHOUT ROWID;
+
+CREATE TABLE IF NOT EXISTS chat_attr
+(
+    id         INTEGER  NOT NULL PRIMARY KEY,
+    type       TEXT     NOT NULL,
+    title      TEXT,
+    username   TEXT,
+    first_name TEXT,
+    last_name  TEXT,
+    is_forum   INT_BOOL NOT NULL
+) WITHOUT ROWID;

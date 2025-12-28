@@ -220,6 +220,60 @@ func (q *Queries) createChatStatDaily(ctx context.Context, chatID int64, statDat
 	return i, err
 }
 
+const createOrUpdateChatAttr = `-- name: createOrUpdateChatAttr :exec
+INSERT INTO chat_attr (id, type, title, username, first_name, last_name, is_forum)
+VALUES (?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT DO UPDATE SET type=excluded.type,
+                          title=excluded.title,
+                          username=excluded.username,
+                          first_name=excluded.first_name,
+                          last_name=excluded.last_name,
+                          is_forum=excluded.is_forum
+`
+
+type createOrUpdateChatAttrParams struct {
+	ID        int64          `json:"id"`
+	Type      string         `json:"type"`
+	Title     sql.NullString `json:"title"`
+	Username  sql.NullString `json:"username"`
+	FirstName sql.NullString `json:"first_name"`
+	LastName  sql.NullString `json:"last_name"`
+	IsForum   bool           `json:"is_forum"`
+}
+
+func (q *Queries) createOrUpdateChatAttr(ctx context.Context, arg createOrUpdateChatAttrParams) error {
+	var logFields []zap.Field
+	var start time.Time
+	if q.logger != nil {
+		logFields = make([]zap.Field, 0, 8)
+		start = time.Now()
+		if q.LogArgument {
+			logFields = append(logFields,
+				zap.Dict("fields",
+					zap.Int64("id", arg.ID),
+					zap.String("type", arg.Type),
+					zapNullString("title", arg.Title),
+					zapNullString("username", arg.Username),
+					zapNullString("first_name", arg.FirstName),
+					zapNullString("last_name", arg.LastName),
+					zap.Bool("is_forum", arg.IsForum),
+				),
+			)
+		}
+	}
+	_, err := q.exec(ctx, q.createOrUpdateChatAttrStmt, createOrUpdateChatAttr,
+		arg.ID,
+		arg.Type,
+		arg.Title,
+		arg.Username,
+		arg.FirstName,
+		arg.LastName,
+		arg.IsForum,
+	)
+	q.logQuery(createOrUpdateChatAttr, "createOrUpdateChatAttr", logFields, err, start)
+	return err
+}
+
 const getChatCfgById = `-- name: getChatCfgById :one
 
 SELECT id, web_id, auto_cvt_bili, auto_ocr, auto_calculate, auto_exchange, auto_check_adult, save_messages, enable_coc, resp_nsfw_msg, timezone

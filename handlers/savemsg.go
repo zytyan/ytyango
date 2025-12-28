@@ -103,6 +103,11 @@ func saveMessageToMeilisearch(bot *gotgbot.Bot, msg *gotgbot.Message) (err error
 	if err != nil {
 		logger.Warn("save message to meilisearch", zap.Error(err))
 	}
+	chat := msg.GetChat()
+	err = g.Q.UpdateChatAttr(context.Background(), &chat)
+	if err != nil {
+		logD.Warn("update chat error", zap.Error(err))
+	}
 	return err
 }
 

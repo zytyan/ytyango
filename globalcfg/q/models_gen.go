@@ -21,6 +21,16 @@ type CharacterAttr struct {
 	AttrValue string `json:"attr_value"`
 }
 
+type ChatAttr struct {
+	ID        int64          `json:"id"`
+	Type      string         `json:"type"`
+	Title     sql.NullString `json:"title"`
+	Username  sql.NullString `json:"username"`
+	FirstName sql.NullString `json:"first_name"`
+	LastName  sql.NullString `json:"last_name"`
+	IsForum   bool           `json:"is_forum"`
+}
+
 type ChatStatDaily struct {
 	ChatID             int64          `json:"chat_id"`
 	StatDate           int64          `json:"stat_date"`

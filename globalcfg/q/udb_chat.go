@@ -6,6 +6,8 @@ import (
 	"main/helpers/lrusf"
 	"strconv"
 	"time"
+
+	"github.com/PaulSonOfLars/gotgbot/v2"
 )
 
 type ChatCfg struct {
@@ -121,4 +123,19 @@ func (q *Queries) GetChatCfgByIdOrDefault(id int64) *ChatCfg {
 		return defaultChagCfg(id)
 	}
 	return cfg
+}
+
+func (q *Queries) UpdateChatAttr(ctx context.Context, chat *gotgbot.Chat) error {
+	nstr := func(s string) sql.NullString {
+		return sql.NullString{String: s, Valid: s != ""}
+	}
+	return q.createOrUpdateChatAttr(ctx, createOrUpdateChatAttrParams{
+		ID:        chat.Id,
+		Type:      chat.Type,
+		Title:     nstr(chat.Title),
+		Username:  nstr(chat.Username),
+		FirstName: nstr(chat.FirstName),
+		LastName:  nstr(chat.LastName),
+		IsForum:   chat.IsForum,
+	})
 }
