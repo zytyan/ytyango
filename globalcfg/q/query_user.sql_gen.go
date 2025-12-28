@@ -66,8 +66,8 @@ func (q *Queries) SetPrprCache(ctx context.Context, profilePhotoUid string, prpr
 }
 
 const createNewUser = `-- name: createNewUser :one
-INSERT INTO users (updated_at, user_id, first_name, last_name, profile_update_at, profile_photo, timezone)
-VALUES (?1, ?2, ?3, ?4, ?1, ?5, ?6)
+INSERT INTO users (updated_at, user_id, first_name, last_name, username, profile_update_at, profile_photo, timezone)
+VALUES (?1, ?2, ?3, ?4, ?5, ?1, ?6, ?7)
 RETURNING id
 `
 
@@ -76,6 +76,7 @@ type createNewUserParams struct {
 	UserID       int64          `json:"user_id"`
 	FirstName    string         `json:"first_name"`
 	LastName     sql.NullString `json:"last_name"`
+	Username     sql.NullString `json:"username"`
 	ProfilePhoto sql.NullString `json:"profile_photo"`
 	Timezone     int64          `json:"timezone"`
 }
@@ -93,6 +94,7 @@ func (q *Queries) createNewUser(ctx context.Context, arg createNewUserParams) (i
 					zap.Int64("user_id", arg.UserID),
 					zap.String("first_name", arg.FirstName),
 					zapNullString("last_name", arg.LastName),
+					zapNullString("username", arg.Username),
 					zapNullString("profile_photo", arg.ProfilePhoto),
 					zap.Int64("timezone", arg.Timezone),
 				),
@@ -104,6 +106,7 @@ func (q *Queries) createNewUser(ctx context.Context, arg createNewUserParams) (i
 		arg.UserID,
 		arg.FirstName,
 		arg.LastName,
+		arg.Username,
 		arg.ProfilePhoto,
 		arg.Timezone,
 	)
@@ -115,7 +118,7 @@ func (q *Queries) createNewUser(ctx context.Context, arg createNewUserParams) (i
 
 const getUserById = `-- name: getUserById :one
 
-SELECT id, updated_at, user_id, first_name, last_name, profile_update_at, profile_photo, timezone
+SELECT id, updated_at, user_id, first_name, last_name, username, profile_update_at, profile_photo, timezone
 FROM users
 WHERE user_id = ?
 `
@@ -143,6 +146,7 @@ func (q *Queries) getUserById(ctx context.Context, userID int64) (User, error) {
 		&i.UserID,
 		&i.FirstName,
 		&i.LastName,
+		&i.Username,
 		&i.ProfileUpdateAt,
 		&i.ProfilePhoto,
 		&i.Timezone,
@@ -155,12 +159,21 @@ const updateUserBase = `-- name: updateUserBase :one
 UPDATE users
 SET updated_at=?2,
     first_name=?3,
-    last_name =?4
+    last_name =?4,
+    username  = ?5
 WHERE user_id = ?1
 RETURNING id
 `
 
-func (q *Queries) updateUserBase(ctx context.Context, userID int64, updatedAt UnixTime, firstName string, lastName sql.NullString) (int64, error) {
+type updateUserBaseParams struct {
+	UserID    int64          `json:"user_id"`
+	UpdatedAt UnixTime       `json:"updated_at"`
+	FirstName string         `json:"first_name"`
+	LastName  sql.NullString `json:"last_name"`
+	Username  sql.NullString `json:"username"`
+}
+
+func (q *Queries) updateUserBase(ctx context.Context, arg updateUserBaseParams) (int64, error) {
 	var logFields []zap.Field
 	var start time.Time
 	if q.logger != nil {
@@ -169,19 +182,21 @@ func (q *Queries) updateUserBase(ctx context.Context, userID int64, updatedAt Un
 		if q.LogArgument {
 			logFields = append(logFields,
 				zap.Dict("fields",
-					zap.Int64("user_id", userID),
-					updatedAt.ZapObject("updated_at"),
-					zap.String("first_name", firstName),
-					zapNullString("last_name", lastName),
+					zap.Int64("user_id", arg.UserID),
+					arg.UpdatedAt.ZapObject("updated_at"),
+					zap.String("first_name", arg.FirstName),
+					zapNullString("last_name", arg.LastName),
+					zapNullString("username", arg.Username),
 				),
 			)
 		}
 	}
 	row := q.queryRow(ctx, q.updateUserBaseStmt, updateUserBase,
-		userID,
-		updatedAt,
-		firstName,
-		lastName,
+		arg.UserID,
+		arg.UpdatedAt,
+		arg.FirstName,
+		arg.LastName,
+		arg.Username,
 	)
 	var id int64
 	err := row.Scan(&id)

@@ -45,6 +45,7 @@ func (q *Queries) CreateNewUserByTg(ctx context.Context, tgUser *gotgbot.User, b
 			UserID:       tgUser.Id,
 			FirstName:    tgUser.FirstName,
 			LastName:     sql.NullString{String: tgUser.LastName, Valid: tgUser.LastName != ""},
+			Username:     sql.NullString{String: tgUser.Username, Valid: tgUser.Username != ""},
 			ProfilePhoto: sql.NullString{},
 			Timezone:     8 * 60 * 60,
 		})
@@ -85,8 +86,18 @@ func (u *User) TryUpdate(q *Queries, tgUser *gotgbot.User) error {
 		u.LastName.String = tgUser.LastName
 		needCommit = true
 	}
+	if tgUser.Username != "" && u.Username.String != tgUser.Username {
+		u.Username = sql.NullString{String: tgUser.Username, Valid: true}
+		needCommit = true
+	}
 	if needCommit {
-		_, err := q.updateUserBase(context.Background(), u.UserID, UnixTime{time.Now()}, u.FirstName, u.LastName)
+		_, err := q.updateUserBase(context.Background(), updateUserBaseParams{
+			UserID:    u.UserID,
+			UpdatedAt: UnixTime{Time: time.Now()},
+			FirstName: u.FirstName,
+			LastName:  u.LastName,
+			Username:  u.Username,
+		})
 		return err
 	}
 	return nil

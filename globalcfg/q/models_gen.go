@@ -97,6 +97,7 @@ type User struct {
 	UserID          int64          `json:"user_id"`
 	FirstName       string         `json:"first_name"`
 	LastName        sql.NullString `json:"last_name"`
+	Username        sql.NullString `json:"username"`
 	ProfileUpdateAt UnixTime       `json:"profile_update_at"`
 	ProfilePhoto    sql.NullString `json:"profile_photo"`
 	Timezone        int64          `json:"timezone"`

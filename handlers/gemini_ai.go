@@ -157,6 +157,9 @@ func (s *GeminiSession) AddTgMessage(bot *gotgbot.Bot, msg *gotgbot.Message) (er
 		if err != nil {
 			return err
 		}
+		if len(data) == 0 || data[0] == '{' {
+			return errors.New("不支持的动画类型")
+		}
 		content.Blob = data
 		content.MsgType = "sticker"
 		content.MimeType.Valid = true
@@ -200,6 +203,9 @@ func (s *GeminiSession) PersistTmpUpdates(ctx context.Context) error {
 	s.TmpContents = nil
 	s.UpdateTime = time.Now()
 	return tx.Commit()
+}
+func (s *GeminiSession) DiscardTmpUpdates() {
+	s.TmpContents = nil
 }
 
 func IsGeminiReq(msg *gotgbot.Message) bool {
@@ -288,8 +294,7 @@ func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 消息类型有 text, photo, sticker三种，对应文本消息、图片消息及表情消息。
 若用户明确回复了某条消息，则有回复的消息的ID(reply)字段。
 若用户特地引用了被回复的消息中的某段文字，则会有引用(quote)字段。
-这些元数据由代码自动生成，不要在模型的输出中加入该数据。
-请使用中文回复消息。`,
+这些元数据由代码自动生成，不要在模型的输出中加入该数据。`,
 		time.Now().Format("2006-01-02 15:04:05 -07:00"),
 		session.ChatType,
 		session.ChatName,
@@ -298,7 +303,7 @@ func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 	config := &genai.GenerateContentConfig{
 		SystemInstruction: genai.NewContentFromText(sysInst, genai.RoleModel),
 		Tools: []*genai.Tool{
-			{GoogleSearch: &genai.GoogleSearch{}, CodeExecution: &genai.ToolCodeExecution{}},
+			{GoogleSearch: &genai.GoogleSearch{}},
 		},
 	}
 	if err := session.AddTgMessage(bot, ctx.EffectiveMessage.ReplyToMessage); err != nil {
@@ -314,6 +319,11 @@ func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 	if err != nil {
 		log.Warnf("set reaction emoji to message %s(%d) failed ", getChatName(&ctx.EffectiveMessage.Chat), ctx.EffectiveMessage.MessageId)
 	}
+	defer func() {
+		if err != nil {
+			session.DiscardTmpUpdates()
+		}
+	}()
 	ticker := time.NewTicker(time.Second * 4)
 	defer ticker.Stop()
 	tickerCtx, tickerCancel := context.WithCancel(context.Background())

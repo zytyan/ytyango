@@ -6,15 +6,16 @@ FROM users
 WHERE user_id = ?;
 
 -- name: createNewUser :one
-INSERT INTO users (updated_at, user_id, first_name, last_name, profile_update_at, profile_photo, timezone)
-VALUES (?1, ?2, ?3, ?4, ?1, ?5, ?6)
+INSERT INTO users (updated_at, user_id, first_name, last_name, username, profile_update_at, profile_photo, timezone)
+VALUES (?1, ?2, ?3, ?4, ?5, ?1, ?6, ?7)
 RETURNING id;
 
 -- name: updateUserBase :one
 UPDATE users
 SET updated_at=?2,
     first_name=?3,
-    last_name =?4
+    last_name =?4,
+    username  = ?5
 WHERE user_id = ?1
 RETURNING id;
 
