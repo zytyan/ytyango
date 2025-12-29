@@ -8,7 +8,8 @@ import (
 	g "main/globalcfg"
 	"main/globalcfg/h"
 	"main/globalcfg/q"
-	"main/mdnormalizer"
+	"main/helpers/mdnormalizer"
+	"regexp"
 	"slices"
 	"strings"
 	"sync"
@@ -271,6 +272,8 @@ create:
 	return session
 }
 
+var reLabelHeader = regexp.MustCompile(`(?s)^-start-label-\n.*-end-label-\n`)
+
 func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 	client, err := getGenAiClient()
 	if !slices.Contains([]int64{-1001471592463, -1001282155019, -1001126241898, -1001170816274}, ctx.EffectiveChat.Id) {
@@ -279,7 +282,7 @@ func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 	if err != nil {
 		return err
 	}
-	genCtx, cancel := context.WithTimeout(context.Background(), time.Second*120)
+	genCtx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
 	defer cancel()
 	session := GeminiGetSession(genCtx, ctx.EffectiveMessage)
 	if session == nil {
@@ -294,7 +297,8 @@ func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 消息类型有 text, photo, sticker三种，对应文本消息、图片消息及表情消息。
 若用户明确回复了某条消息，则有回复的消息的ID(reply)字段。
 若用户特地引用了被回复的消息中的某段文字，则会有引用(quote)字段。
-这些元数据由代码自动生成，不要在模型的输出中加入该数据。`,
+这些元数据由代码自动生成，不要在模型的输出中加入该数据。
+请务必情绪不要过于激动。`,
 		time.Now().Format("2006-01-02 15:04:05 -07:00"),
 		session.ChatType,
 		session.ChatName,
@@ -350,6 +354,7 @@ func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 		return err
 	}
 	text := res.Text()
+	text = reLabelHeader.ReplaceAllString(text, "")
 	if text == "" {
 		text = "模型没有返回任何信息"
 		if res.PromptFeedback != nil {
