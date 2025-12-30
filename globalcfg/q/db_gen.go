@@ -40,6 +40,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.createNewGeminiSessionStmt, err = db.PrepareContext(ctx, createNewGeminiSession); err != nil {
 		return nil, fmt.Errorf("error preparing query CreateNewGeminiSession: %w", err)
 	}
+	if q.createOrUpdateGeminiSystemPromptStmt, err = db.PrepareContext(ctx, createOrUpdateGeminiSystemPrompt); err != nil {
+		return nil, fmt.Errorf("error preparing query CreateOrUpdateGeminiSystemPrompt: %w", err)
+	}
 	if q.delCocCharAttrStmt, err = db.PrepareContext(ctx, delCocCharAttr); err != nil {
 		return nil, fmt.Errorf("error preparing query DelCocCharAttr: %w", err)
 	}
@@ -51,6 +54,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	}
 	if q.getCocCharAttrStmt, err = db.PrepareContext(ctx, getCocCharAttr); err != nil {
 		return nil, fmt.Errorf("error preparing query GetCocCharAttr: %w", err)
+	}
+	if q.getGeminiSystemPromptStmt, err = db.PrepareContext(ctx, getGeminiSystemPrompt); err != nil {
+		return nil, fmt.Errorf("error preparing query GetGeminiSystemPrompt: %w", err)
 	}
 	if q.getNsfwPicByFileUidStmt, err = db.PrepareContext(ctx, getNsfwPicByFileUid); err != nil {
 		return nil, fmt.Errorf("error preparing query GetNsfwPicByFileUid: %w", err)
@@ -170,6 +176,11 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing createNewGeminiSessionStmt: %w", cerr)
 		}
 	}
+	if q.createOrUpdateGeminiSystemPromptStmt != nil {
+		if cerr := q.createOrUpdateGeminiSystemPromptStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing createOrUpdateGeminiSystemPromptStmt: %w", cerr)
+		}
+	}
 	if q.delCocCharAttrStmt != nil {
 		if cerr := q.delCocCharAttrStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing delCocCharAttrStmt: %w", cerr)
@@ -188,6 +199,11 @@ func (q *Queries) Close() error {
 	if q.getCocCharAttrStmt != nil {
 		if cerr := q.getCocCharAttrStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing getCocCharAttrStmt: %w", cerr)
+		}
+	}
+	if q.getGeminiSystemPromptStmt != nil {
+		if cerr := q.getGeminiSystemPromptStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getGeminiSystemPromptStmt: %w", cerr)
 		}
 	}
 	if q.getNsfwPicByFileUidStmt != nil {
@@ -382,102 +398,106 @@ func (q *Queries) queryRow(ctx context.Context, stmt *sql.Stmt, query string, ar
 }
 
 type Queries struct {
-	db                                DBTX
-	logger                            *zap.Logger
-	SlowQueryThreshold                time.Duration
-	txID                              string
-	LogRawSqlString                   bool
-	LogArgument                       bool
-	tx                                *sql.Tx
-	addGeminiMessageStmt              *sql.Stmt
-	createBiliInlineDataStmt          *sql.Stmt
-	createChatCfgStmt                 *sql.Stmt
-	createNewGeminiSessionStmt        *sql.Stmt
-	delCocCharAttrStmt                *sql.Stmt
-	getBiliInlineDataStmt             *sql.Stmt
-	getCocCharAllAttrStmt             *sql.Stmt
-	getCocCharAttrStmt                *sql.Stmt
-	getNsfwPicByFileUidStmt           *sql.Stmt
-	getPrprCacheStmt                  *sql.Stmt
-	getSessionByIdStmt                *sql.Stmt
-	getSessionIdByMessageStmt         *sql.Stmt
-	getYtDlpDbCacheStmt               *sql.Stmt
-	incYtDlUploadCountStmt            *sql.Stmt
-	listNsfwPicUserRatesByFileUidStmt *sql.Stmt
-	setCocCharAttrStmt                *sql.Stmt
-	setPrprCacheStmt                  *sql.Stmt
-	updateBiliInlineMsgIdStmt         *sql.Stmt
-	updateChatStatDailyStmt           *sql.Stmt
-	updateYtDlpCacheStmt              *sql.Stmt
-	createChatStatDailyStmt           *sql.Stmt
-	createNewUserStmt                 *sql.Stmt
-	createNsfwPicUserRateStmt         *sql.Stmt
-	createOrUpdateChatAttrStmt        *sql.Stmt
-	createOrUpdateNsfwPicStmt         *sql.Stmt
-	getAllMsgInSessionReversedStmt    *sql.Stmt
-	getChatCfgByIdStmt                *sql.Stmt
-	getChatIdByWebIdStmt              *sql.Stmt
-	getChatStatStmt                   *sql.Stmt
-	getNsfwPicByRateAndRandKeyStmt    *sql.Stmt
-	getNsfwPicByRateFirstStmt         *sql.Stmt
-	getNsfwPicRateByUserIdStmt        *sql.Stmt
-	getUserByIdStmt                   *sql.Stmt
-	listNsfwPicRateCounterStmt        *sql.Stmt
-	updateChatCfgStmt                 *sql.Stmt
-	updateNsfwPicUserRateStmt         *sql.Stmt
-	updateUserBaseStmt                *sql.Stmt
-	updateUserProfilePhotoStmt        *sql.Stmt
-	updateUserTimeZoneStmt            *sql.Stmt
+	db                                   DBTX
+	logger                               *zap.Logger
+	SlowQueryThreshold                   time.Duration
+	txID                                 string
+	LogRawSqlString                      bool
+	LogArgument                          bool
+	tx                                   *sql.Tx
+	addGeminiMessageStmt                 *sql.Stmt
+	createBiliInlineDataStmt             *sql.Stmt
+	createChatCfgStmt                    *sql.Stmt
+	createNewGeminiSessionStmt           *sql.Stmt
+	createOrUpdateGeminiSystemPromptStmt *sql.Stmt
+	delCocCharAttrStmt                   *sql.Stmt
+	getBiliInlineDataStmt                *sql.Stmt
+	getCocCharAllAttrStmt                *sql.Stmt
+	getCocCharAttrStmt                   *sql.Stmt
+	getGeminiSystemPromptStmt            *sql.Stmt
+	getNsfwPicByFileUidStmt              *sql.Stmt
+	getPrprCacheStmt                     *sql.Stmt
+	getSessionByIdStmt                   *sql.Stmt
+	getSessionIdByMessageStmt            *sql.Stmt
+	getYtDlpDbCacheStmt                  *sql.Stmt
+	incYtDlUploadCountStmt               *sql.Stmt
+	listNsfwPicUserRatesByFileUidStmt    *sql.Stmt
+	setCocCharAttrStmt                   *sql.Stmt
+	setPrprCacheStmt                     *sql.Stmt
+	updateBiliInlineMsgIdStmt            *sql.Stmt
+	updateChatStatDailyStmt              *sql.Stmt
+	updateYtDlpCacheStmt                 *sql.Stmt
+	createChatStatDailyStmt              *sql.Stmt
+	createNewUserStmt                    *sql.Stmt
+	createNsfwPicUserRateStmt            *sql.Stmt
+	createOrUpdateChatAttrStmt           *sql.Stmt
+	createOrUpdateNsfwPicStmt            *sql.Stmt
+	getAllMsgInSessionReversedStmt       *sql.Stmt
+	getChatCfgByIdStmt                   *sql.Stmt
+	getChatIdByWebIdStmt                 *sql.Stmt
+	getChatStatStmt                      *sql.Stmt
+	getNsfwPicByRateAndRandKeyStmt       *sql.Stmt
+	getNsfwPicByRateFirstStmt            *sql.Stmt
+	getNsfwPicRateByUserIdStmt           *sql.Stmt
+	getUserByIdStmt                      *sql.Stmt
+	listNsfwPicRateCounterStmt           *sql.Stmt
+	updateChatCfgStmt                    *sql.Stmt
+	updateNsfwPicUserRateStmt            *sql.Stmt
+	updateUserBaseStmt                   *sql.Stmt
+	updateUserProfilePhotoStmt           *sql.Stmt
+	updateUserTimeZoneStmt               *sql.Stmt
 }
 
 func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 	return &Queries{
-		db:                                tx,
-		logger:                            q.logger,
-		SlowQueryThreshold:                q.SlowQueryThreshold,
-		txID:                              fmt.Sprintf("%p", tx),
-		LogRawSqlString:                   q.LogRawSqlString,
-		LogArgument:                       q.LogArgument,
-		tx:                                tx,
-		addGeminiMessageStmt:              q.addGeminiMessageStmt,
-		createBiliInlineDataStmt:          q.createBiliInlineDataStmt,
-		createChatCfgStmt:                 q.createChatCfgStmt,
-		createNewGeminiSessionStmt:        q.createNewGeminiSessionStmt,
-		delCocCharAttrStmt:                q.delCocCharAttrStmt,
-		getBiliInlineDataStmt:             q.getBiliInlineDataStmt,
-		getCocCharAllAttrStmt:             q.getCocCharAllAttrStmt,
-		getCocCharAttrStmt:                q.getCocCharAttrStmt,
-		getNsfwPicByFileUidStmt:           q.getNsfwPicByFileUidStmt,
-		getPrprCacheStmt:                  q.getPrprCacheStmt,
-		getSessionByIdStmt:                q.getSessionByIdStmt,
-		getSessionIdByMessageStmt:         q.getSessionIdByMessageStmt,
-		getYtDlpDbCacheStmt:               q.getYtDlpDbCacheStmt,
-		incYtDlUploadCountStmt:            q.incYtDlUploadCountStmt,
-		listNsfwPicUserRatesByFileUidStmt: q.listNsfwPicUserRatesByFileUidStmt,
-		setCocCharAttrStmt:                q.setCocCharAttrStmt,
-		setPrprCacheStmt:                  q.setPrprCacheStmt,
-		updateBiliInlineMsgIdStmt:         q.updateBiliInlineMsgIdStmt,
-		updateChatStatDailyStmt:           q.updateChatStatDailyStmt,
-		updateYtDlpCacheStmt:              q.updateYtDlpCacheStmt,
-		createChatStatDailyStmt:           q.createChatStatDailyStmt,
-		createNewUserStmt:                 q.createNewUserStmt,
-		createNsfwPicUserRateStmt:         q.createNsfwPicUserRateStmt,
-		createOrUpdateChatAttrStmt:        q.createOrUpdateChatAttrStmt,
-		createOrUpdateNsfwPicStmt:         q.createOrUpdateNsfwPicStmt,
-		getAllMsgInSessionReversedStmt:    q.getAllMsgInSessionReversedStmt,
-		getChatCfgByIdStmt:                q.getChatCfgByIdStmt,
-		getChatIdByWebIdStmt:              q.getChatIdByWebIdStmt,
-		getChatStatStmt:                   q.getChatStatStmt,
-		getNsfwPicByRateAndRandKeyStmt:    q.getNsfwPicByRateAndRandKeyStmt,
-		getNsfwPicByRateFirstStmt:         q.getNsfwPicByRateFirstStmt,
-		getNsfwPicRateByUserIdStmt:        q.getNsfwPicRateByUserIdStmt,
-		getUserByIdStmt:                   q.getUserByIdStmt,
-		listNsfwPicRateCounterStmt:        q.listNsfwPicRateCounterStmt,
-		updateChatCfgStmt:                 q.updateChatCfgStmt,
-		updateNsfwPicUserRateStmt:         q.updateNsfwPicUserRateStmt,
-		updateUserBaseStmt:                q.updateUserBaseStmt,
-		updateUserProfilePhotoStmt:        q.updateUserProfilePhotoStmt,
-		updateUserTimeZoneStmt:            q.updateUserTimeZoneStmt,
+		db:                                   tx,
+		logger:                               q.logger,
+		SlowQueryThreshold:                   q.SlowQueryThreshold,
+		txID:                                 fmt.Sprintf("%p", tx),
+		LogRawSqlString:                      q.LogRawSqlString,
+		LogArgument:                          q.LogArgument,
+		tx:                                   tx,
+		addGeminiMessageStmt:                 q.addGeminiMessageStmt,
+		createBiliInlineDataStmt:             q.createBiliInlineDataStmt,
+		createChatCfgStmt:                    q.createChatCfgStmt,
+		createNewGeminiSessionStmt:           q.createNewGeminiSessionStmt,
+		createOrUpdateGeminiSystemPromptStmt: q.createOrUpdateGeminiSystemPromptStmt,
+		delCocCharAttrStmt:                   q.delCocCharAttrStmt,
+		getBiliInlineDataStmt:                q.getBiliInlineDataStmt,
+		getCocCharAllAttrStmt:                q.getCocCharAllAttrStmt,
+		getCocCharAttrStmt:                   q.getCocCharAttrStmt,
+		getGeminiSystemPromptStmt:            q.getGeminiSystemPromptStmt,
+		getNsfwPicByFileUidStmt:              q.getNsfwPicByFileUidStmt,
+		getPrprCacheStmt:                     q.getPrprCacheStmt,
+		getSessionByIdStmt:                   q.getSessionByIdStmt,
+		getSessionIdByMessageStmt:            q.getSessionIdByMessageStmt,
+		getYtDlpDbCacheStmt:                  q.getYtDlpDbCacheStmt,
+		incYtDlUploadCountStmt:               q.incYtDlUploadCountStmt,
+		listNsfwPicUserRatesByFileUidStmt:    q.listNsfwPicUserRatesByFileUidStmt,
+		setCocCharAttrStmt:                   q.setCocCharAttrStmt,
+		setPrprCacheStmt:                     q.setPrprCacheStmt,
+		updateBiliInlineMsgIdStmt:            q.updateBiliInlineMsgIdStmt,
+		updateChatStatDailyStmt:              q.updateChatStatDailyStmt,
+		updateYtDlpCacheStmt:                 q.updateYtDlpCacheStmt,
+		createChatStatDailyStmt:              q.createChatStatDailyStmt,
+		createNewUserStmt:                    q.createNewUserStmt,
+		createNsfwPicUserRateStmt:            q.createNsfwPicUserRateStmt,
+		createOrUpdateChatAttrStmt:           q.createOrUpdateChatAttrStmt,
+		createOrUpdateNsfwPicStmt:            q.createOrUpdateNsfwPicStmt,
+		getAllMsgInSessionReversedStmt:       q.getAllMsgInSessionReversedStmt,
+		getChatCfgByIdStmt:                   q.getChatCfgByIdStmt,
+		getChatIdByWebIdStmt:                 q.getChatIdByWebIdStmt,
+		getChatStatStmt:                      q.getChatStatStmt,
+		getNsfwPicByRateAndRandKeyStmt:       q.getNsfwPicByRateAndRandKeyStmt,
+		getNsfwPicByRateFirstStmt:            q.getNsfwPicByRateFirstStmt,
+		getNsfwPicRateByUserIdStmt:           q.getNsfwPicRateByUserIdStmt,
+		getUserByIdStmt:                      q.getUserByIdStmt,
+		listNsfwPicRateCounterStmt:           q.listNsfwPicRateCounterStmt,
+		updateChatCfgStmt:                    q.updateChatCfgStmt,
+		updateNsfwPicUserRateStmt:            q.updateNsfwPicUserRateStmt,
+		updateUserBaseStmt:                   q.updateUserBaseStmt,
+		updateUserProfilePhotoStmt:           q.updateUserProfilePhotoStmt,
+		updateUserTimeZoneStmt:               q.updateUserTimeZoneStmt,
 	}
 }
 

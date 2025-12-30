@@ -38,3 +38,13 @@ WHERE chat_id = ?
 SELECT *
 FROM gemini_sessions
 WHERE id = ?;
+
+-- name: CreateOrUpdateGeminiSystemPrompt :exec
+INSERT INTO gemini_system_prompt (chat_id, prompt)
+VALUES (?, ?)
+ON CONFLICT DO UPDATE SET prompt=excluded.prompt;
+
+-- name: GetGeminiSystemPrompt :one
+SELECT prompt
+FROM gemini_system_prompt
+WHERE chat_id = ?;

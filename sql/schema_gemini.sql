@@ -38,3 +38,9 @@ CREATE TABLE gemini_contents
         (blob IS NOT NULL AND mime_type IS NOT NULL)
         )
 ) WITHOUT ROWID;
+
+CREATE TABLE IF NOT EXISTS gemini_system_prompt
+(
+    chat_id INTEGER NOT NULL PRIMARY KEY,
+    prompt  TEXT    NOT NULL
+);

@@ -127,6 +127,59 @@ func (q *Queries) CreateNewGeminiSession(ctx context.Context, chatID int64, chat
 	return i, err
 }
 
+const createOrUpdateGeminiSystemPrompt = `-- name: CreateOrUpdateGeminiSystemPrompt :exec
+INSERT INTO gemini_system_prompt (chat_id, prompt)
+VALUES (?, ?)
+ON CONFLICT DO UPDATE SET prompt=excluded.prompt
+`
+
+func (q *Queries) CreateOrUpdateGeminiSystemPrompt(ctx context.Context, chatID int64, prompt string) error {
+	var logFields []zap.Field
+	var start time.Time
+	if q.logger != nil {
+		logFields = make([]zap.Field, 0, 8)
+		start = time.Now()
+		if q.LogArgument {
+			logFields = append(logFields,
+				zap.Dict("fields",
+					zap.Int64("chat_id", chatID),
+					zap.String("prompt", prompt),
+				),
+			)
+		}
+	}
+	_, err := q.exec(ctx, q.createOrUpdateGeminiSystemPromptStmt, createOrUpdateGeminiSystemPrompt, chatID, prompt)
+	q.logQuery(createOrUpdateGeminiSystemPrompt, "CreateOrUpdateGeminiSystemPrompt", logFields, err, start)
+	return err
+}
+
+const getGeminiSystemPrompt = `-- name: GetGeminiSystemPrompt :one
+SELECT prompt
+FROM gemini_system_prompt
+WHERE chat_id = ?
+`
+
+func (q *Queries) GetGeminiSystemPrompt(ctx context.Context, chatID int64) (string, error) {
+	var logFields []zap.Field
+	var start time.Time
+	if q.logger != nil {
+		logFields = make([]zap.Field, 0, 8)
+		start = time.Now()
+		if q.LogArgument {
+			logFields = append(logFields,
+				zap.Dict("fields",
+					zap.Int64("chat_id", chatID),
+				),
+			)
+		}
+	}
+	row := q.queryRow(ctx, q.getGeminiSystemPromptStmt, getGeminiSystemPrompt, chatID)
+	var prompt string
+	err := row.Scan(&prompt)
+	q.logQuery(getGeminiSystemPrompt, "GetGeminiSystemPrompt", logFields, err, start)
+	return prompt, err
+}
+
 const getSessionById = `-- name: GetSessionById :one
 SELECT id, chat_id, chat_name, chat_type
 FROM gemini_sessions

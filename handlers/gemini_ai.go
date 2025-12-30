@@ -290,22 +290,27 @@ func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 	}
 	session.mu.Lock()
 	defer session.mu.Unlock()
-	sysInst := fmt.Sprintf(`现在是:%s
+	sysPrompt, err := g.Q.GetGeminiSystemPrompt(genCtx, ctx.EffectiveChat.Id)
+	if errors.Is(err, sql.ErrNoRows) {
+		sysPrompt = fmt.Sprintf(`现在是:%s
 这里是一个Telegram聊天 type:%s,name:%s
 你是一个Telegram机器人，name: %s username: %s
 你会看到很多消息，每个消息头部都有一个元数据，以 '-start-label-'开头， '-end-label-' 结尾，元数据中标记了消息的ID(id)，发送时间(time)，发送者的用户名（name)以及消息类型(type)
 消息类型有 text, photo, sticker三种，对应文本消息、图片消息及表情消息。
 若用户明确回复了某条消息，则有回复的消息的ID(reply)字段。
 若用户特地引用了被回复的消息中的某段文字，则会有引用(quote)字段。
-这些元数据由代码自动生成，不要在模型的输出中加入该数据。
-请务必情绪不要过于激动。`,
-		time.Now().Format("2006-01-02 15:04:05 -07:00"),
-		session.ChatType,
-		session.ChatName,
-		bot.FirstName+bot.LastName,
-		bot.Username)
+这些元数据由代码自动生成，不要在模型的输出中加入该数据。`,
+			time.Now().Format("2006-01-02 15:04:05 -07:00"),
+			session.ChatType,
+			session.ChatName,
+			bot.FirstName+bot.LastName,
+			bot.Username)
+	} else if err != nil {
+		return err
+	}
+
 	config := &genai.GenerateContentConfig{
-		SystemInstruction: genai.NewContentFromText(sysInst, genai.RoleModel),
+		SystemInstruction: genai.NewContentFromText(sysPrompt, genai.RoleModel),
 		Tools: []*genai.Tool{
 			{GoogleSearch: &genai.GoogleSearch{}},
 		},
@@ -408,5 +413,22 @@ func SetUserTimeZone(bot *gotgbot.Bot, ctx *ext.Context) error {
 	}
 	user.Timezone = int64(zone)
 	_, err = ctx.EffectiveMessage.Reply(bot, fmt.Sprintf("设置成功 %d seconds", zone), nil)
+	return err
+}
+
+func UpdateGeminiSysPrompt(bot *gotgbot.Bot, ctx *ext.Context) error {
+	msg := ctx.EffectiveMessage
+	text := msg.GetText()
+	prompt := h.TrimCmd(text)
+	if prompt == "" {
+		if msg.ReplyToMessage == nil || msg.ReplyToMessage.GetText() == "" {
+			_, err := msg.Reply(bot, "没有找到任何System prompt，请使用 /sysprompt 提示词或使用该命令回复其他消息设置提示词。", nil)
+			return err
+		}
+	}
+	err := g.Q.CreateOrUpdateGeminiSystemPrompt(context.Background(), msg.Chat.Id, prompt)
+	if err != nil {
+		_, err = msg.Reply(bot, "设置系统提示词错误: "+err.Error(), nil)
+	}
 	return err
 }

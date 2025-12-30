@@ -75,6 +75,11 @@ type GeminiSession struct {
 	ChatType string `json:"chat_type"`
 }
 
+type GeminiSystemPrompt struct {
+	ChatID int64  `json:"chat_id"`
+	Prompt string `json:"prompt"`
+}
+
 type PicRateCounter struct {
 	Rate  int64 `json:"rate"`
 	Count int64 `json:"count"`

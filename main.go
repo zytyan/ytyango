@@ -266,6 +266,7 @@ func main() {
 	dp.Command("chat_config", hdrs.ShowChatCfg)
 	dp.Command("count_nsfw_pics", hdrs.CountNsfwPics)
 	dp.Command("settimezone", hdrs.SetUserTimeZone)
+	dp.Command("sysprompt", hdrs.UpdateGeminiSysPrompt)
 
 	dp.NewMessage(hdrs.BiliMsgFilter, hdrs.BiliMsgConverter)
 	dp.NewMessage(hdrs.HasSinaGif, hdrs.Gif2Mp4)
