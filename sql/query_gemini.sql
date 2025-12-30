@@ -48,3 +48,8 @@ ON CONFLICT DO UPDATE SET prompt=excluded.prompt;
 SELECT prompt
 FROM gemini_system_prompt
 WHERE chat_id = ?;
+
+-- name: ResetGeminiSystemPrompt :exec
+DELETE
+FROM gemini_system_prompt
+WHERE chat_id = ?;

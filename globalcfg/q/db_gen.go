@@ -79,6 +79,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.listNsfwPicUserRatesByFileUidStmt, err = db.PrepareContext(ctx, listNsfwPicUserRatesByFileUid); err != nil {
 		return nil, fmt.Errorf("error preparing query ListNsfwPicUserRatesByFileUid: %w", err)
 	}
+	if q.resetGeminiSystemPromptStmt, err = db.PrepareContext(ctx, resetGeminiSystemPrompt); err != nil {
+		return nil, fmt.Errorf("error preparing query ResetGeminiSystemPrompt: %w", err)
+	}
 	if q.setCocCharAttrStmt, err = db.PrepareContext(ctx, setCocCharAttr); err != nil {
 		return nil, fmt.Errorf("error preparing query SetCocCharAttr: %w", err)
 	}
@@ -239,6 +242,11 @@ func (q *Queries) Close() error {
 	if q.listNsfwPicUserRatesByFileUidStmt != nil {
 		if cerr := q.listNsfwPicUserRatesByFileUidStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing listNsfwPicUserRatesByFileUidStmt: %w", cerr)
+		}
+	}
+	if q.resetGeminiSystemPromptStmt != nil {
+		if cerr := q.resetGeminiSystemPromptStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing resetGeminiSystemPromptStmt: %w", cerr)
 		}
 	}
 	if q.setCocCharAttrStmt != nil {
@@ -422,6 +430,7 @@ type Queries struct {
 	getYtDlpDbCacheStmt                  *sql.Stmt
 	incYtDlUploadCountStmt               *sql.Stmt
 	listNsfwPicUserRatesByFileUidStmt    *sql.Stmt
+	resetGeminiSystemPromptStmt          *sql.Stmt
 	setCocCharAttrStmt                   *sql.Stmt
 	setPrprCacheStmt                     *sql.Stmt
 	updateBiliInlineMsgIdStmt            *sql.Stmt
@@ -474,6 +483,7 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		getYtDlpDbCacheStmt:                  q.getYtDlpDbCacheStmt,
 		incYtDlUploadCountStmt:               q.incYtDlUploadCountStmt,
 		listNsfwPicUserRatesByFileUidStmt:    q.listNsfwPicUserRatesByFileUidStmt,
+		resetGeminiSystemPromptStmt:          q.resetGeminiSystemPromptStmt,
 		setCocCharAttrStmt:                   q.setCocCharAttrStmt,
 		setPrprCacheStmt:                     q.setPrprCacheStmt,
 		updateBiliInlineMsgIdStmt:            q.updateBiliInlineMsgIdStmt,

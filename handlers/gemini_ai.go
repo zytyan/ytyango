@@ -428,7 +428,8 @@ func UpdateGeminiSysPrompt(bot *gotgbot.Bot, ctx *ext.Context) error {
 			} else {
 				rawPrompt = "当前提示词为" + rawPrompt
 			}
-			_, err = msg.Reply(bot, "没有找到任何System prompt，请使用 /sysprompt 提示词或使用该命令回复其他消息设置提示词。\n"+rawPrompt, nil)
+			_, err = msg.Reply(bot, "没有找到任何System prompt，请使用 /sysprompt 提示词或使用该命令回复其他消息设置提示词。\n"+
+				"使用 /resetsysprompt 恢复原始提示词\n"+rawPrompt, nil)
 			return err
 		}
 	}
@@ -438,5 +439,10 @@ func UpdateGeminiSysPrompt(bot *gotgbot.Bot, ctx *ext.Context) error {
 		return err
 	}
 	_, err = msg.Reply(bot, "成功设置系统提示词:\n"+prompt, nil)
+	return err
+}
+func ResetGeminiSysPrompt(bot *gotgbot.Bot, ctx *ext.Context) error {
+	err := g.Q.ResetGeminiSystemPrompt(context.Background(), ctx.EffectiveChat.Id)
+	_, err = ctx.EffectiveMessage.Reply(bot, err.Error(), nil)
 	return err
 }

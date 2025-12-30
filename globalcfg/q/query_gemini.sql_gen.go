@@ -241,6 +241,31 @@ func (q *Queries) GetSessionIdByMessage(ctx context.Context, chatID int64, msgID
 	return session_id, err
 }
 
+const resetGeminiSystemPrompt = `-- name: ResetGeminiSystemPrompt :exec
+DELETE
+FROM gemini_system_prompt
+WHERE chat_id = ?
+`
+
+func (q *Queries) ResetGeminiSystemPrompt(ctx context.Context, chatID int64) error {
+	var logFields []zap.Field
+	var start time.Time
+	if q.logger != nil {
+		logFields = make([]zap.Field, 0, 8)
+		start = time.Now()
+		if q.LogArgument {
+			logFields = append(logFields,
+				zap.Dict("fields",
+					zap.Int64("chat_id", chatID),
+				),
+			)
+		}
+	}
+	_, err := q.exec(ctx, q.resetGeminiSystemPromptStmt, resetGeminiSystemPrompt, chatID)
+	q.logQuery(resetGeminiSystemPrompt, "ResetGeminiSystemPrompt", logFields, err, start)
+	return err
+}
+
 const getAllMsgInSessionReversed = `-- name: getAllMsgInSessionReversed :many
 SELECT session_id, chat_id, msg_id, role, sent_time, username, msg_type, reply_to_msg_id, text, blob, mime_type, quote_part, thought_signature
 FROM gemini_contents
