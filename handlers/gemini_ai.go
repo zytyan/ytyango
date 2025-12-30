@@ -422,13 +422,21 @@ func UpdateGeminiSysPrompt(bot *gotgbot.Bot, ctx *ext.Context) error {
 	prompt := h.TrimCmd(text)
 	if prompt == "" {
 		if msg.ReplyToMessage == nil || msg.ReplyToMessage.GetText() == "" {
-			_, err := msg.Reply(bot, "没有找到任何System prompt，请使用 /sysprompt 提示词或使用该命令回复其他消息设置提示词。", nil)
+			rawPrompt, err := g.Q.GetGeminiSystemPrompt(context.Background(), msg.Chat.Id)
+			if err != nil {
+				rawPrompt = "当前没有提示词"
+			} else {
+				rawPrompt = "当前提示词为" + rawPrompt
+			}
+			_, err = msg.Reply(bot, "没有找到任何System prompt，请使用 /sysprompt 提示词或使用该命令回复其他消息设置提示词。\n"+rawPrompt, nil)
 			return err
 		}
 	}
 	err := g.Q.CreateOrUpdateGeminiSystemPrompt(context.Background(), msg.Chat.Id, prompt)
 	if err != nil {
 		_, err = msg.Reply(bot, "设置系统提示词错误: "+err.Error(), nil)
+		return err
 	}
+	_, err = msg.Reply(bot, "成功设置系统提示词:\n"+prompt, nil)
 	return err
 }
