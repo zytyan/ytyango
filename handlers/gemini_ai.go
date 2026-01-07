@@ -184,6 +184,9 @@ func (s *GeminiSession) loadContentFromDatabase(ctx context.Context) error {
 }
 
 func (s *GeminiSession) PersistTmpUpdates(ctx context.Context) error {
+	if len(s.TmpContents) == 0 {
+		return nil
+	}
 	tx, err := g.RawMainDb().BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -329,9 +332,7 @@ func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 		log.Warnf("set reaction emoji to message %s(%d) failed ", getChatName(&ctx.EffectiveMessage.Chat), ctx.EffectiveMessage.MessageId)
 	}
 	defer func() {
-		if err != nil {
-			session.DiscardTmpUpdates()
-		}
+		session.DiscardTmpUpdates()
 	}()
 	ticker := time.NewTicker(time.Second * 4)
 	defer ticker.Stop()
@@ -368,6 +369,7 @@ func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 		_, _ = ctx.EffectiveMessage.SetReaction(bot, &gotgbot.SetMessageReactionOpts{
 			Reaction: []gotgbot.ReactionType{gotgbot.ReactionTypeEmoji{Emoji: "😭"}},
 		})
+		session.DiscardTmpUpdates()
 	}
 	normTxt, err := mdnormalizer.Normalize(text)
 	var respMsg *gotgbot.Message
