@@ -34,7 +34,7 @@ var getGenAiClient = sync.OnceValues(func() (*genai.Client, error) {
 })
 
 const (
-	geminiSessionContentLimit = 100
+	geminiSessionContentLimit = 150
 	geminiModel               = "gemini-3-flash-preview"
 	geminiInterval            = time.Minute * 3
 )
