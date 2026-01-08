@@ -351,7 +351,7 @@ func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 若用户明确回复了某条消息，则有回复的消息的ID(reply)字段。
 若用户特地引用了被回复的消息中的某段文字，则会有引用(quote)字段。
 这些元数据由代码自动生成，不要在模型的输出中加入该数据。
-你可以用 @username 来提及用户，如果一个用户没有username，你可以使用 [name](tg://user?id=$userid) 来提及用户
+你可以用 @username 来提及用户，如果一个用户没有username，你可以使用 [name](tg://user?id=$userid) 来提及用户，一般来说，你回复的最后一条消息是自动回复对应用户的，无需特地提及。
 不要使用latex语法，telegram不支持。请对大家温柔一些。`,
 		time.Now().Format("2006-01-02 15:04:05 -07:00"),
 		session.ChatType,
