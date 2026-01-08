@@ -399,6 +399,12 @@ func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 		_, _ = ctx.EffectiveMessage.Reply(bot, fmt.Sprintf("error:%s", err), nil)
 		return err
 	}
+	_ = g.Q.IncrementSessionTokenCounters(
+		genCtx,
+		int64(res.UsageMetadata.PromptTokenCount),
+		int64(res.UsageMetadata.CandidatesTokenCount),
+		session.ID,
+	)
 	text := res.Text()
 	text = reLabelHeader.ReplaceAllString(text, "")
 

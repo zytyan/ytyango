@@ -76,6 +76,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.incYtDlUploadCountStmt, err = db.PrepareContext(ctx, incYtDlUploadCount); err != nil {
 		return nil, fmt.Errorf("error preparing query IncYtDlUploadCount: %w", err)
 	}
+	if q.incrementSessionTokenCountersStmt, err = db.PrepareContext(ctx, incrementSessionTokenCounters); err != nil {
+		return nil, fmt.Errorf("error preparing query IncrementSessionTokenCounters: %w", err)
+	}
 	if q.listNsfwPicUserRatesByFileUidStmt, err = db.PrepareContext(ctx, listNsfwPicUserRatesByFileUid); err != nil {
 		return nil, fmt.Errorf("error preparing query ListNsfwPicUserRatesByFileUid: %w", err)
 	}
@@ -237,6 +240,11 @@ func (q *Queries) Close() error {
 	if q.incYtDlUploadCountStmt != nil {
 		if cerr := q.incYtDlUploadCountStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing incYtDlUploadCountStmt: %w", cerr)
+		}
+	}
+	if q.incrementSessionTokenCountersStmt != nil {
+		if cerr := q.incrementSessionTokenCountersStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing incrementSessionTokenCountersStmt: %w", cerr)
 		}
 	}
 	if q.listNsfwPicUserRatesByFileUidStmt != nil {
@@ -429,6 +437,7 @@ type Queries struct {
 	getSessionIdByMessageStmt            *sql.Stmt
 	getYtDlpDbCacheStmt                  *sql.Stmt
 	incYtDlUploadCountStmt               *sql.Stmt
+	incrementSessionTokenCountersStmt    *sql.Stmt
 	listNsfwPicUserRatesByFileUidStmt    *sql.Stmt
 	resetGeminiSystemPromptStmt          *sql.Stmt
 	setCocCharAttrStmt                   *sql.Stmt
@@ -482,6 +491,7 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		getSessionIdByMessageStmt:            q.getSessionIdByMessageStmt,
 		getYtDlpDbCacheStmt:                  q.getYtDlpDbCacheStmt,
 		incYtDlUploadCountStmt:               q.incYtDlUploadCountStmt,
+		incrementSessionTokenCountersStmt:    q.incrementSessionTokenCountersStmt,
 		listNsfwPicUserRatesByFileUidStmt:    q.listNsfwPicUserRatesByFileUidStmt,
 		resetGeminiSystemPromptStmt:          q.resetGeminiSystemPromptStmt,
 		setCocCharAttrStmt:                   q.setCocCharAttrStmt,

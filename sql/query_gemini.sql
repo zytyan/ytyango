@@ -53,3 +53,9 @@ WHERE chat_id = ?;
 DELETE
 FROM gemini_system_prompt
 WHERE chat_id = ?;
+
+-- name: IncrementSessionTokenCounters :exec
+UPDATE gemini_sessions
+SET total_input_tokens = total_input_tokens + ?,
+    total_output_tokens=total_output_tokens + ?
+WHERE id = ?;

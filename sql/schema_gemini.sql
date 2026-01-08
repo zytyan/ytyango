@@ -1,10 +1,13 @@
 -- Sessions（会话表）
 CREATE TABLE gemini_sessions
 (
-    id        INTEGER PRIMARY KEY AUTOINCREMENT,
-    chat_id   INTEGER NOT NULL,
-    chat_name TEXT    NOT NULL,
-    chat_type TEXT    NOT NULL
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    chat_id             INTEGER  NOT NULL,
+    chat_name           TEXT     NOT NULL,
+    chat_type           TEXT     NOT NULL,
+    frozen              INT_BOOL NOT NULL DEFAULT FALSE,
+    total_input_tokens  INTEGER  NOT NULL DEFAULT 0,
+    total_output_tokens INTEGER  NOT NULL DEFAULT 0
 ) STRICT;
 
 -- Contents（消息内容表）
@@ -23,6 +26,8 @@ CREATE TABLE gemini_contents
     mime_type         TEXT,                  -- 若blob存在，mime_type必须存在
     quote_part        TEXT,                  -- 回复消息时，被回复的消息被引用的部分。
     thought_signature TEXT,                  -- 模型的思考签名
+    atable_username   TEXT,
+    user_id           INTEGER,
     -- 一个消息唯一由 SessionId + MsgId 组成
     PRIMARY KEY (session_id, msg_id),
 

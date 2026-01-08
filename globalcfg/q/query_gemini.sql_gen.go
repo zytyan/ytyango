@@ -95,7 +95,7 @@ const createNewGeminiSession = `-- name: CreateNewGeminiSession :one
 
 INSERT INTO gemini_sessions (chat_id, chat_name, chat_type)
 VALUES (?, ?, ?)
-RETURNING id, chat_id, chat_name, chat_type
+RETURNING id, chat_id, chat_name, chat_type, frozen, total_input_tokens, total_output_tokens
 `
 
 // encoding: utf-8
@@ -122,6 +122,9 @@ func (q *Queries) CreateNewGeminiSession(ctx context.Context, chatID int64, chat
 		&i.ChatID,
 		&i.ChatName,
 		&i.ChatType,
+		&i.Frozen,
+		&i.TotalInputTokens,
+		&i.TotalOutputTokens,
 	)
 	q.logQuery(createNewGeminiSession, "CreateNewGeminiSession", logFields, err, start)
 	return i, err
@@ -181,7 +184,7 @@ func (q *Queries) GetGeminiSystemPrompt(ctx context.Context, chatID int64) (stri
 }
 
 const getSessionById = `-- name: GetSessionById :one
-SELECT id, chat_id, chat_name, chat_type
+SELECT id, chat_id, chat_name, chat_type, frozen, total_input_tokens, total_output_tokens
 FROM gemini_sessions
 WHERE id = ?
 `
@@ -207,6 +210,9 @@ func (q *Queries) GetSessionById(ctx context.Context, id int64) (GeminiSession, 
 		&i.ChatID,
 		&i.ChatName,
 		&i.ChatType,
+		&i.Frozen,
+		&i.TotalInputTokens,
+		&i.TotalOutputTokens,
 	)
 	q.logQuery(getSessionById, "GetSessionById", logFields, err, start)
 	return i, err
@@ -241,6 +247,34 @@ func (q *Queries) GetSessionIdByMessage(ctx context.Context, chatID int64, msgID
 	return session_id, err
 }
 
+const incrementSessionTokenCounters = `-- name: IncrementSessionTokenCounters :exec
+UPDATE gemini_sessions
+SET total_input_tokens = total_input_tokens + ?,
+    total_output_tokens=total_output_tokens + ?
+WHERE id = ?
+`
+
+func (q *Queries) IncrementSessionTokenCounters(ctx context.Context, totalInputTokens int64, totalOutputTokens int64, iD int64) error {
+	var logFields []zap.Field
+	var start time.Time
+	if q.logger != nil {
+		logFields = make([]zap.Field, 0, 8)
+		start = time.Now()
+		if q.LogArgument {
+			logFields = append(logFields,
+				zap.Dict("fields",
+					zap.Int64("total_input_tokens", totalInputTokens),
+					zap.Int64("total_output_tokens", totalOutputTokens),
+					zap.Int64("id", iD),
+				),
+			)
+		}
+	}
+	_, err := q.exec(ctx, q.incrementSessionTokenCountersStmt, incrementSessionTokenCounters, totalInputTokens, totalOutputTokens, iD)
+	q.logQuery(incrementSessionTokenCounters, "IncrementSessionTokenCounters", logFields, err, start)
+	return err
+}
+
 const resetGeminiSystemPrompt = `-- name: ResetGeminiSystemPrompt :exec
 DELETE
 FROM gemini_system_prompt
@@ -267,7 +301,7 @@ func (q *Queries) ResetGeminiSystemPrompt(ctx context.Context, chatID int64) err
 }
 
 const getAllMsgInSessionReversed = `-- name: getAllMsgInSessionReversed :many
-SELECT session_id, chat_id, msg_id, role, sent_time, username, msg_type, reply_to_msg_id, text, blob, mime_type, quote_part, thought_signature
+SELECT session_id, chat_id, msg_id, role, sent_time, username, msg_type, reply_to_msg_id, text, blob, mime_type, quote_part, thought_signature, atable_username, user_id
 FROM gemini_contents
 WHERE session_id = ?
 ORDER BY msg_id DESC
@@ -314,6 +348,8 @@ func (q *Queries) getAllMsgInSessionReversed(ctx context.Context, sessionID int6
 			&i.MimeType,
 			&i.QuotePart,
 			&i.ThoughtSignature,
+			&i.AtableUsername,
+			&i.UserID,
 		); err != nil {
 			return nil, err
 		}

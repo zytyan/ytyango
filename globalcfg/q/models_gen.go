@@ -66,13 +66,18 @@ type GeminiContent struct {
 	MimeType         sql.NullString `json:"mime_type"`
 	QuotePart        sql.NullString `json:"quote_part"`
 	ThoughtSignature sql.NullString `json:"thought_signature"`
+	AtableUsername   sql.NullString `json:"atable_username"`
+	UserID           sql.NullInt64  `json:"user_id"`
 }
 
 type GeminiSession struct {
-	ID       int64  `json:"id"`
-	ChatID   int64  `json:"chat_id"`
-	ChatName string `json:"chat_name"`
-	ChatType string `json:"chat_type"`
+	ID                int64  `json:"id"`
+	ChatID            int64  `json:"chat_id"`
+	ChatName          string `json:"chat_name"`
+	ChatType          string `json:"chat_type"`
+	Frozen            bool   `json:"frozen"`
+	TotalInputTokens  int64  `json:"total_input_tokens"`
+	TotalOutputTokens int64  `json:"total_output_tokens"`
 }
 
 type GeminiSystemPrompt struct {
