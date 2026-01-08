@@ -11,6 +11,7 @@ import (
 	"main/helpers/mdnormalizer"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -276,11 +277,51 @@ create:
 }
 
 var reLabelHeader = regexp.MustCompile(`(?s)^-start-label-\n.*-end-label-\n`)
+var reBanCmd = regexp.MustCompile(`(?im)^/ban\s*(\d+d)?(\d+h)?(\d+m)?(\d+s)?`)
+
+func findAndParseBanDuration(text string) (untilUnix int64, found bool) {
+	m := reBanCmd.FindStringSubmatch(text)
+	if m == nil {
+		return 0, false
+	}
+
+	found = true
+
+	const defaultDuration = 5 * time.Minute
+
+	var dur time.Duration
+	hasTime := false
+
+	parse := func(s string, unit time.Duration) {
+		if s == "" {
+			return
+		}
+		hasTime = true
+		n, _ := strconv.Atoi(s[:len(s)-1]) // 去掉单位
+		dur += time.Duration(n) * unit
+	}
+
+	parse(m[1], 24*time.Hour)
+	parse(m[2], time.Hour)
+	parse(m[3], time.Minute)
+	parse(m[4], time.Second)
+
+	if !hasTime {
+		dur = defaultDuration
+	}
+
+	return int64(dur.Seconds()), true
+}
 
 func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 	client, err := getGenAiClient()
 	if !slices.Contains([]int64{-1001471592463, -1001282155019, -1001126241898, -1001170816274}, ctx.EffectiveChat.Id) {
 		return nil
+	}
+	mem, err := bot.GetChatMember(ctx.EffectiveChat.Id, bot.Id, nil)
+	canRestrictMember := false
+	if err == nil && mem.MergeChatMember().CanRestrictMembers {
+		canRestrictMember = true
 	}
 	if err != nil {
 		return err
@@ -293,9 +334,7 @@ func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 	}
 	session.mu.Lock()
 	defer session.mu.Unlock()
-	sysPrompt, err := g.Q.GetGeminiSystemPrompt(genCtx, ctx.EffectiveChat.Id)
-	if errors.Is(err, sql.ErrNoRows) {
-		sysPrompt = fmt.Sprintf(`现在是:%s
+	sysPrompt := fmt.Sprintf(`现在是:%s
 这里是一个Telegram聊天 type:%s,name:%s
 你是一个Telegram机器人，name: %s username: %s
 你会看到很多消息，每个消息头部都有一个元数据，以 '-start-label-'开头， '-end-label-' 结尾，元数据中标记了消息的ID(id)，发送时间(time)，发送者的用户名（name)以及消息类型(type)
@@ -303,15 +342,16 @@ func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 若用户明确回复了某条消息，则有回复的消息的ID(reply)字段。
 若用户特地引用了被回复的消息中的某段文字，则会有引用(quote)字段。
 这些元数据由代码自动生成，不要在模型的输出中加入该数据。`,
-			time.Now().Format("2006-01-02 15:04:05 -07:00"),
-			session.ChatType,
-			session.ChatName,
-			bot.FirstName+bot.LastName,
-			bot.Username)
-	} else if err != nil {
-		return err
+		time.Now().Format("2006-01-02 15:04:05 -07:00"),
+		session.ChatType,
+		session.ChatName,
+		bot.FirstName+bot.LastName,
+		bot.Username)
+	if canRestrictMember {
+		sysPrompt += `
+你在本群中是管理员，你可以使用 /ban [duration] 来禁言上一条消息的发送者，duration的格式可以为 1d2h3m4s，最小为60s，最大为366d，默认为5分钟，若超过366d，则会永久禁言。
+当系统识别到你新起一行使用 /ban 时，将会自动解析并执行。`
 	}
-
 	config := &genai.GenerateContentConfig{
 		SystemInstruction: genai.NewContentFromText(sysPrompt, genai.RoleModel),
 		Tools: []*genai.Tool{
@@ -361,6 +401,38 @@ func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 	}
 	text := res.Text()
 	text = reLabelHeader.ReplaceAllString(text, "")
+
+	if dur, found := findAndParseBanDuration(text); found {
+		untilUnix := int64(time.Now().Second()) + dur
+		_, err = bot.RestrictChatMember(ctx.EffectiveChat.Id, ctx.EffectiveUser.Id, gotgbot.ChatPermissions{
+			CanSendMessages:       false,
+			CanSendAudios:         false,
+			CanSendDocuments:      false,
+			CanSendPhotos:         false,
+			CanSendVideos:         false,
+			CanSendVideoNotes:     false,
+			CanSendVoiceNotes:     false,
+			CanSendPolls:          false,
+			CanSendOtherMessages:  false,
+			CanAddWebPagePreviews: false,
+			CanChangeInfo:         false,
+			CanInviteUsers:        false,
+			CanPinMessages:        false,
+			CanManageTopics:       false,
+		}, &gotgbot.RestrictChatMemberOpts{
+			UntilDate: untilUnix,
+		})
+		if err == nil {
+			text += fmt.Sprintf("\nbot禁言了%s，截止日期：%s",
+				ctx.EffectiveMessage.GetSender().Name(),
+				time.Unix(untilUnix, 0).Format("2006-01-02 15:04:05"))
+		} else {
+			text += fmt.Sprintf("\nbot尝试禁言%s失败，原因%s",
+				ctx.EffectiveMessage.GetSender().Name(),
+				err.Error(),
+			)
+		}
+	}
 	if text == "" {
 		text = "模型没有返回任何信息"
 		if res.PromptFeedback != nil {
