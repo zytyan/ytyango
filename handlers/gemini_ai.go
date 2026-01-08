@@ -66,7 +66,13 @@ id:%d
 time:%s
 name:%s
 type:%s
-`, content.MsgID, content.SentTime.Format("2006-01-02 15:04:05"), content.Username, content.MsgType)
+userid:%d
+`, content.MsgID, content.SentTime.Format("2006-01-02 15:04:05"),
+		content.Username,
+		content.MsgType, content.UserID)
+	if content.AtableUsername.Valid {
+		label += fmt.Sprintf("username: %s", content.AtableUsername.String)
+	}
 	if content.ReplyToMsgID.Valid {
 		label += fmt.Sprintf("reply:%d\n", content.ReplyToMsgID.Int64)
 	}
@@ -341,7 +347,9 @@ func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 消息类型有 text, photo, sticker三种，对应文本消息、图片消息及表情消息。
 若用户明确回复了某条消息，则有回复的消息的ID(reply)字段。
 若用户特地引用了被回复的消息中的某段文字，则会有引用(quote)字段。
-这些元数据由代码自动生成，不要在模型的输出中加入该数据。`,
+这些元数据由代码自动生成，不要在模型的输出中加入该数据。
+你可以用 @username 来提及用户，如果一个用户没有username，你可以使用 [name](tg://user?id=$userid) 来提及用户
+不要使用latex语法，telegram不支持。请对大家温柔一些。`,
 		time.Now().Format("2006-01-02 15:04:05 -07:00"),
 		session.ChatType,
 		session.ChatName,

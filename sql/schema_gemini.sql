@@ -27,7 +27,7 @@ CREATE TABLE gemini_contents
     quote_part        TEXT,                  -- 回复消息时，被回复的消息被引用的部分。
     thought_signature TEXT,                  -- 模型的思考签名
     atable_username   TEXT,
-    user_id           INTEGER,
+    user_id           INTEGER      NOT NULL,
     -- 一个消息唯一由 SessionId + MsgId 组成
     PRIMARY KEY (session_id, msg_id),
 

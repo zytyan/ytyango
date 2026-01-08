@@ -67,7 +67,7 @@ type GeminiContent struct {
 	QuotePart        sql.NullString `json:"quote_part"`
 	ThoughtSignature sql.NullString `json:"thought_signature"`
 	AtableUsername   sql.NullString `json:"atable_username"`
-	UserID           sql.NullInt64  `json:"user_id"`
+	UserID           int64          `json:"user_id"`
 }
 
 type GeminiSession struct {
