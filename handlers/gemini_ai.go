@@ -126,13 +126,16 @@ func (s *GeminiSession) AddTgMessage(bot *gotgbot.Bot, msg *gotgbot.Message) (er
 	if msg.GetSender().Id() == mainBot.Id {
 		role = genai.RoleModel
 	}
+	username := msg.GetSender().Username()
 	content := q.GeminiContent{
-		SessionID: s.ID,
-		ChatID:    msg.Chat.Id,
-		MsgID:     msg.MessageId,
-		Role:      role,
-		SentTime:  q.UnixTime{Time: time.Unix(msg.Date, 0)},
-		Username:  msg.GetSender().Name(),
+		SessionID:      s.ID,
+		ChatID:         msg.Chat.Id,
+		MsgID:          msg.MessageId,
+		Role:           role,
+		SentTime:       q.UnixTime{Time: time.Unix(msg.Date, 0)},
+		Username:       msg.GetSender().Name(),
+		AtableUsername: sql.NullString{String: username, Valid: username != ""},
+		UserID:         msg.GetSender().Id(),
 	}
 	if msg.ReplyToMessage != nil {
 		content.ReplyToMsgID.Valid = true
