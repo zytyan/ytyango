@@ -403,7 +403,7 @@ func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 	text = reLabelHeader.ReplaceAllString(text, "")
 
 	if dur, found := findAndParseBanDuration(text); found {
-		untilUnix := int64(time.Now().Second()) + dur
+		untilUnix := time.Now().Unix() + dur
 		_, err = bot.RestrictChatMember(ctx.EffectiveChat.Id, ctx.EffectiveUser.Id, gotgbot.ChatPermissions{
 			CanSendMessages:       false,
 			CanSendAudios:         false,
