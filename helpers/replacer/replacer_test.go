@@ -73,3 +73,14 @@ func TestReplacerMetaVars(t *testing.T) {
 		t.Fatalf("unexpected chat name with first name only: %q", got)
 	}
 }
+
+func TestReplacerGeminiSysPromptFormat(t *testing.T) {
+	ctx := testCtx(gotgbot.Chat{Title: "Test Group", Type: "group"})
+	tpl := "现在是:%DATETIME%\n这里是一个Telegram聊天 type:" + ctx.Msg.Chat.Type + ",name:%CHAT_NAME%\n你是一个Telegram机器人，name: %BOT_NAME% username: %BOT_USERNAME%"
+	r := NewReplacer(tpl)
+	got := r.Replace(ctx)
+	want := "现在是:2024-03-14 15:09:26\n这里是一个Telegram聊天 type:group,name:Test Group\n你是一个Telegram机器人，name: Mars Bot username: marsbot"
+	if got != want {
+		t.Fatalf("unexpected gemini prompt output: %q", got)
+	}
+}
