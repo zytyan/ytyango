@@ -8,7 +8,7 @@ CREATE TABLE gemini_sessions
     frozen              INT_BOOL NOT NULL DEFAULT FALSE,
     total_input_tokens  INTEGER  NOT NULL DEFAULT 0,
     total_output_tokens INTEGER  NOT NULL DEFAULT 0
-) STRICT;
+);
 
 -- Contents（消息内容表）
 CREATE TABLE gemini_contents
