@@ -405,7 +405,9 @@ func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 		for {
 			select {
 			case <-ticker.C:
-				_, _ = bot.SendChatAction(ctx.EffectiveChat.Id, "typing", nil)
+				_, _ = bot.SendChatAction(ctx.EffectiveChat.Id, "typing",
+					&gotgbot.SendChatActionOpts{MessageThreadId: ctx.EffectiveMessage.MessageThreadId},
+				)
 			case <-tickerCtx.Done():
 				return
 			}
