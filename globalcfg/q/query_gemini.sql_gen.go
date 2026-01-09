@@ -131,12 +131,12 @@ func (q *Queries) CreateNewGeminiSession(ctx context.Context, chatID int64, chat
 }
 
 const createOrUpdateGeminiSystemPrompt = `-- name: CreateOrUpdateGeminiSystemPrompt :exec
-INSERT INTO gemini_system_prompt (chat_id, prompt)
-VALUES (?, ?)
+INSERT INTO gemini_system_prompt (chat_id, thread_id, prompt)
+VALUES (?, ?, ?)
 ON CONFLICT DO UPDATE SET prompt=excluded.prompt
 `
 
-func (q *Queries) CreateOrUpdateGeminiSystemPrompt(ctx context.Context, chatID int64, prompt string) error {
+func (q *Queries) CreateOrUpdateGeminiSystemPrompt(ctx context.Context, chatID int64, threadID int64, prompt string) error {
 	var logFields []zap.Field
 	var start time.Time
 	if q.logger != nil {
@@ -146,12 +146,13 @@ func (q *Queries) CreateOrUpdateGeminiSystemPrompt(ctx context.Context, chatID i
 			logFields = append(logFields,
 				zap.Dict("fields",
 					zap.Int64("chat_id", chatID),
+					zap.Int64("thread_id", threadID),
 					zap.String("prompt", prompt),
 				),
 			)
 		}
 	}
-	_, err := q.exec(ctx, q.createOrUpdateGeminiSystemPromptStmt, createOrUpdateGeminiSystemPrompt, chatID, prompt)
+	_, err := q.exec(ctx, q.createOrUpdateGeminiSystemPromptStmt, createOrUpdateGeminiSystemPrompt, chatID, threadID, prompt)
 	q.logQuery(createOrUpdateGeminiSystemPrompt, "CreateOrUpdateGeminiSystemPrompt", logFields, err, start)
 	return err
 }
@@ -160,9 +161,10 @@ const getGeminiSystemPrompt = `-- name: GetGeminiSystemPrompt :one
 SELECT prompt
 FROM gemini_system_prompt
 WHERE chat_id = ?
+  AND thread_id = ?
 `
 
-func (q *Queries) GetGeminiSystemPrompt(ctx context.Context, chatID int64) (string, error) {
+func (q *Queries) GetGeminiSystemPrompt(ctx context.Context, chatID int64, threadID int64) (string, error) {
 	var logFields []zap.Field
 	var start time.Time
 	if q.logger != nil {
@@ -172,11 +174,12 @@ func (q *Queries) GetGeminiSystemPrompt(ctx context.Context, chatID int64) (stri
 			logFields = append(logFields,
 				zap.Dict("fields",
 					zap.Int64("chat_id", chatID),
+					zap.Int64("thread_id", threadID),
 				),
 			)
 		}
 	}
-	row := q.queryRow(ctx, q.getGeminiSystemPromptStmt, getGeminiSystemPrompt, chatID)
+	row := q.queryRow(ctx, q.getGeminiSystemPromptStmt, getGeminiSystemPrompt, chatID, threadID)
 	var prompt string
 	err := row.Scan(&prompt)
 	q.logQuery(getGeminiSystemPrompt, "GetGeminiSystemPrompt", logFields, err, start)
@@ -279,9 +282,10 @@ const resetGeminiSystemPrompt = `-- name: ResetGeminiSystemPrompt :exec
 DELETE
 FROM gemini_system_prompt
 WHERE chat_id = ?
+  AND thread_id = ?
 `
 
-func (q *Queries) ResetGeminiSystemPrompt(ctx context.Context, chatID int64) error {
+func (q *Queries) ResetGeminiSystemPrompt(ctx context.Context, chatID int64, threadID int64) error {
 	var logFields []zap.Field
 	var start time.Time
 	if q.logger != nil {
@@ -291,11 +295,12 @@ func (q *Queries) ResetGeminiSystemPrompt(ctx context.Context, chatID int64) err
 			logFields = append(logFields,
 				zap.Dict("fields",
 					zap.Int64("chat_id", chatID),
+					zap.Int64("thread_id", threadID),
 				),
 			)
 		}
 	}
-	_, err := q.exec(ctx, q.resetGeminiSystemPromptStmt, resetGeminiSystemPrompt, chatID)
+	_, err := q.exec(ctx, q.resetGeminiSystemPromptStmt, resetGeminiSystemPrompt, chatID, threadID)
 	q.logQuery(resetGeminiSystemPrompt, "ResetGeminiSystemPrompt", logFields, err, start)
 	return err
 }

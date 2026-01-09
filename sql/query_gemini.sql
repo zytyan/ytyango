@@ -40,19 +40,21 @@ FROM gemini_sessions
 WHERE id = ?;
 
 -- name: CreateOrUpdateGeminiSystemPrompt :exec
-INSERT INTO gemini_system_prompt (chat_id, prompt)
-VALUES (?, ?)
+INSERT INTO gemini_system_prompt (chat_id, thread_id, prompt)
+VALUES (?, ?, ?)
 ON CONFLICT DO UPDATE SET prompt=excluded.prompt;
 
 -- name: GetGeminiSystemPrompt :one
 SELECT prompt
 FROM gemini_system_prompt
-WHERE chat_id = ?;
+WHERE chat_id = ?
+  AND thread_id = ?;
 
 -- name: ResetGeminiSystemPrompt :exec
 DELETE
 FROM gemini_system_prompt
-WHERE chat_id = ?;
+WHERE chat_id = ?
+  AND thread_id = ?;
 
 -- name: IncrementSessionTokenCounters :exec
 UPDATE gemini_sessions

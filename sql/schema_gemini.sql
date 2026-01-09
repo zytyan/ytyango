@@ -46,6 +46,8 @@ CREATE TABLE gemini_contents
 
 CREATE TABLE IF NOT EXISTS gemini_system_prompt
 (
-    chat_id INTEGER NOT NULL PRIMARY KEY,
-    prompt  TEXT    NOT NULL
-);
+    chat_id   INTEGER NOT NULL,
+    thread_id INTEGER NOT NULL,
+    prompt    TEXT    NOT NULL,
+    PRIMARY KEY (chat_id, thread_id)
+) WITHOUT ROWID;

@@ -335,6 +335,29 @@ func findAndParseBanDuration(text string) (untilUnix int64, found bool) {
 //go:embed gemini_sysprompt.txt
 var gDefaultSysPrompt string
 var geminiSysPromptReplacer = replacer.NewReplacer(gDefaultSysPrompt)
+var sysPromptReplacerCache = make(map[geminiTopic]*replacer.Replacer)
+
+var gMu sync.Mutex
+
+func getSysPrompt(chatId, threadId int64) *replacer.Replacer {
+	gMu.Lock()
+	defer gMu.Unlock()
+	topic := geminiTopic{
+		chatId:  chatId,
+		topicId: threadId,
+	}
+	if r, ok := sysPromptReplacerCache[topic]; ok {
+		return r
+	}
+	tmpl, err := g.Q.GetGeminiSystemPrompt(context.Background(), chatId, threadId)
+	if err == nil {
+		r := replacer.NewReplacer(tmpl)
+		sysPromptReplacerCache[topic] = &r
+		return &r
+	}
+	sysPromptReplacerCache[topic] = &geminiSysPromptReplacer
+	return &geminiSysPromptReplacer
+}
 
 func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 	client, err := getGenAiClient()
@@ -363,7 +386,7 @@ func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 		Msg: ctx.EffectiveMessage,
 		Now: time.Now(),
 	}
-	sysPrompt := geminiSysPromptReplacer.Replace(&sysPromptCtx)
+	sysPrompt := getSysPrompt(ctx.EffectiveChat.Id, ctx.EffectiveMessage.MessageThreadId).Replace(&sysPromptCtx)
 	if canRestrictMember {
 		sysPrompt += `
 你在本群中是管理员，你可以使用 /mute [duration] 来禁言上一条消息的发送者，duration的格式可以为 1d2h3m4s，最小为60s，默认为5分钟，若超过366d，则会永久禁言。
@@ -523,7 +546,7 @@ func UpdateGeminiSysPrompt(bot *gotgbot.Bot, ctx *ext.Context) error {
 	prompt := h.TrimCmd(text)
 	if prompt == "" {
 		if msg.ReplyToMessage == nil || msg.ReplyToMessage.GetText() == "" {
-			rawPrompt, err := g.Q.GetGeminiSystemPrompt(context.Background(), msg.Chat.Id)
+			rawPrompt, err := g.Q.GetGeminiSystemPrompt(context.Background(), msg.Chat.Id, msg.MessageThreadId)
 			if err != nil {
 				rawPrompt = "当前没有提示词"
 			} else {
@@ -534,7 +557,7 @@ func UpdateGeminiSysPrompt(bot *gotgbot.Bot, ctx *ext.Context) error {
 			return err
 		}
 	}
-	err := g.Q.CreateOrUpdateGeminiSystemPrompt(context.Background(), msg.Chat.Id, prompt)
+	err := g.Q.CreateOrUpdateGeminiSystemPrompt(context.Background(), msg.Chat.Id, msg.MessageThreadId, prompt)
 	if err != nil {
 		_, err = msg.Reply(bot, "设置系统提示词错误: "+err.Error(), nil)
 		return err
@@ -543,7 +566,7 @@ func UpdateGeminiSysPrompt(bot *gotgbot.Bot, ctx *ext.Context) error {
 	return err
 }
 func ResetGeminiSysPrompt(bot *gotgbot.Bot, ctx *ext.Context) error {
-	err := g.Q.ResetGeminiSystemPrompt(context.Background(), ctx.EffectiveChat.Id)
+	err := g.Q.ResetGeminiSystemPrompt(context.Background(), ctx.EffectiveChat.Id, ctx.EffectiveMessage.MessageThreadId)
 	_, err = ctx.EffectiveMessage.Reply(bot, err.Error(), nil)
 	return err
 }
