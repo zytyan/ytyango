@@ -47,22 +47,16 @@ var replaceMetaVar = map[string]func(ctx *ReplaceCtx) string{
 		return getChatName(ctx.Msg.Chat)
 	},
 	"BOT_NAME": func(ctx *ReplaceCtx) string {
-		if ctx == nil || ctx.Bot == nil {
-			return ""
+		if ctx.Bot.LastName != "" {
+			return ctx.Bot.FirstName + " " + ctx.Bot.LastName
 		}
-		if ctx.Bot.FirstName != "" {
-			if ctx.Bot.LastName != "" {
-				return ctx.Bot.FirstName + " " + ctx.Bot.LastName
-			}
-			return ctx.Bot.FirstName
-		}
-		return ctx.Bot.Username
+		return ctx.Bot.FirstName
 	},
 	"BOT_USERNAME": func(ctx *ReplaceCtx) string {
-		if ctx == nil || ctx.Bot == nil {
-			return ""
-		}
 		return ctx.Bot.Username
+	},
+	"CHAT_TYPE": func(ctx *ReplaceCtx) string {
+		return ctx.Msg.Chat.Type
 	},
 }
 
@@ -71,6 +65,9 @@ type Replacer struct {
 }
 
 func (r *Replacer) Replace(ctx *ReplaceCtx) string {
+	if ctx == nil || ctx.Bot == nil || ctx.Msg == nil {
+		return ""
+	}
 	buf := make([]string, 0, len(r.replaceFunc))
 	for _, fn := range r.replaceFunc {
 		buf = append(buf, fn(ctx))

@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"database/sql"
+	_ "embed"
 	"errors"
 	"fmt"
 	g "main/globalcfg"
@@ -330,6 +331,9 @@ func findAndParseBanDuration(text string) (untilUnix int64, found bool) {
 	return int64(dur.Seconds()), true
 }
 
+//go:embed gemini_sysprompt.txt
+var gDefaultSysPrompt string
+
 func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 	client, err := getGenAiClient()
 	if !slices.Contains([]int64{-1001471592463, -1001282155019, -1001126241898,
@@ -369,7 +373,7 @@ func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 		bot.Username)
 	if canRestrictMember {
 		sysPrompt += `
-你在本群中是管理员，你可以使用 /mute [duration] 来禁言上一条消息的发送者，duration的格式可以为 1d2h3m4s，最小为60s，最大为366d，默认为5分钟，若超过366d，则会永久禁言。
+你在本群中是管理员，你可以使用 /mute [duration] 来禁言上一条消息的发送者，duration的格式可以为 1d2h3m4s，最小为60s，默认为5分钟，若超过366d，则会永久禁言。
 当系统识别到你新起一行使用 /mute 时，将会自动解析并执行。`
 	}
 	config := &genai.GenerateContentConfig{
