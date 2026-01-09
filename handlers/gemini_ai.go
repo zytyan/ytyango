@@ -333,7 +333,7 @@ func findAndParseBanDuration(text string) (untilUnix int64, found bool) {
 func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 	client, err := getGenAiClient()
 	if !slices.Contains([]int64{-1001471592463, -1001282155019, -1001126241898,
-		-1001170816274, -1001126241898}, ctx.EffectiveChat.Id) {
+		-1001170816274, -1003612476571}, ctx.EffectiveChat.Id) {
 		return nil
 	}
 	mem, err := bot.GetChatMember(ctx.EffectiveChat.Id, bot.Id, nil)
