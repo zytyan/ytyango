@@ -10,6 +10,7 @@ import (
 	"main/globalcfg/h"
 	"main/globalcfg/q"
 	"main/helpers/mdnormalizer"
+	"main/helpers/replacer"
 	"regexp"
 	"slices"
 	"strconv"
@@ -333,6 +334,7 @@ func findAndParseBanDuration(text string) (untilUnix int64, found bool) {
 
 //go:embed gemini_sysprompt.txt
 var gDefaultSysPrompt string
+var geminiSysPromptReplacer = replacer.NewReplacer(gDefaultSysPrompt)
 
 func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 	client, err := getGenAiClient()
@@ -356,16 +358,15 @@ func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 	}
 	session.mu.Lock()
 	defer session.mu.Unlock()
-	botName := bot.FirstName
-	if bot.LastName != "" {
-		botName = bot.FirstName + " " + bot.LastName
+	sysPromptCtx := replacer.ReplaceCtx{
+		Bot: bot,
+		Msg: &gotgbot.Message{Chat: gotgbot.Chat{
+			Title: session.ChatName,
+			Type:  session.ChatType,
+		}},
+		Now: time.Now(),
 	}
-	sysPrompt := fmt.Sprintf(gDefaultSysPrompt,
-		time.Now().Format("2006-01-02 15:04:05 -07:00"),
-		session.ChatType,
-		session.ChatName,
-		botName,
-		bot.Username)
+	sysPrompt := geminiSysPromptReplacer.Replace(&sysPromptCtx)
 	if canRestrictMember {
 		sysPrompt += `
 你在本群中是管理员，你可以使用 /mute [duration] 来禁言上一条消息的发送者，duration的格式可以为 1d2h3m4s，最小为60s，默认为5分钟，若超过366d，则会永久禁言。
