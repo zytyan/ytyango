@@ -53,9 +53,9 @@ func TestReplacerUnknownAndInvalidVars(t *testing.T) {
 
 func TestReplacerMetaVars(t *testing.T) {
 	ctx := testCtx(gotgbot.Chat{Title: "Test Group"})
-	tpl := "chat:%CHAT_NAME% bot:%BOT_NAME% user:%BOT_USERNAME% time:%TIME% date:%DATE% dt:%DATETIME%"
+	tpl := "chat:%CHAT_NAME% bot:%BOT_NAME% user:%BOT_USERNAME% time:%TIME% date:%DATE% dt:%DATETIME% dtz:%DATETIME_TZ%"
 	r := NewReplacer(tpl)
-	if got := r.Replace(ctx); got != "chat:Test Group bot:Mars Bot user:marsbot time:15:09:26 date:2024-03-14 dt:2024-03-14 15:09:26" {
+	if got := r.Replace(ctx); got != "chat:Test Group bot:Mars Bot user:marsbot time:15:09:26 date:2024-03-14 dt:2024-03-14 15:09:26 dtz:2024-03-14 15:09:26 +00:00" {
 		t.Fatalf("unexpected result: %q", got)
 	}
 
@@ -76,11 +76,11 @@ func TestReplacerMetaVars(t *testing.T) {
 
 func TestReplacerGeminiSysPromptFormat(t *testing.T) {
 	ctx := testCtx(gotgbot.Chat{Title: "Test Group", Type: "group"})
-	tpl := "现在是:%DATETIME%\n这里是一个Telegram聊天 type:%CHAT_TYPE%,name:%CHAT_NAME%\n" +
+	tpl := "现在是:%DATETIME_TZ%\n这里是一个Telegram聊天 type:%CHAT_TYPE%,name:%CHAT_NAME%\n" +
 		"你是一个Telegram机器人，name: %BOT_NAME% username: %BOT_USERNAME%"
 	r := NewReplacer(tpl)
 	got := r.Replace(ctx)
-	want := "现在是:2024-03-14 15:09:26\n这里是一个Telegram聊天 type:group,name:Test Group\n你是一个Telegram机器人，name: Mars Bot username: marsbot"
+	want := "现在是:2024-03-14 15:09:26 +00:00\n这里是一个Telegram聊天 type:group,name:Test Group\n你是一个Telegram机器人，name: Mars Bot username: marsbot"
 	if got != want {
 		t.Fatalf("unexpected gemini prompt output: %q", got)
 	}

@@ -360,10 +360,7 @@ func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 	defer session.mu.Unlock()
 	sysPromptCtx := replacer.ReplaceCtx{
 		Bot: bot,
-		Msg: &gotgbot.Message{Chat: gotgbot.Chat{
-			Title: session.ChatName,
-			Type:  session.ChatType,
-		}},
+		Msg: ctx.EffectiveMessage,
 		Now: time.Now(),
 	}
 	sysPrompt := geminiSysPromptReplacer.Replace(&sysPromptCtx)
