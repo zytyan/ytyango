@@ -541,6 +541,7 @@ func SetUserTimeZone(bot *gotgbot.Bot, ctx *ext.Context) error {
 }
 
 func UpdateGeminiSysPrompt(bot *gotgbot.Bot, ctx *ext.Context) error {
+	delete(sysPromptReplacerCache, geminiTopic{chatId: ctx.EffectiveChat.Id, topicId: ctx.EffectiveMessage.MessageThreadId})
 	msg := ctx.EffectiveMessage
 	text := msg.GetText()
 	prompt := h.TrimCmd(text)
@@ -566,6 +567,7 @@ func UpdateGeminiSysPrompt(bot *gotgbot.Bot, ctx *ext.Context) error {
 	return err
 }
 func ResetGeminiSysPrompt(bot *gotgbot.Bot, ctx *ext.Context) error {
+	delete(sysPromptReplacerCache, geminiTopic{chatId: ctx.EffectiveChat.Id, topicId: ctx.EffectiveMessage.MessageThreadId})
 	err := g.Q.ResetGeminiSystemPrompt(context.Background(), ctx.EffectiveChat.Id, ctx.EffectiveMessage.MessageThreadId)
 	_, err = ctx.EffectiveMessage.Reply(bot, err.Error(), nil)
 	return err
