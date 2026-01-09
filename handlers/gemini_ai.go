@@ -47,17 +47,21 @@ type GeminiSession struct {
 	TmpContents []q.GeminiContent
 	UpdateTime  time.Time
 }
+type geminiTopic struct {
+	chatId  int64
+	topicId int64
+}
 
 var geminiSessions struct {
 	mu sync.RWMutex
 	// session id -> session ，这是一个缓存
 	sidToSess    map[int64]*GeminiSession
-	chatIdToSess map[int64]*GeminiSession
+	chatIdToSess map[geminiTopic]*GeminiSession
 }
 
 func init() {
 	geminiSessions.sidToSess = make(map[int64]*GeminiSession)
-	geminiSessions.chatIdToSess = make(map[int64]*GeminiSession)
+	geminiSessions.chatIdToSess = make(map[geminiTopic]*GeminiSession)
 }
 func databaseContentToGenaiPart(content *q.GeminiContent) (out *genai.Content) {
 	out = &genai.Content{}
@@ -240,6 +244,10 @@ func GeminiGetSession(ctx context.Context, msg *gotgbot.Message) *GeminiSession 
 	geminiSessions.mu.Lock()
 	defer geminiSessions.mu.Unlock()
 	session := &GeminiSession{}
+	topic := geminiTopic{
+		chatId:  msg.Chat.Id,
+		topicId: msg.MessageThreadId,
+	}
 	if msg.ReplyToMessage != nil {
 		sessionId, err := g.Q.GetSessionIdByMessage(ctx, msg.Chat.Id, msg.ReplyToMessage.MessageId)
 		if err == nil {
@@ -259,18 +267,18 @@ func GeminiGetSession(ctx context.Context, msg *gotgbot.Message) *GeminiSession 
 			return nil
 		}
 		geminiSessions.sidToSess[sessionId] = session
-		geminiSessions.chatIdToSess[msg.Chat.Id] = session
+		geminiSessions.chatIdToSess[topic] = session
 		return session
 	}
 create:
-	sess, ok := geminiSessions.chatIdToSess[msg.Chat.Id]
+	sess, ok := geminiSessions.chatIdToSess[topic]
 	if ok {
 		if time.Since(sess.UpdateTime) < geminiInterval {
 			return sess
 		}
 		delete(geminiSessions.sidToSess, sess.ID)
 	}
-	delete(geminiSessions.chatIdToSess, msg.Chat.Id)
+	delete(geminiSessions.chatIdToSess, topic)
 	var err error
 	session.GeminiSession, err = g.Q.CreateNewGeminiSession(ctx, msg.Chat.Id, getChatName(&msg.Chat), msg.Chat.Type)
 	if err != nil {
@@ -281,7 +289,7 @@ create:
 		return nil
 	}
 	geminiSessions.sidToSess[session.ID] = session
-	geminiSessions.chatIdToSess[msg.Chat.Id] = session
+	geminiSessions.chatIdToSess[topic] = session
 	return session
 }
 
@@ -324,7 +332,8 @@ func findAndParseBanDuration(text string) (untilUnix int64, found bool) {
 
 func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 	client, err := getGenAiClient()
-	if !slices.Contains([]int64{-1001471592463, -1001282155019, -1001126241898, -1001170816274}, ctx.EffectiveChat.Id) {
+	if !slices.Contains([]int64{-1001471592463, -1001282155019, -1001126241898,
+		-1001170816274, -1001126241898}, ctx.EffectiveChat.Id) {
 		return nil
 	}
 	mem, err := bot.GetChatMember(ctx.EffectiveChat.Id, bot.Id, nil)
@@ -352,7 +361,7 @@ func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 若用户特地引用了被回复的消息中的某段文字，则会有引用(quote)字段。
 这些元数据由代码自动生成，不要在模型的输出中加入该数据。
 你可以用 @username 来提及用户，如果一个用户没有username，你可以使用 [name](tg://user?id=$userid) 来提及用户，一般来说，你回复的最后一条消息是自动回复对应用户的，无需特地提及。
-不要使用latex语法，telegram不支持。请对大家温柔一些。`,
+不要使用latex公式，telegram不支持。请对大家温柔一些。`,
 		time.Now().Format("2006-01-02 15:04:05 -07:00"),
 		session.ChatType,
 		session.ChatName,

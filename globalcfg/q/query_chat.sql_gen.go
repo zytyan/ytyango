@@ -173,6 +173,35 @@ func (q *Queries) UpdateChatStatDaily(ctx context.Context, arg UpdateChatStatDai
 	return err
 }
 
+const updateChatTopicName = `-- name: UpdateChatTopicName :exec
+;
+
+INSERT INTO chat_topics (chat_id, thread_id, name)
+VALUES (?, ?, ?)
+ON CONFLICT DO UPDATE SET name=excluded.name
+`
+
+func (q *Queries) UpdateChatTopicName(ctx context.Context, chatID int64, threadID int64, name string) error {
+	var logFields []zap.Field
+	var start time.Time
+	if q.logger != nil {
+		logFields = make([]zap.Field, 0, 8)
+		start = time.Now()
+		if q.LogArgument {
+			logFields = append(logFields,
+				zap.Dict("fields",
+					zap.Int64("chat_id", chatID),
+					zap.Int64("thread_id", threadID),
+					zap.String("name", name),
+				),
+			)
+		}
+	}
+	_, err := q.exec(ctx, q.updateChatTopicNameStmt, updateChatTopicName, chatID, threadID, name)
+	q.logQuery(updateChatTopicName, "UpdateChatTopicName", logFields, err, start)
+	return err
+}
+
 const createChatStatDaily = `-- name: createChatStatDaily :one
 INSERT INTO chat_stat_daily (chat_id, stat_date)
 VALUES (?, ?)

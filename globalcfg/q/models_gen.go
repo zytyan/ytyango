@@ -52,6 +52,12 @@ type ChatStatDaily struct {
 	MsgIDAtTimeStart   TenMinuteStats `json:"msg_id_at_time_start"`
 }
 
+type ChatTopic struct {
+	ChatID   int64  `json:"chat_id"`
+	ThreadID int64  `json:"thread_id"`
+	Name     string `json:"name"`
+}
+
 type GeminiContent struct {
 	SessionID        int64          `json:"session_id"`
 	ChatID           int64          `json:"chat_id"`

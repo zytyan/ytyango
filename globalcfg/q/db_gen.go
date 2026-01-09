@@ -97,6 +97,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.updateChatStatDailyStmt, err = db.PrepareContext(ctx, updateChatStatDaily); err != nil {
 		return nil, fmt.Errorf("error preparing query UpdateChatStatDaily: %w", err)
 	}
+	if q.updateChatTopicNameStmt, err = db.PrepareContext(ctx, updateChatTopicName); err != nil {
+		return nil, fmt.Errorf("error preparing query UpdateChatTopicName: %w", err)
+	}
 	if q.updateYtDlpCacheStmt, err = db.PrepareContext(ctx, updateYtDlpCache); err != nil {
 		return nil, fmt.Errorf("error preparing query UpdateYtDlpCache: %w", err)
 	}
@@ -277,6 +280,11 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing updateChatStatDailyStmt: %w", cerr)
 		}
 	}
+	if q.updateChatTopicNameStmt != nil {
+		if cerr := q.updateChatTopicNameStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing updateChatTopicNameStmt: %w", cerr)
+		}
+	}
 	if q.updateYtDlpCacheStmt != nil {
 		if cerr := q.updateYtDlpCacheStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing updateYtDlpCacheStmt: %w", cerr)
@@ -444,6 +452,7 @@ type Queries struct {
 	setPrprCacheStmt                     *sql.Stmt
 	updateBiliInlineMsgIdStmt            *sql.Stmt
 	updateChatStatDailyStmt              *sql.Stmt
+	updateChatTopicNameStmt              *sql.Stmt
 	updateYtDlpCacheStmt                 *sql.Stmt
 	createChatStatDailyStmt              *sql.Stmt
 	createNewUserStmt                    *sql.Stmt
@@ -498,6 +507,7 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		setPrprCacheStmt:                     q.setPrprCacheStmt,
 		updateBiliInlineMsgIdStmt:            q.updateBiliInlineMsgIdStmt,
 		updateChatStatDailyStmt:              q.updateChatStatDailyStmt,
+		updateChatTopicNameStmt:              q.updateChatTopicNameStmt,
 		updateYtDlpCacheStmt:                 q.updateYtDlpCacheStmt,
 		createChatStatDailyStmt:              q.createChatStatDailyStmt,
 		createNewUserStmt:                    q.createNewUserStmt,

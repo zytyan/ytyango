@@ -70,3 +70,8 @@ ON CONFLICT DO UPDATE SET type=excluded.type,
                           last_name=excluded.last_name,
                           is_forum=excluded.is_forum
 ;
+
+-- name: UpdateChatTopicName :exec
+INSERT INTO chat_topics (chat_id, thread_id, name)
+VALUES (?, ?, ?)
+ON CONFLICT DO UPDATE SET name=excluded.name;

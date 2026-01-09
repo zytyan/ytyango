@@ -58,3 +58,11 @@ CREATE TABLE IF NOT EXISTS chat_attr
     last_name  TEXT,
     is_forum   INT_BOOL NOT NULL
 ) WITHOUT ROWID;
+
+CREATE TABLE IF NOT EXISTS chat_topics
+(
+    chat_id   INTEGER NOT NULL,
+    thread_id INTEGER NOT NULL,
+    name      TEXT    NOT NULL,
+    PRIMARY KEY (chat_id, thread_id)
+) WITHOUT ROWID ;
