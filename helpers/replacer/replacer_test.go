@@ -65,4 +65,11 @@ func TestReplacerMetaVars(t *testing.T) {
 	if got := r.Replace(ctx); got != "chat:Alice Doe" {
 		t.Fatalf("unexpected chat name: %q", got)
 	}
+
+	ctx = testCtx(gotgbot.Chat{FirstName: "Solo", Username: "solo"})
+	tpl = "chat:%CHAT_NAME%"
+	r = NewReplacer(tpl)
+	if got := r.Replace(ctx); got != "chat:Solo" {
+		t.Fatalf("unexpected chat name with first name only: %q", got)
+	}
 }
