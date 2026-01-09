@@ -47,9 +47,21 @@ var replaceMetaVar = map[string]func(ctx *ReplaceCtx) string{
 		return getChatName(ctx.Msg.Chat)
 	},
 	"BOT_NAME": func(ctx *ReplaceCtx) string {
-		return getChatName(ctx.Msg.Chat)
+		if ctx == nil || ctx.Bot == nil {
+			return ""
+		}
+		if ctx.Bot.FirstName != "" {
+			if ctx.Bot.LastName != "" {
+				return ctx.Bot.FirstName + " " + ctx.Bot.LastName
+			}
+			return ctx.Bot.FirstName
+		}
+		return ctx.Bot.Username
 	},
 	"BOT_USERNAME": func(ctx *ReplaceCtx) string {
+		if ctx == nil || ctx.Bot == nil {
+			return ""
+		}
 		return ctx.Bot.Username
 	},
 }
