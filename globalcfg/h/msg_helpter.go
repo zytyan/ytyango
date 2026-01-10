@@ -2,6 +2,7 @@ package h
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -12,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"main/helpers/lrusf"
 
@@ -245,4 +247,26 @@ func sanitizeFileID(fileId string) string {
 		return "file"
 	}
 	return b.String()
+}
+
+func WithChatAction(bot *gotgbot.Bot, action string, chatId, topicId int64, useTopic bool) func() {
+	ctx, cancel := context.WithCancel(context.Background())
+	ticker := time.NewTicker(time.Second * 3)
+	go func() {
+		opt := &gotgbot.SendChatActionOpts{}
+		if useTopic {
+			opt.MessageThreadId = topicId
+		}
+		_, _ = bot.SendChatAction(chatId, action, opt)
+		for {
+			select {
+			case <-ticker.C:
+				_, _ = bot.SendChatAction(chatId, action, opt)
+				ticker.Reset(time.Second * 3)
+			case <-ctx.Done():
+				ticker.Stop()
+			}
+		}
+	}()
+	return cancel
 }

@@ -43,6 +43,9 @@ var replaceMetaVar = map[string]func(ctx *ReplaceCtx) string{
 	"DATETIME_TZ": func(ctx *ReplaceCtx) string {
 		return ctx.Now.Format("2006-01-02 15:04:05 -07:00")
 	},
+	"WEEKDAY": func(ctx *ReplaceCtx) string {
+		return ctx.Now.Format("Mon")
+	},
 	"CHAT_NAME": func(ctx *ReplaceCtx) string {
 		chat := ctx.Msg.GetChat()
 		if chat.Title != "" {

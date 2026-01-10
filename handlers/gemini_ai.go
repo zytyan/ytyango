@@ -13,7 +13,6 @@ import (
 	"main/helpers/replacer"
 	"regexp"
 	"slices"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -296,41 +295,6 @@ create:
 }
 
 var reLabelHeader = regexp.MustCompile(`(?s)^-start-label-\n.*-end-label-\n`)
-var reBanCmd = regexp.MustCompile(`(?im)^/mute\s*(\d+d)?(\d+h)?(\d+m)?(\d+s)?`)
-
-func findAndParseBanDuration(text string) (untilUnix int64, found bool) {
-	m := reBanCmd.FindStringSubmatch(text)
-	if m == nil {
-		return 0, false
-	}
-
-	found = true
-
-	const defaultDuration = 5 * time.Minute
-
-	var dur time.Duration
-	hasTime := false
-
-	parse := func(s string, unit time.Duration) {
-		if s == "" {
-			return
-		}
-		hasTime = true
-		n, _ := strconv.Atoi(s[:len(s)-1]) // 去掉单位
-		dur += time.Duration(n) * unit
-	}
-
-	parse(m[1], 24*time.Hour)
-	parse(m[2], time.Hour)
-	parse(m[3], time.Minute)
-	parse(m[4], time.Second)
-
-	if !hasTime {
-		dur = defaultDuration
-	}
-
-	return int64(dur.Seconds()), true
-}
 
 //go:embed gemini_sysprompt.txt
 var gDefaultSysPrompt string
@@ -359,12 +323,21 @@ func getSysPrompt(chatId, threadId int64) *replacer.Replacer {
 	return &geminiSysPromptReplacer
 }
 
+func setReaction(bot *gotgbot.Bot, msg *gotgbot.Message, emoji string) {
+	_, err := msg.SetReaction(bot, &gotgbot.SetMessageReactionOpts{
+		Reaction: []gotgbot.ReactionType{gotgbot.ReactionTypeEmoji{Emoji: emoji}},
+	})
+	if err != nil {
+		logD.Warn("set reaction", zap.Error(err))
+	}
+}
+
 func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
-	client, err := getGenAiClient()
 	if !slices.Contains([]int64{-1001471592463, -1001282155019, -1001126241898,
 		-1001170816274, -1003612476571}, ctx.EffectiveChat.Id) {
 		return nil
 	}
+	client, err := getGenAiClient()
 	if err != nil {
 		return err
 	}
@@ -394,42 +367,16 @@ func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 	if err := session.AddTgMessage(bot, ctx.EffectiveMessage); err != nil {
 		return err
 	}
-	_, err = ctx.EffectiveMessage.SetReaction(bot, &gotgbot.SetMessageReactionOpts{
-		Reaction: []gotgbot.ReactionType{gotgbot.ReactionTypeEmoji{Emoji: "👀"}},
-		IsBig:    false,
-	})
-	if err != nil {
-		log.Warnf("set reaction emoji to message %s(%d) failed ", getChatName(&ctx.EffectiveMessage.Chat), ctx.EffectiveMessage.MessageId)
-	}
-	defer func() {
-		session.DiscardTmpUpdates()
-	}()
-	ticker := time.NewTicker(time.Second * 4)
-	defer ticker.Stop()
-	tickerCtx, tickerCancel := context.WithCancel(context.Background())
-	defer tickerCancel()
-	go func() {
-		_, _ = bot.SendChatAction(ctx.EffectiveChat.Id, "typing",
-			&gotgbot.SendChatActionOpts{MessageThreadId: ctx.EffectiveMessage.MessageThreadId},
-		)
-		for {
-			select {
-			case <-ticker.C:
-				_, _ = bot.SendChatAction(ctx.EffectiveChat.Id, "typing",
-					&gotgbot.SendChatActionOpts{MessageThreadId: ctx.EffectiveMessage.MessageThreadId},
-				)
-			case <-tickerCtx.Done():
-				return
-			}
-		}
-	}()
+	msg := ctx.EffectiveMessage
+	setReaction(bot, msg, "👀")
+	defer session.DiscardTmpUpdates()
+
+	actionCancel := h.WithChatAction(bot, "typing", msg.Chat.Id, msg.MessageThreadId, msg.IsTopicMessage)
+	defer actionCancel()
 	res, err := client.Models.GenerateContent(genCtx, geminiModel, session.ToGenaiContents(), config)
-	tickerCancel()
-	ticker.Stop()
+	actionCancel()
 	if err != nil {
-		_, _ = ctx.EffectiveMessage.SetReaction(bot, &gotgbot.SetMessageReactionOpts{
-			Reaction: []gotgbot.ReactionType{gotgbot.ReactionTypeEmoji{Emoji: "😭"}},
-		})
+		setReaction(bot, msg, "😭")
 		_, _ = ctx.EffectiveMessage.Reply(bot, fmt.Sprintf("error:%s", err), nil)
 		return err
 	}
@@ -442,45 +389,12 @@ func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 	text := res.Text()
 	text = reLabelHeader.ReplaceAllString(text, "")
 
-	if dur, found := findAndParseBanDuration(text); found {
-		untilUnix := time.Now().Unix() + dur
-		_, err = bot.RestrictChatMember(ctx.EffectiveChat.Id, ctx.EffectiveUser.Id, gotgbot.ChatPermissions{
-			CanSendMessages:       false,
-			CanSendAudios:         false,
-			CanSendDocuments:      false,
-			CanSendPhotos:         false,
-			CanSendVideos:         false,
-			CanSendVideoNotes:     false,
-			CanSendVoiceNotes:     false,
-			CanSendPolls:          false,
-			CanSendOtherMessages:  false,
-			CanAddWebPagePreviews: false,
-			CanChangeInfo:         false,
-			CanInviteUsers:        false,
-			CanPinMessages:        false,
-			CanManageTopics:       false,
-		}, &gotgbot.RestrictChatMemberOpts{
-			UntilDate: untilUnix,
-		})
-		if err == nil {
-			text += fmt.Sprintf("\nbot禁言了%s，截止日期：%s",
-				ctx.EffectiveMessage.GetSender().Name(),
-				time.Unix(untilUnix, 0).Format("2006-01-02 15:04:05"))
-		} else {
-			text += fmt.Sprintf("\nbot尝试禁言%s失败，原因%s",
-				ctx.EffectiveMessage.GetSender().Name(),
-				err.Error(),
-			)
-		}
-	}
 	if text == "" {
 		text = "模型没有返回任何信息"
 		if res.PromptFeedback != nil {
 			text += "，原因: " + string(res.PromptFeedback.BlockReason) + res.PromptFeedback.BlockReasonMessage
 		}
-		_, _ = ctx.EffectiveMessage.SetReaction(bot, &gotgbot.SetMessageReactionOpts{
-			Reaction: []gotgbot.ReactionType{gotgbot.ReactionTypeEmoji{Emoji: "😭"}},
-		})
+		setReaction(bot, msg, "😭")
 		session.DiscardTmpUpdates()
 	}
 	normTxt, err := mdnormalizer.Normalize(text)
