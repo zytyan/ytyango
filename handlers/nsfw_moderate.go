@@ -210,17 +210,6 @@ func DetectNsfwPhoto(msg *gotgbot.Message) bool {
 	return true
 }
 
-func CountNsfwPics(bot *gotgbot.Bot, ctx *ext.Context) error {
-	var racyPicCnt, adultPicCnt, manualNotNsfwCount int64
-	text := fmt.Sprintf(
-		"racy pic count: %d\n"+
-			"adult pic count: %d\n"+
-			"manual not nsfw pic count %d",
-		racyPicCnt, adultPicCnt, manualNotNsfwCount)
-	_, err := ctx.EffectiveMessage.Reply(bot, text, nil)
-	return err
-}
-
 var reUserRateInMsg = regexp.MustCompile(`用户评分.*(\d|\?\?\?)/6$`)
 
 func refreshMsgFromBtn(bot *gotgbot.Bot, ctx *ext.Context, fileUid, cmd string) {

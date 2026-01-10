@@ -1,6 +1,7 @@
 package replacer
 
 import (
+	"strconv"
 	"strings"
 	"time"
 	"unicode"
@@ -60,6 +61,30 @@ var replaceMetaVar = map[string]func(ctx *ReplaceCtx) string{
 	},
 	"CHAT_TYPE": func(ctx *ReplaceCtx) string {
 		return ctx.Msg.Chat.Type
+	},
+	"MSG_ID": func(ctx *ReplaceCtx) string {
+		return strconv.FormatInt(ctx.Msg.MessageId, 10)
+	},
+	"CHAT_ID": func(ctx *ReplaceCtx) string {
+		return strconv.FormatInt(ctx.Msg.Chat.Id, 10)
+	},
+	"SENDER_NAME": func(ctx *ReplaceCtx) string {
+		return ctx.Msg.GetSender().Name()
+	},
+	"SENDER_USERNAME": func(ctx *ReplaceCtx) string {
+		return ctx.Msg.GetSender().Username()
+	},
+	"SENDER_ID": func(ctx *ReplaceCtx) string {
+		return strconv.FormatInt(ctx.Msg.GetSender().Id(), 10)
+	},
+	"MSG_DATETIME": func(ctx *ReplaceCtx) string {
+		return time.Unix(ctx.Msg.Date, 0).Format("2006-01-02 15:04:05")
+	},
+	"QUOTE": func(ctx *ReplaceCtx) string {
+		if ctx.Msg.Quote == nil {
+			return ""
+		}
+		return ctx.Msg.Quote.Text
 	},
 }
 
