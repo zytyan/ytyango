@@ -121,7 +121,7 @@
 
 {#if isLoadingInitial}
 	<div class="loader initial">
-		<div class="spinner" />
+		<div class="spinner" ></div>
 		<span>正在搜索...</span>
 	</div>
 {/if}
