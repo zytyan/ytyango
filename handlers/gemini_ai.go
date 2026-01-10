@@ -565,3 +565,11 @@ func GetGeminiSysPrompt(bot *gotgbot.Bot, ctx *ext.Context) error {
 	_, err = ctx.EffectiveMessage.Reply(bot, prompt, nil)
 	return err
 }
+func NewGeminiSession(bot *gotgbot.Bot, ctx *ext.Context) error {
+	delete(geminiSessions.chatIdToSess, geminiTopic{
+		chatId:  ctx.EffectiveMessage.GetChat().Id,
+		topicId: ctx.EffectiveMessage.MessageThreadId,
+	})
+	_, err := ctx.EffectiveMessage.Reply(bot, "已清理session，请不要回复老对话。", nil)
+	return err
+}

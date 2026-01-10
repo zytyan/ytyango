@@ -265,6 +265,7 @@ func main() {
 	dp.Command("sysprompt", hdrs.UpdateGeminiSysPrompt)
 	dp.Command("reset_sysprompt", hdrs.ResetGeminiSysPrompt)
 	dp.Command("get_sysprompt", hdrs.GetGeminiSysPrompt)
+	dp.Command("new_session", hdrs.NewGeminiSession)
 
 	dp.NewMessage(hdrs.BiliMsgFilter, hdrs.BiliMsgConverter)
 	dp.NewMessage(hdrs.DetectNsfwPhoto, hdrs.NsfwDetect)
