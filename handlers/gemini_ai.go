@@ -365,11 +365,6 @@ func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 		-1001170816274, -1003612476571}, ctx.EffectiveChat.Id) {
 		return nil
 	}
-	mem, err := bot.GetChatMember(ctx.EffectiveChat.Id, bot.Id, nil)
-	canRestrictMember := false
-	if err == nil && mem.MergeChatMember().CanRestrictMembers {
-		canRestrictMember = true
-	}
 	if err != nil {
 		return err
 	}
@@ -387,11 +382,6 @@ func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 		Now: time.Now(),
 	}
 	sysPrompt := getSysPrompt(ctx.EffectiveChat.Id, ctx.EffectiveMessage.MessageThreadId).Replace(&sysPromptCtx)
-	if canRestrictMember {
-		sysPrompt += `
-你在本群中是管理员，你可以使用 /mute [duration] 来禁言上一条消息的发送者，duration的格式可以为 1d2h3m4s，最小为60s，默认为5分钟，若超过366d，则会永久禁言。
-当系统识别到你新起一行使用 /mute 时，将会自动解析并执行。`
-	}
 	config := &genai.GenerateContentConfig{
 		SystemInstruction: genai.NewContentFromText(sysPrompt, genai.RoleModel),
 		Tools: []*genai.Tool{
@@ -565,11 +555,14 @@ func GetGeminiSysPrompt(bot *gotgbot.Bot, ctx *ext.Context) error {
 	_, err = ctx.EffectiveMessage.Reply(bot, prompt, nil)
 	return err
 }
+
 func NewGeminiSession(bot *gotgbot.Bot, ctx *ext.Context) error {
+	geminiSessions.mu.Lock()
 	delete(geminiSessions.chatIdToSess, geminiTopic{
 		chatId:  ctx.EffectiveMessage.GetChat().Id,
 		topicId: ctx.EffectiveMessage.MessageThreadId,
 	})
+	geminiSessions.mu.Unlock()
 	_, err := ctx.EffectiveMessage.Reply(bot, "已清理session，请不要回复老对话。", nil)
 	return err
 }
