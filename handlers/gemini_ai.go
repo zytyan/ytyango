@@ -501,6 +501,17 @@ func NewGeminiSession(bot *gotgbot.Bot, ctx *ext.Context) error {
 		topicId: ctx.EffectiveMessage.MessageThreadId,
 	})
 	geminiSessions.mu.Unlock()
-	_, err := ctx.EffectiveMessage.Reply(bot, "已清理session，请不要回复老对话。", nil)
+	_, err := ctx.EffectiveMessage.Reply(bot, "已重新开始session，新建会话不会携带历史记录。", nil)
+	return err
+}
+
+func GetGeminiSessionId(bot *gotgbot.Bot, ctx *ext.Context) error {
+	geminiSessions.mu.Lock()
+	sess := geminiSessions.chatIdToSess[geminiTopic{
+		chatId:  ctx.EffectiveMessage.GetChat().Id,
+		topicId: ctx.EffectiveMessage.MessageThreadId,
+	}]
+	geminiSessions.mu.Unlock()
+	_, err := ctx.EffectiveMessage.Reply(bot, fmt.Sprintf("Session ID: %d", sess.ID), nil)
 	return err
 }
