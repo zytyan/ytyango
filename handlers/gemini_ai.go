@@ -188,7 +188,7 @@ func (s *GeminiSession) AddTgMessage(bot *gotgbot.Bot, msg *gotgbot.Message) (er
 			content.MimeType.String = "image/webp"
 		}
 	} else if msg.Video != nil {
-		if msg.Video.Duration <= 120 && msg.Video.FileSize <= 2*1024*1024 {
+		if msg.Video.Duration <= 120 && msg.Video.FileSize <= 10*1024*1024 {
 			s.AllowCodeExecution = false
 			data, err = h.DownloadToMemoryCached(bot, msg.Video.FileId)
 			if err != nil {
