@@ -195,8 +195,9 @@ func (s *GeminiSession) AddTgMessage(bot *gotgbot.Bot, msg *gotgbot.Message) (er
 				return err
 			}
 			content.Blob = data
-			content.MsgType = "video/mp4"
+			content.MsgType = "video"
 			content.MimeType.Valid = true
+			content.MimeType.String = "video/mp4"
 		}
 	}
 	s.TmpContents = append(s.TmpContents, content)
