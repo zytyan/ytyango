@@ -382,14 +382,14 @@ func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 			{GoogleSearch: &genai.GoogleSearch{}},
 		},
 	}
-	if session.AllowCodeExecution {
-		config.Tools[0].CodeExecution = &genai.ToolCodeExecution{}
-	}
 	if err := session.AddTgMessage(bot, ctx.EffectiveMessage.ReplyToMessage); err != nil {
 		return err
 	}
 	if err := session.AddTgMessage(bot, ctx.EffectiveMessage); err != nil {
 		return err
+	}
+	if session.AllowCodeExecution {
+		config.Tools[0].CodeExecution = &genai.ToolCodeExecution{}
 	}
 	msg := ctx.EffectiveMessage
 	setReaction(bot, msg, "👀")
