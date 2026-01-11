@@ -38,7 +38,7 @@ var getGenAiClient = sync.OnceValues(func() (*genai.Client, error) {
 const (
 	geminiSessionContentLimit = 150
 	geminiModel               = "gemini-3-flash-preview"
-	geminiInterval            = time.Minute * 3
+	geminiInterval            = time.Second * 30
 )
 
 type GeminiSession struct {
@@ -47,6 +47,8 @@ type GeminiSession struct {
 	Contents    []q.GeminiContent
 	TmpContents []q.GeminiContent
 	UpdateTime  time.Time
+
+	AllowCodeExecution bool
 }
 type geminiTopic struct {
 	chatId  int64
@@ -169,20 +171,32 @@ func (s *GeminiSession) AddTgMessage(bot *gotgbot.Bot, msg *gotgbot.Message) (er
 		content.MimeType.Valid = true
 		content.MimeType.String = "image/jpeg"
 	} else if msg.Sticker != nil {
+		if msg.Sticker.IsAnimated {
+			return errors.New("不支持的动画类型")
+		}
 		data, err = h.DownloadToMemoryCached(bot, msg.Sticker.FileId)
 		if err != nil {
 			return err
-		}
-		if len(data) == 0 || data[0] == '{' {
-			return errors.New("不支持的动画类型")
 		}
 		content.Blob = data
 		content.MsgType = "sticker"
 		content.MimeType.Valid = true
 		if msg.Sticker.IsVideo {
+			s.AllowCodeExecution = false
 			content.MimeType.String = "video/webm"
 		} else {
 			content.MimeType.String = "image/webp"
+		}
+	} else if msg.Video != nil {
+		if msg.Video.Duration <= 120 && msg.Video.FileSize <= 2*1024*1024 {
+			s.AllowCodeExecution = false
+			data, err = h.DownloadToMemoryCached(bot, msg.Video.FileId)
+			if err != nil {
+				return err
+			}
+			content.Blob = data
+			content.MsgType = "video/mp4"
+			content.MimeType.Valid = true
 		}
 	}
 	s.TmpContents = append(s.TmpContents, content)
@@ -193,6 +207,12 @@ func (s *GeminiSession) loadContentFromDatabase(ctx context.Context) error {
 	content, err := g.Q.GetAllMsgInSession(ctx, s.ID, geminiSessionContentLimit)
 	if err != nil {
 		return err
+	}
+	s.AllowCodeExecution = true
+	for _, c := range content {
+		if c.MimeType.Valid && strings.Contains(c.MimeType.String, "video") {
+			s.AllowCodeExecution = false
+		}
 	}
 	s.Contents = content
 	return nil
