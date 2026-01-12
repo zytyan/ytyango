@@ -41,7 +41,7 @@ const (
 	geminiSessionContentLimit = 150
 	geminiModel               = "gemini-3-flash-preview"
 	geminiInterval            = time.Second * 30
-	geminiMemoriesLimit       = 30
+	geminiMemoriesLimit       = 60
 )
 
 type GeminiSession struct {
