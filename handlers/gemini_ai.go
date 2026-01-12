@@ -358,6 +358,8 @@ func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 		-1001170816274, -1003612476571}, ctx.EffectiveChat.Id) {
 		return nil
 	}
+	msg := ctx.EffectiveMessage
+	setReaction(bot, msg, "👀")
 	client, err := getGenAiClient()
 	if err != nil {
 		return err
@@ -391,8 +393,6 @@ func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 	if session.AllowCodeExecution {
 		config.Tools[0].CodeExecution = &genai.ToolCodeExecution{}
 	}
-	msg := ctx.EffectiveMessage
-	setReaction(bot, msg, "👀")
 	defer session.DiscardTmpUpdates()
 
 	actionCancel := h.WithChatAction(bot, "typing", msg.Chat.Id, msg.MessageThreadId, msg.IsTopicMessage)
@@ -418,7 +418,7 @@ func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 		if res.PromptFeedback != nil {
 			text += "，原因: " + string(res.PromptFeedback.BlockReason) + res.PromptFeedback.BlockReasonMessage
 		}
-		setReaction(bot, msg, "😭")
+		setReaction(bot, msg, "🤯")
 		session.DiscardTmpUpdates()
 	}
 	normTxt, err := mdnormalizer.Normalize(text)
