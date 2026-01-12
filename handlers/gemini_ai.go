@@ -450,10 +450,11 @@ func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 				continue
 			}
 			id, err := strconv.ParseInt(fields[1], 10, 64)
-			if err != nil || int(id) > len(session.Memories) {
+			if err != nil || int(id) > len(session.Memories) || id <= 0 {
 				continue
 			}
 			session.Memories[id-1].Content = fields[2]
+			_ = g.Q.UpdateGeminiMemory(genCtx, session.Memories[id-1].ID, fields[2])
 		} else if strings.HasPrefix(match, "/memdel ") {
 			fields := strings.Fields(match)
 			if len(fields) <= 1 {
@@ -465,6 +466,7 @@ func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 					continue
 				}
 				session.Memories[id-1].Content = "<deleted>"
+				_ = g.Q.DeleteGeminiMemory(genCtx, session.Memories[id-1].ID)
 			}
 		}
 	}
@@ -582,9 +584,13 @@ func GetMemories(bot *gotgbot.Bot, ctx *ext.Context) error {
 		_, _ = msg.Reply(bot, err.Error(), nil)
 		return err
 	}
+	if len(memories) == 0 {
+		_, err = msg.Reply(bot, "当前没有任何记忆", nil)
+		return err
+	}
 	buf := bytes.NewBuffer(nil)
 	for i, m := range memories {
-		buf.WriteString(fmt.Sprintf("%d. %s\n", i, m.Content))
+		buf.WriteString(fmt.Sprintf("%d. %s\n", i+1, m.Content))
 	}
 	_, err = msg.Reply(bot, buf.String(), nil)
 	return err
