@@ -1,6 +1,7 @@
 package replacer
 
 import (
+	"bytes"
 	"strconv"
 	"strings"
 	"time"
@@ -10,9 +11,11 @@ import (
 )
 
 type ReplaceCtx struct {
+	Now time.Time
 	Bot *gotgbot.Bot
 	Msg *gotgbot.Message
-	Now time.Time
+
+	Memories []string
 }
 
 func getChatName(chat gotgbot.Chat) string {
@@ -88,6 +91,18 @@ var replaceMetaVar = map[string]func(ctx *ReplaceCtx) string{
 			return ""
 		}
 		return ctx.Msg.Quote.Text
+	},
+	"MEMORIES": func(ctx *ReplaceCtx) string {
+		if len(ctx.Memories) == 0 {
+			return "当前没有记忆"
+		}
+		buf := bytes.NewBuffer(nil)
+		for i, m := range ctx.Memories {
+			buf.WriteString(strconv.FormatInt(int64(i)+1, 10))
+			buf.WriteString(". ")
+			buf.WriteString(m)
+		}
+		return buf.String()
 	},
 }
 

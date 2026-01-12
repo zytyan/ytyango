@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	_ "embed"
@@ -9,10 +10,11 @@ import (
 	g "main/globalcfg"
 	"main/globalcfg/h"
 	"main/globalcfg/q"
+	"main/handlers/replacer"
 	"main/helpers/mdnormalizer"
-	"main/helpers/replacer"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -39,6 +41,7 @@ const (
 	geminiSessionContentLimit = 150
 	geminiModel               = "gemini-3-flash-preview"
 	geminiInterval            = time.Second * 30
+	geminiMemoriesLimit       = 30
 )
 
 type GeminiSession struct {
@@ -47,6 +50,7 @@ type GeminiSession struct {
 	Contents    []q.GeminiContent
 	TmpContents []q.GeminiContent
 	UpdateTime  time.Time
+	Memories    []q.GeminiMemory
 
 	AllowCodeExecution bool
 }
@@ -249,15 +253,15 @@ func (s *GeminiSession) DiscardTmpUpdates() {
 }
 
 func IsGeminiReq(msg *gotgbot.Message) bool {
-	if strings.HasPrefix(msg.GetText(), "/") {
+	text := msg.GetText()
+	if strings.HasPrefix(text, "/") {
 		return false
 	}
-	if strings.Contains(msg.GetText(), "@"+mainBot.Username) {
+	if strings.Contains(text, "@"+mainBot.Username) {
 		return true
 	}
 	if msg.ReplyToMessage != nil {
-		user := msg.ReplyToMessage.GetSender().User
-		return user != nil && user.Id == mainBot.Id
+		return msg.ReplyToMessage.GetSender().Id() == mainBot.Id
 	}
 	return false
 }
@@ -269,6 +273,9 @@ func GeminiGetSession(ctx context.Context, msg *gotgbot.Message) *GeminiSession 
 	topic := geminiTopic{
 		chatId:  msg.Chat.Id,
 		topicId: msg.MessageThreadId,
+	}
+	if sess, ok := geminiSessions.chatIdToSess[topic]; ok {
+		return sess
 	}
 	if msg.ReplyToMessage != nil {
 		sessionId, err := g.Q.GetSessionIdByMessage(ctx, msg.Chat.Id, msg.ReplyToMessage.MessageId)
@@ -353,12 +360,18 @@ func setReaction(bot *gotgbot.Bot, msg *gotgbot.Message, emoji string) {
 	}
 }
 
+var reMemManager = regexp.MustCompile(`(?m)^/mem(add|edit|del).*?$`)
+
 func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 	if !slices.Contains([]int64{-1001471592463, -1001282155019, -1001126241898,
 		-1001170816274, -1003612476571}, ctx.EffectiveChat.Id) {
 		return nil
 	}
 	msg := ctx.EffectiveMessage
+	topicId := int64(0)
+	if msg.IsTopicMessage {
+		topicId = msg.MessageThreadId
+	}
 	setReaction(bot, msg, "👀")
 	client, err := getGenAiClient()
 	if err != nil {
@@ -370,12 +383,22 @@ func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 	if session == nil {
 		return nil
 	}
+	if len(session.Memories) == 0 {
+		memories, err := g.Q.ListGeminiMemory(genCtx, msg.Chat.Id, topicId, 30)
+		if err != nil {
+			return err
+		}
+		session.Memories = memories
+	}
 	session.mu.Lock()
 	defer session.mu.Unlock()
 	sysPromptCtx := replacer.ReplaceCtx{
 		Bot: bot,
 		Msg: ctx.EffectiveMessage,
 		Now: time.Now(),
+	}
+	for _, mem := range session.Memories {
+		sysPromptCtx.Memories = append(sysPromptCtx.Memories, mem.Content)
 	}
 	sysPrompt := getSysPrompt(ctx.EffectiveChat.Id, ctx.EffectiveMessage.MessageThreadId).Replace(&sysPromptCtx)
 	config := &genai.GenerateContentConfig{
@@ -412,7 +435,39 @@ func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 	)
 	text := res.Text()
 	text = reLabelHeader.ReplaceAllString(text, "")
-
+	matches := reMemManager.FindAllString(text, -1)
+	for _, match := range matches {
+		if strings.HasPrefix(match, "/memadd ") {
+			match = strings.TrimPrefix(match, "/memadd ")
+			mem, err := g.Q.CreateGeminiMemory(genCtx, msg.Chat.Id, topicId, match)
+			if err != nil {
+				continue
+			}
+			session.Memories = append(session.Memories, mem)
+		} else if strings.HasPrefix(match, "/memedit ") {
+			fields := strings.SplitN(match, " ", 2)
+			if len(fields) <= 2 {
+				continue
+			}
+			id, err := strconv.ParseInt(fields[1], 10, 64)
+			if err != nil || int(id) > len(session.Memories) {
+				continue
+			}
+			session.Memories[id-1].Content = fields[2]
+		} else if strings.HasPrefix(match, "/memdel ") {
+			fields := strings.Fields(match)
+			if len(fields) <= 1 {
+				continue
+			}
+			for _, field := range fields[1:] {
+				id, err := strconv.ParseInt(field, 10, 64)
+				if err != nil || int(id) > len(session.Memories) {
+					continue
+				}
+				session.Memories[id-1].Content = "<deleted>"
+			}
+		}
+	}
 	if text == "" {
 		text = "模型没有返回任何信息"
 		if res.PromptFeedback != nil {
@@ -513,5 +568,24 @@ func GetGeminiSessionId(bot *gotgbot.Bot, ctx *ext.Context) error {
 	}]
 	geminiSessions.mu.Unlock()
 	_, err := ctx.EffectiveMessage.Reply(bot, fmt.Sprintf("Session ID: %d", sess.ID), nil)
+	return err
+}
+
+func GetMemories(bot *gotgbot.Bot, ctx *ext.Context) error {
+	msg := ctx.EffectiveMessage
+	topicId := int64(0)
+	if msg.IsTopicMessage {
+		topicId = msg.MessageThreadId
+	}
+	memories, err := g.Q.ListGeminiMemory(context.Background(), msg.Chat.Id, topicId, geminiMemoriesLimit)
+	if err != nil {
+		_, _ = msg.Reply(bot, err.Error(), nil)
+		return err
+	}
+	buf := bytes.NewBuffer(nil)
+	for i, m := range memories {
+		buf.WriteString(fmt.Sprintf("%d. %s\n", i, m.Content))
+	}
+	_, err = msg.Reply(bot, buf.String(), nil)
 	return err
 }
