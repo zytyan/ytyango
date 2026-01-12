@@ -274,9 +274,6 @@ func GeminiGetSession(ctx context.Context, msg *gotgbot.Message) *GeminiSession 
 		chatId:  msg.Chat.Id,
 		topicId: msg.MessageThreadId,
 	}
-	if sess, ok := geminiSessions.chatIdToSess[topic]; ok {
-		return sess
-	}
 	if msg.ReplyToMessage != nil {
 		sessionId, err := g.Q.GetSessionIdByMessage(ctx, msg.Chat.Id, msg.ReplyToMessage.MessageId)
 		if err == nil {
