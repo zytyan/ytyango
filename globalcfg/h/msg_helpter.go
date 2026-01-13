@@ -262,9 +262,9 @@ func WithChatAction(bot *gotgbot.Bot, action string, chatId, topicId int64, useT
 			select {
 			case <-ticker.C:
 				_, _ = bot.SendChatAction(chatId, action, opt)
-				ticker.Reset(time.Second * 3)
 			case <-ctx.Done():
 				ticker.Stop()
+				return
 			}
 		}
 	}()
