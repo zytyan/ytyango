@@ -1,4 +1,4 @@
-package replacer
+package genbot
 
 import (
 	"testing"

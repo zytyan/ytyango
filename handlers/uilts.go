@@ -103,13 +103,3 @@ func MakeAnswerCallback(bot *gotgbot.Bot, ctx *ext.Context) func(string, bool) {
 
 	}
 }
-
-func getChatName(chat *gotgbot.Chat) string {
-	if chat.Title != "" {
-		return chat.Title
-	}
-	if chat.LastName == "" {
-		return chat.FirstName
-	}
-	return chat.FirstName + " " + chat.LastName
-}

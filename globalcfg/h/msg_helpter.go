@@ -249,7 +249,7 @@ func sanitizeFileID(fileId string) string {
 	return b.String()
 }
 
-func WithChatAction(bot *gotgbot.Bot, action string, chatId, topicId int64, useTopic bool) func() {
+func WithChatAction(bot *gotgbot.Bot, action string, chatId, topicId int64, useTopic bool) context.CancelFunc {
 	ctx, cancel := context.WithCancel(context.Background())
 	ticker := time.NewTicker(time.Second * 3)
 	go func() {

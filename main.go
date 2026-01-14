@@ -4,6 +4,7 @@ import (
 	"context"
 	g "main/globalcfg"
 	hdrs "main/handlers"
+	"main/handlers/genbot"
 	"main/http/backend"
 	"net/http"
 	"os"
@@ -230,6 +231,8 @@ func main() {
 		},
 	},
 	)
+	genBotLogger := g.GetLogger("genbot", zap.InfoLevel)
+	genbot.Init(b, genBotLogger.Desugar())
 	hMsg := handlers.NewMessage(message.All, hdrs.SaveMessage)
 	hMsg.AllowChannel = true
 	hMsg.AllowEdited = true
@@ -262,12 +265,14 @@ func main() {
 	dp.Command("new_battle", hdrs.NewBattle)
 	dp.Command("webp2png", hdrs.WebpToPng)
 	dp.Command("chat_config", hdrs.ShowChatCfg)
-	dp.Command("sysprompt", hdrs.UpdateGeminiSysPrompt)
-	dp.Command("reset_sysprompt", hdrs.ResetGeminiSysPrompt)
-	dp.Command("get_sysprompt", hdrs.GetGeminiSysPrompt)
-	dp.Command("new_session", hdrs.NewGeminiSession)
-	dp.Command("session_id", hdrs.GetGeminiSessionId)
-	dp.Command("get_memories", hdrs.GetMemories)
+
+	dp.Command("sysprompt", genbot.UpdateGeminiSysPrompt)
+	dp.Command("reset_sysprompt", genbot.ResetGeminiSysPrompt)
+	dp.Command("get_sysprompt", genbot.GetGeminiSysPrompt)
+	dp.Command("new_session", genbot.NewGeminiSession)
+	dp.Command("session_id", genbot.GetGeminiSessionId)
+	dp.Command("get_memories", genbot.GetMemories)
+	dp.Command("session_help", genbot.SessionHelp)
 
 	dp.NewMessage(hdrs.BiliMsgFilter, hdrs.BiliMsgConverter)
 	dp.NewMessage(hdrs.DetectNsfwPhoto, hdrs.NsfwDetect)
@@ -279,7 +284,7 @@ func main() {
 	dp.NewMessage(hdrs.RequireNsfw, hdrs.SendRandRacy)
 	dp.NewMessage(hdrs.IsSacabam, hdrs.GenSacabam)
 	dp.NewMessage(hdrs.IsBattleCommand, hdrs.ExecuteBattleCommand)
-	dp.NewMessage(hdrs.IsGeminiReq, hdrs.GeminiReply)
+	dp.NewMessage(genbot.IsGeminiReq, genbot.GeminiReply)
 
 	dp.NewCallback(hdrs.IsStopBattle, hdrs.StopBattle)
 	dp.NewCallback(hdrs.IsNextRound, hdrs.NextRound)
