@@ -7,6 +7,7 @@ import (
 	g "main/globalcfg"
 	"main/globalcfg/h"
 	"main/helpers/mdnormalizer"
+	"math/rand/v2"
 	"regexp"
 	"slices"
 	"strings"
@@ -22,16 +23,16 @@ import (
 var mainBot *gotgbot.Bot
 var log *zap.Logger
 
-var getGenAiClient = sync.OnceValues(func() (*genai.Client, error) {
+var getGenAiClient = sync.OnceValue(func() *genai.Client {
 	ctx := context.Background()
 	client, err := genai.NewClient(ctx, &genai.ClientConfig{
 		APIKey:  g.GetConfig().GeminiKey,
 		Backend: genai.BackendGeminiAPI,
 	})
 	if err != nil {
-		return nil, err
+		panic(err)
 	}
-	return client, nil
+	return client
 })
 
 const (
@@ -102,11 +103,7 @@ func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 	}
 	msg := ctx.EffectiveMessage
 	topic := newTopic(msg)
-	client, err := getGenAiClient()
-	if err != nil {
-		return err
-	}
-	genCtx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
+	genCtx, cancel := context.WithTimeout(context.Background(), time.Minute*15)
 	defer cancel()
 	session := GeminiGetSession(genCtx, msg)
 	if session == nil {
@@ -151,7 +148,7 @@ func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 
 	actionCancel := h.WithChatAction(bot, "typing", msg.Chat.Id, msg.MessageThreadId, msg.IsTopicMessage)
 	defer actionCancel()
-	res, err := client.Models.GenerateContent(genCtx, geminiModel, session.ToGenaiContents(), config)
+	res, err := generate(genCtx, session, config)
 	actionCancel()
 	if err != nil {
 		setReaction(bot, msg, "😭")
@@ -165,7 +162,6 @@ func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 		session.ID,
 	)
 	text := res.Text()
-	text = reLabelHeader.ReplaceAllString(text, "")
 	if text == "" {
 		text = "模型没有返回任何信息"
 		if res.PromptFeedback != nil {
@@ -174,6 +170,7 @@ func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 		setReaction(bot, msg, "🤯")
 		session.DiscardTmpUpdates()
 	}
+	text = reLabelHeader.ReplaceAllString(text, "")
 	normTxt, err := mdnormalizer.Normalize(text)
 	var respMsg *gotgbot.Message
 	if err != nil {
@@ -195,7 +192,30 @@ func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 	}
 	return session.PersistTmpUpdates(genCtx)
 }
+func generate(ctx context.Context, session *GeminiSession, config *genai.GenerateContentConfig) (res *genai.GenerateContentResponse, err error) {
+	client := getGenAiClient()
+	base := 30.0
+	jitter := 0.1
+	multiplier := 2.0
+	maxDelay := 180.0
 
+	current := base * (rand.Float64()*jitter + 1)
+	wait := func() {
+		time.Sleep(time.Duration(current) * time.Second)
+		current = base * (rand.Float64()*jitter + multiplier)
+		if current > maxDelay {
+			current = maxDelay * (rand.Float64()*jitter + 1)
+		}
+	}
+	for range 5 {
+		res, err = client.Models.GenerateContent(ctx, geminiModel, session.ToGenaiContents(), config)
+		if err == nil && res.Text() != "" {
+			return res, nil
+		}
+		wait()
+	}
+	return
+}
 func Init(bot *gotgbot.Bot, logger *zap.Logger) {
 	mainBot = bot
 	log = logger
