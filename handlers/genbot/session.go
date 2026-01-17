@@ -166,6 +166,16 @@ func (s *GeminiSession) AddTgMessage(bot *gotgbot.Bot, msg *gotgbot.Message) (er
 			content.MimeType.Valid = true
 			content.MimeType.String = "video/mp4"
 		}
+	} else if msg.Animation != nil {
+		s.AllowCodeExecution = false
+		data, err = h.DownloadToMemoryCached(bot, msg.Animation.FileId)
+		if err != nil {
+			return err
+		}
+		content.Blob = data
+		content.MsgType = "video"
+		content.MimeType.Valid = true
+		content.MimeType.String = "video/mp4"
 	}
 	s.TmpContents = append(s.TmpContents, content)
 	return
