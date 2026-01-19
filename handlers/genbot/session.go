@@ -155,7 +155,7 @@ func (s *GeminiSession) AddTgMessage(bot *gotgbot.Bot, msg *gotgbot.Message) (er
 			content.MimeType.String = "image/webp"
 		}
 	} else if msg.Video != nil {
-		if msg.Video.Duration <= 120 && msg.Video.FileSize <= 10*1024*1024 {
+		if msg.Video.Duration <= 240 && msg.Video.FileSize <= 15*1024*1024 {
 			s.AllowCodeExecution = false
 			data, err = h.DownloadToMemoryCached(bot, msg.Video.FileId)
 			if err != nil {
@@ -165,6 +165,9 @@ func (s *GeminiSession) AddTgMessage(bot *gotgbot.Bot, msg *gotgbot.Message) (er
 			content.MsgType = "video"
 			content.MimeType.Valid = true
 			content.MimeType.String = "video/mp4"
+		} else {
+			content.Text.Valid = true
+			content.Text.String += "(用户发送了一个视频，但由于不满足 size<15MB且时长<=240s，无法上传)"
 		}
 	} else if msg.Animation != nil {
 		s.AllowCodeExecution = false
