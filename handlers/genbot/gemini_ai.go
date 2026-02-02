@@ -105,7 +105,15 @@ func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 	topic := newTopic(msg)
 	genCtx, cancel := context.WithTimeout(context.Background(), time.Minute*15)
 	defer cancel()
-	session := GeminiGetSession(genCtx, msg)
+	text := msg.GetText()
+	createNewSession := false
+	ignoreSessionTimeout := false
+	if strings.Contains(text, "@new") {
+		createNewSession = true
+	} else if strings.Contains(text, "@last") {
+		ignoreSessionTimeout = true
+	}
+	session := GeminiGetSession(genCtx, msg, createNewSession, ignoreSessionTimeout)
 	if session == nil {
 		return nil
 	}
@@ -161,20 +169,20 @@ func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 		int64(res.UsageMetadata.CandidatesTokenCount+res.UsageMetadata.ThoughtsTokenCount),
 		session.ID,
 	)
-	text := res.Text()
-	if text == "" {
-		text = "模型没有返回任何信息"
+	aiText := res.Text()
+	if aiText == "" {
+		aiText = "模型没有返回任何信息"
 		if res.PromptFeedback != nil {
-			text += "，原因: " + string(res.PromptFeedback.BlockReason) + res.PromptFeedback.BlockReasonMessage
+			aiText += "，原因: " + string(res.PromptFeedback.BlockReason) + res.PromptFeedback.BlockReasonMessage
 		}
 		setReaction(bot, msg, "🤯")
 		session.DiscardTmpUpdates()
 	}
-	text = reLabelHeader.ReplaceAllString(text, "")
-	normTxt, err := mdnormalizer.Normalize(text)
+	aiText = reLabelHeader.ReplaceAllString(aiText, "")
+	normTxt, err := mdnormalizer.Normalize(aiText)
 	var respMsg *gotgbot.Message
 	if err != nil {
-		respMsg, err = ctx.EffectiveMessage.Reply(bot, text, nil)
+		respMsg, err = ctx.EffectiveMessage.Reply(bot, aiText, nil)
 		log.Warn("parse markdown failed", zap.Error(err))
 	} else {
 		respMsg, err = ctx.EffectiveMessage.Reply(bot, normTxt.Text, &gotgbot.SendMessageOpts{Entities: normTxt.Entities})

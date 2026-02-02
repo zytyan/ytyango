@@ -88,6 +88,7 @@ func (m *Moderator) EvalFile(path string) (*ModeratorResult, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer file.Close()
 	req := m.reqWithAuth(http.MethodPost, "image/jpeg")
 	req.Body = file
 	resp, err := m.client.Do(req)

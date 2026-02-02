@@ -229,12 +229,12 @@ func (s *GeminiSession) DiscardTmpUpdates() {
 	s.TmpContents = nil
 }
 
-func GeminiGetSession(ctx context.Context, msg *gotgbot.Message) *GeminiSession {
+func GeminiGetSession(ctx context.Context, msg *gotgbot.Message, createNewSession bool, ignoreSessionTimeout bool) *GeminiSession {
 	geminiSessions.mu.Lock()
 	defer geminiSessions.mu.Unlock()
 	session := &GeminiSession{}
 	topic := newTopic(msg)
-	if msg.ReplyToMessage != nil {
+	if msg.ReplyToMessage != nil && !createNewSession {
 		sessionId, err := g.Q.GetSessionIdByMessage(ctx, msg.Chat.Id, msg.ReplyToMessage.MessageId)
 		if err == nil {
 			if sess, ok := geminiSessions.sidToSess[sessionId]; ok {
@@ -258,8 +258,8 @@ func GeminiGetSession(ctx context.Context, msg *gotgbot.Message) *GeminiSession 
 	}
 create:
 	sess, ok := geminiSessions.chatIdToSess[topic]
-	if ok {
-		if time.Since(sess.UpdateTime) < geminiInterval {
+	if ok && !createNewSession {
+		if ignoreSessionTimeout || time.Since(sess.UpdateTime) < geminiInterval {
 			return sess
 		}
 		delete(geminiSessions.sidToSess, sess.ID)
