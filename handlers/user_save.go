@@ -26,7 +26,7 @@ func botGetUserProfilePhotoFileId(bot *gotgbot.Bot, userId int64) (string, error
 	if len(photo.Photos) == 0 {
 		return "", nil
 	}
-	return photo.Photos[0][len(photo.Photos[0])-1].FileId, nil
+	return photo.Photos[len(photo.Photos)-1][len(photo.Photos[len(photo.Photos)-1])-1].FileId, nil
 }
 
 func UpdateUser(bot *gotgbot.Bot, ctx *ext.Context) error {
