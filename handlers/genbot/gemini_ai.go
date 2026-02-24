@@ -7,7 +7,6 @@ import (
 	g "main/globalcfg"
 	"main/globalcfg/h"
 	"main/helpers/mdnormalizer"
-	"math/rand/v2"
 	"regexp"
 	"slices"
 	"strings"
@@ -203,57 +202,7 @@ func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 
 func generate(ctx context.Context, session *GeminiSession, config *genai.GenerateContentConfig) (res *genai.GenerateContentResponse, err error) {
 	client := getGenAiClient()
-	base := 30.0
-	jitter := 0.1
-	multiplier := 2.0
-	maxDelay := 180.0
-	jit := func() float64 {
-		return 1.0 + (rand.Float64()*2-1)*jitter
-	}
-	// rand/v2 可安全使用全局rand
-	current := base
-	sleepCtx := func(seconds float64) {
-		d := time.Duration(seconds * float64(time.Second))
-		t := time.NewTimer(d)
-		defer t.Stop()
-		select {
-		case <-ctx.Done():
-			return
-		case <-t.C:
-			return
-		}
-	}
-	for i := range 5 {
-		wait := func() {
-			if i == 4 {
-				return
-			}
-			sleepCtx(current * jit())
-			current = current * multiplier
-			if current > maxDelay {
-				current = maxDelay
-			}
-		}
-		if ctx.Err() != nil {
-			err = ctx.Err()
-			break
-		}
-		res, err = client.Models.GenerateContent(ctx, geminiModel, session.ToGenaiContents(), config)
-		if err != nil {
-			wait()
-			continue
-		}
-		if res.PromptFeedback != nil {
-			return
-		}
-		if res.Text() == "" {
-			wait()
-			continue
-		}
-		return
-
-	}
-	return
+	return client.Models.GenerateContent(ctx, geminiModel, session.ToGenaiContents(), config)
 }
 
 func Init(bot *gotgbot.Bot, logger *zap.Logger) {
