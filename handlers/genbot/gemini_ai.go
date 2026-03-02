@@ -203,9 +203,9 @@ func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 
 func generate(ctx context.Context, session *GeminiSession, config *genai.GenerateContentConfig) (res *genai.GenerateContentResponse, err error) {
 	client := getGenAiClient()
-	base := 30.0
+	base := 3.0
 	jitter := 0.1
-	multiplier := 2.0
+	multiplier := 1.5
 	maxDelay := 180.0
 	jit := func() float64 {
 		return 1.0 + (rand.Float64()*2-1)*jitter
