@@ -8,6 +8,7 @@ import (
 	g "main/globalcfg"
 	"main/globalcfg/h"
 	"main/globalcfg/q"
+	"main/helpers/ent2md"
 	"strings"
 	"sync"
 	"time"
@@ -118,14 +119,11 @@ func (s *GeminiSession) AddTgMessage(bot *gotgbot.Bot, msg *gotgbot.Message) (er
 			content.QuotePart = sql.NullString{String: msg.Quote.Text, Valid: true}
 		}
 	}
-	if msg.Text != "" {
+	mdTxt := ent2md.TgMsgTextToMarkdown(msg)
+	if mdTxt != "" {
 		content.Text.Valid = true
-		content.Text.String = msg.Text
+		content.Text.String = mdTxt
 		content.MsgType = "text"
-	}
-	if msg.Caption != "" {
-		content.Text.Valid = true
-		content.Text.String = msg.Caption
 	}
 	var data []byte
 	if msg.Photo != nil {
