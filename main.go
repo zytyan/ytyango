@@ -273,7 +273,7 @@ func main() {
 	dp.Command("session_id", genbot.GetGeminiSessionId)
 	dp.Command("get_memories", genbot.GetMemories)
 	dp.Command("session_help", genbot.SessionHelp)
-
+	dp.Command("change_model", genbot.ChangeGeminiModel)
 	dp.NewMessage(hdrs.BiliMsgFilter, hdrs.BiliMsgConverter)
 	dp.NewMessage(hdrs.DetectNsfwPhoto, hdrs.NsfwDetect)
 	dp.NewMessage(hdrs.NeedSolve, hdrs.SolveMath)

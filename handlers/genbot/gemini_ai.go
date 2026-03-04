@@ -37,10 +37,11 @@ var getGenAiClient = sync.OnceValue(func() *genai.Client {
 
 const (
 	geminiSessionContentLimit = 150
-	geminiModel               = "gemini-3-flash-preview"
 	geminiInterval            = time.Second * 30
 	geminiMemoriesLimit       = 60
 )
+
+var geminiModel = "gemini-3-flash-preview"
 
 type geminiTopic struct {
 	chatId  int64
@@ -259,4 +260,17 @@ func generate(ctx context.Context, session *GeminiSession, config *genai.Generat
 func Init(bot *gotgbot.Bot, logger *zap.Logger) {
 	mainBot = bot
 	log = logger
+}
+
+func ChangeGeminiModel(bot *gotgbot.Bot, ctx *ext.Context) error {
+	const flashLite = "gemini-3.1-flash-lite-preview"
+	const flash = "gemini-3-flash-preview"
+	oldModel := geminiModel
+	if geminiModel == flashLite {
+		geminiModel = flash
+	} else {
+		geminiModel = flashLite
+	}
+	_, err := ctx.EffectiveMessage.Reply(bot, fmt.Sprintf("model: %s => %s", oldModel, geminiModel), nil)
+	return err
 }
