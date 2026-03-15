@@ -14,6 +14,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/knadh/koanf/parsers/yaml"
 	"github.com/knadh/koanf/providers/file"
@@ -181,6 +182,7 @@ func InitConfig() {
 			log.Printf("message database path cannot be changed without restart, old: %s, new: %s", oldCfg.MsgDbPath, cfg2.MsgDbPath)
 			return
 		}
+		log.Printf("config changed at %s", time.Now())
 	})
 	if err != nil {
 		panic(err)
