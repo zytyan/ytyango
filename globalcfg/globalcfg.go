@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"log/slog"
 	"main/globalcfg/msgs"
 	"main/globalcfg/q"
 	"main/helpers/azure"
@@ -20,7 +21,6 @@ import (
 	"github.com/knadh/koanf/providers/file"
 	"github.com/knadh/koanf/v2"
 	_ "github.com/mattn/go-sqlite3"
-	"go.uber.org/zap/zapcore"
 )
 
 type Azure struct {
@@ -202,7 +202,6 @@ func InitConfig() {
 		panic(err)
 	}
 	config.Store(cfg)
-	gWriteSyncer = initWriteSyncer()
 	db = getSqliteConn(config.Load().DatabasePath)
 	msgDb = getSqliteConn(config.Load().MsgDbPath)
 	if testing.Testing() {
@@ -210,11 +209,12 @@ func InitConfig() {
 		_ = msgDb.Close()
 		msgDb = db
 	}
-	Q, err = q.PrepareWithLogger(context.Background(), db, GetLogger("sql", zapcore.DebugLevel).Desugar())
+	Q, err = q.PrepareWithLogger(context.Background(), db, nil)
 	if err != nil {
 		panic(err)
 	}
-	Msgs, err = msgs.PrepareWithLogger(context.Background(), msgDb, GetLogger("sql", zapcore.DebugLevel).Desugar())
+	slog.Info("")
+	Msgs, err = msgs.PrepareWithLogger(context.Background(), msgDb, nil)
 	if err != nil {
 		panic(err)
 	}

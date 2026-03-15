@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"log/slog"
 	g "main/globalcfg"
 	hdrs "main/handlers"
 	"main/handlers/genbot"
@@ -11,6 +12,7 @@ import (
 	"os/signal"
 	"reflect"
 	"runtime"
+	"runtime/debug"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -23,22 +25,21 @@ import (
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers/filters/callbackquery"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers/filters/inlinequery"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers/filters/message"
-	"go.uber.org/zap"
 )
 
-var log = g.GetLogger("main", zap.InfoLevel)
+var log = g.GetLogger("main", slog.LevelInfo)
 var compileTime = "unknown"
 
 type GroupedDispatcher struct {
 	*ext.Dispatcher
 	autoInc int
-	logger  *zap.Logger
+	logger  *slog.Logger
 	mutex   sync.Mutex
 }
 
 type HookedHandler struct {
 	ext.Handler
-	logger      *zap.Logger
+	logger      *slog.Logger
 	hitCounter  atomic.Int64
 	funcName    string
 	checkerName string
@@ -50,12 +51,12 @@ func (h *HookedHandler) CheckUpdate(b *gotgbot.Bot, ctx *ext.Context) bool {
 	defer func() {
 		dur := time.Since(start)
 		h.logger.Debug("check update",
-			zap.Duration("elapsed", dur),
-			zap.String("name", h.Name()),
-			zap.String("func_name", h.funcName),
-			zap.String("check_name", h.checkerName),
-			zap.Int64("update_id", ctx.UpdateId),
-			zap.Bool("check", check))
+			"elapsed", dur,
+			"name", h.Name(),
+			"func_name", h.funcName,
+			"check_name", h.checkerName,
+			"update_id", ctx.UpdateId,
+			"check", check)
 	}()
 	check = h.Handler.CheckUpdate(b, ctx)
 	return check
@@ -66,13 +67,13 @@ func (h *HookedHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error {
 	newCnt := h.hitCounter.Add(1)
 	defer func() {
 		dur := time.Since(start)
-		h.logger.Info("handle update",
-			zap.Duration("elapsed", dur),
-			zap.String("func_name", h.funcName),
-			zap.String("check_name", h.checkerName),
-			zap.String("name", h.Name()),
-			zap.Int64("update_id", ctx.UpdateId),
-			zap.Int64("hit_count", newCnt))
+		h.logger.Debug("handle update",
+			"elapsed", dur,
+			"func_name", h.funcName,
+			"check_name", h.checkerName,
+			"name", h.Name(),
+			"update_id", ctx.UpdateId,
+			"hit_count", newCnt)
 	}()
 	return h.Handler.HandleUpdate(b, ctx)
 }
@@ -159,42 +160,42 @@ func newBot(token string) *gotgbot.Bot {
 	return bot
 }
 
-func zapLogFields(b *gotgbot.Bot, ctx *ext.Context) []zap.Field {
-	fields := make([]zap.Field, 0, 8)
+func slogLogFields(b *gotgbot.Bot, ctx *ext.Context) []any {
+	fields := make([]any, 0, 16)
 	fields = append(fields,
-		zap.Int64("update_id", ctx.UpdateId),
-		zap.Int64("bot_id", b.Id),
-		zap.String("bot_username", b.Username),
+		"update_id", ctx.UpdateId,
+		"bot_id", b.Id,
+		"bot_username", b.Username,
 	)
 	if ctx.EffectiveChat != nil {
-		fields = append(fields, zap.Int64("effective_chat_id", ctx.EffectiveChat.Id))
+		fields = append(fields, "effective_chat_id", ctx.EffectiveChat.Id)
 	}
 	if ctx.EffectiveUser != nil {
-		fields = append(fields, zap.Int64("effective_user_id", ctx.EffectiveUser.Id))
+		fields = append(fields, "effective_user_id", ctx.EffectiveUser.Id)
 	}
 	if ctx.EffectiveSender != nil {
-		fields = append(fields, zap.Int64("effective_sender_id", ctx.EffectiveSender.Id()))
+		fields = append(fields, "effective_sender_id", ctx.EffectiveSender.Id())
 	}
 	if ctx.EffectiveMessage != nil {
-		fields = append(fields, zap.Int64("effective_msg_id", ctx.EffectiveMessage.MessageId))
+		fields = append(fields, "effective_msg_id", ctx.EffectiveMessage.MessageId)
 	}
 	return fields
 }
 
 func main() {
-	log.Infof("compile time: %s", compileTime)
+	log.Info("compile time", "compile_time", compileTime)
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	defer func() {
 		if err := g.Q.FlushChatStats(context.Background()); err != nil {
-			log.Errorf("flush chat stats: %s", err)
+			log.Error("flush chat stats", "err", err)
 		}
 	}()
 	go func() {
 		<-ctx.Done()
-		log.Infof("save chat stats")
+		log.Info("save chat stats")
 		if err := g.Q.FlushChatStats(context.Background()); err != nil {
-			log.Errorf("flush chat stats: %s", err)
+			log.Error("flush chat stats", "err", err)
 		}
 		os.Exit(0)
 	}()
@@ -204,35 +205,34 @@ func main() {
 	hdrs.StartChatStatScheduler()
 	backend.GoListenAndServe("127.0.0.1:4021", b)
 	go hdrs.HttpListen4019()
-	dLog := log.Desugar()
 	dp := GroupedDispatcher{Dispatcher: ext.NewDispatcher(&ext.DispatcherOpts{
 		Error: func(b *gotgbot.Bot, ctx *ext.Context, err error) ext.DispatcherAction {
-			fields := zapLogFields(b, ctx)
-			fields = append(fields, zap.Error(err))
-			dLog.Warn("an error occurred while handling update", fields...)
+			fields := slogLogFields(b, ctx)
+			fields = append(fields, "err", err)
+			log.Warn("an error occurred while handling update", fields...)
 			return ext.DispatcherActionContinueGroups
 		},
 		Panic: func(b *gotgbot.Bot, ctx *ext.Context, r interface{}) {
-			fields := zapLogFields(b, ctx)
+			fields := slogLogFields(b, ctx)
 			fields = append(fields,
-				zap.Any("panic", r),
-				zap.Stack("stack"),
+				"panic", r,
+				"stack", string(debug.Stack()),
 			)
-			dLog.Error("recovered from panic, a panic occurred while handling update.", fields...)
+			log.Error("recovered from panic, a panic occurred while handling update.", fields...)
 		},
 		MaxRoutines: ext.DefaultMaxRoutines,
 	}),
 		autoInc: 0,
-		logger:  g.GetLogger("handler-midware", zap.WarnLevel).Desugar(),
+		logger:  g.GetLogger("handler-midware", slog.LevelWarn),
 		mutex:   sync.Mutex{}}
 	updater := ext.NewUpdater(dp.Dispatcher, &ext.UpdaterOpts{
 		UnhandledErrFunc: func(err error) {
-			log.Errorf("an error occurred while handling update: %s", err)
+			log.Error("an error occurred while handling update", "err", err)
 		},
 	},
 	)
-	genBotLogger := g.GetLogger("genbot", zap.InfoLevel)
-	genbot.Init(b, genBotLogger.Desugar())
+	genBotLogger := g.GetLogger("genbot", slog.LevelInfo)
+	genbot.Init(b, genBotLogger)
 	hMsg := handlers.NewMessage(message.All, hdrs.SaveMessage)
 	hMsg.AllowChannel = true
 	hMsg.AllowEdited = true
@@ -304,6 +304,6 @@ func main() {
 	if err != nil {
 		panic("failed to start polling: " + err.Error())
 	}
-	log.Infof("%s has been started...", b.Username)
+	log.Info("bot started", "username", b.Username)
 	updater.Idle()
 }

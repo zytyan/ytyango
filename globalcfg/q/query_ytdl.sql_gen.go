@@ -7,9 +7,6 @@ package q
 
 import (
 	"context"
-	"time"
-
-	"go.uber.org/zap"
 )
 
 const getYtDlpDbCache = `-- name: GetYtDlpDbCache :one
@@ -23,21 +20,6 @@ WHERE url = ?
 
 // encoding: utf-8
 func (q *Queries) GetYtDlpDbCache(ctx context.Context, url string, audioOnly bool, resolution int64) (YtDlResult, error) {
-	var logFields []zap.Field
-	var start time.Time
-	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 8)
-		start = time.Now()
-		if q.LogArgument {
-			logFields = append(logFields,
-				zap.Dict("fields",
-					zap.String("url", url),
-					zap.Bool("audio_only", audioOnly),
-					zap.Int64("resolution", resolution),
-				),
-			)
-		}
-	}
 	row := q.queryRow(ctx, q.getYtDlpDbCacheStmt, getYtDlpDbCache, url, audioOnly, resolution)
 	var i YtDlResult
 	err := row.Scan(
@@ -50,7 +32,6 @@ func (q *Queries) GetYtDlpDbCache(ctx context.Context, url string, audioOnly boo
 		&i.Uploader,
 		&i.UploadCount,
 	)
-	q.logQuery(getYtDlpDbCache, "GetYtDlpDbCache", logFields, err, start)
 	return i, err
 }
 
@@ -61,21 +42,7 @@ WHERE file_id = ?
 `
 
 func (q *Queries) IncYtDlUploadCount(ctx context.Context, fileID string) error {
-	var logFields []zap.Field
-	var start time.Time
-	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 8)
-		start = time.Now()
-		if q.LogArgument {
-			logFields = append(logFields,
-				zap.Dict("fields",
-					zap.String("file_id", fileID),
-				),
-			)
-		}
-	}
 	_, err := q.exec(ctx, q.incYtDlUploadCountStmt, incYtDlUploadCount, fileID)
-	q.logQuery(incYtDlUploadCount, "IncYtDlUploadCount", logFields, err, start)
 	return err
 }
 
@@ -101,25 +68,6 @@ type UpdateYtDlpCacheParams struct {
 }
 
 func (q *Queries) UpdateYtDlpCache(ctx context.Context, arg UpdateYtDlpCacheParams) error {
-	var logFields []zap.Field
-	var start time.Time
-	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 8)
-		start = time.Now()
-		if q.LogArgument {
-			logFields = append(logFields,
-				zap.Dict("fields",
-					zap.String("url", arg.Url),
-					zap.Bool("audio_only", arg.AudioOnly),
-					zap.Int64("resolution", arg.Resolution),
-					zap.String("file_id", arg.FileID),
-					zap.String("title", arg.Title),
-					zap.String("description", arg.Description),
-					zap.String("uploader", arg.Uploader),
-				),
-			)
-		}
-	}
 	_, err := q.exec(ctx, q.updateYtDlpCacheStmt, updateYtDlpCache,
 		arg.Url,
 		arg.AudioOnly,
@@ -129,6 +77,5 @@ func (q *Queries) UpdateYtDlpCache(ctx context.Context, arg UpdateYtDlpCachePara
 		arg.Description,
 		arg.Uploader,
 	)
-	q.logQuery(updateYtDlpCache, "UpdateYtDlpCache", logFields, err, start)
 	return err
 }

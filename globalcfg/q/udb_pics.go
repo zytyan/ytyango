@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/mattn/go-sqlite3"
-	"go.uber.org/zap"
 )
 
 var psMu sync.RWMutex
@@ -34,10 +33,7 @@ func (q *Queries) BuildCountByRatePrefixSum() error {
 	buildPrefixSumFromSparse(counts)
 	go func() {
 		for range time.Tick(6 * time.Hour) {
-			err := q.BuildCountByRatePrefixSum()
-			if err != nil {
-				q.logger.Warn("rebuild BuildCountByRatePrefixSum failed", zap.Error(err))
-			}
+			_ = q.BuildCountByRatePrefixSum()
 		}
 	}()
 	return nil

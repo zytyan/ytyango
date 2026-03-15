@@ -101,7 +101,7 @@ func SetDndAttr(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
 		buf.WriteString(fmt.Sprintf("%s : %s -> %s\n", name, oldVal, val))
 		err = g.Q.SetCocCharAttr(context.Background(), userId, name, val)
 		if err != nil {
-			log.Errorf("SetCocCharAttr err: %v", err)
+			log.Error("set coc char attr error", "err", err)
 		}
 	}
 	if !modified {
@@ -135,7 +135,7 @@ func ListDndAttr(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
 		text = strings.TrimSpace(text)
 		re, _ = regexp.Compile(text)
 	}
-	log.Infof("text: %s", text)
+	log.Info("list dnd attr", "text", text)
 	userId, name := getAttrTarget(ctx)
 	attrs, err := g.Q.GetCocCharAllAttr(context.Background(), userId)
 	if err != nil {
@@ -164,7 +164,7 @@ func DelDndAttr(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
 	for _, line := range lines[1:] {
 		err = g.Q.DelCocCharAttr(context.Background(), ctx.EffectiveSender.Id(), line)
 		if err != nil {
-			log.Errorf("DelCocCharAttr err: %v", err)
+			log.Error("del coc char attr error", "err", err)
 		}
 	}
 	_, err = ctx.EffectiveMessage.Reply(bot, "删除成功", nil)
@@ -182,7 +182,7 @@ func DndDice(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
 	if matches[9] != "" {
 		ability, err = getAbility(matches[9], ctx.EffectiveSender.Id())
 		if err != nil {
-			log.Infof("get ability error: %s", err)
+			log.Info("get ability error", "err", err)
 			return nil
 		}
 	}
@@ -233,7 +233,7 @@ var battleGroupIdToUuid = make(map[int64]string)
 
 func NewBattle(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
 	gid := ctx.EffectiveChat.Id
-	log.Infof("battle gid: %d", gid)
+	log.Info("battle gid", "gid", gid)
 	if _, ok := battleGroupIdToUuid[gid]; ok {
 		_, err = ctx.EffectiveMessage.Reply(bot, "已经有一个战斗在进行中", nil)
 		return err
@@ -302,7 +302,7 @@ func IsBattleCommand(msg *gotgbot.Message) bool {
 	if !strings.HasPrefix(replyToMsg.ReplyMarkup.InlineKeyboard[0][0].CallbackData, "battle:") {
 		return false
 	}
-	log.Infof("battle command: %s", msg.Text)
+	log.Info("battle command", "text", msg.Text)
 	return reBattleCmd.MatchString(msg.Text)
 }
 
@@ -316,7 +316,7 @@ func ExecuteBattleCommand(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
 	textList := strings.Split(ctx.EffectiveMessage.Text, "\n")
 	errList := make([]string, 0)
 	for _, text := range textList {
-		log.Infof("battle command: %s", text)
+		log.Info("battle command", "text", text)
 		err = battle.ParseCommand(text)
 		if err != nil {
 			errList = append(errList, err.Error())

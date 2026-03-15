@@ -3,10 +3,9 @@ package q
 import (
 	"database/sql/driver"
 	"fmt"
+	"log/slog"
 	"strconv"
 	"time"
-
-	"go.uber.org/zap"
 )
 
 type UnixTime struct {
@@ -56,6 +55,6 @@ func (u UnixTime) Value() (driver.Value, error) {
 	return u.Unix(), nil
 }
 
-func (u UnixTime) ZapObject(name string) zap.Field {
-	return zap.Time(name, u.Time)
+func (u UnixTime) LogValue() slog.Value {
+	return slog.TimeValue(u.Time)
 }

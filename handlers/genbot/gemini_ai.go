@@ -4,6 +4,7 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
+	"log/slog"
 	g "main/globalcfg"
 	"main/globalcfg/h"
 	"main/helpers/mdnormalizer"
@@ -16,12 +17,11 @@ import (
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
-	"go.uber.org/zap"
 	"google.golang.org/genai"
 )
 
 var mainBot *gotgbot.Bot
-var log *zap.Logger
+var log *slog.Logger
 var client = g.NewPtrLinkedCfg(
 	func(old, new *g.Config) bool {
 		return old.GeminiKey != new.GeminiKey
@@ -191,15 +191,13 @@ func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 	var respMsg *gotgbot.Message
 	if err != nil {
 		respMsg, err = ctx.EffectiveMessage.Reply(bot, aiText, nil)
-		log.Warn("parse markdown failed", zap.Error(err))
+		log.Warn("parse markdown failed", "err", err)
 	} else {
 		respMsg, err = ctx.EffectiveMessage.Reply(bot, normTxt.Text, &gotgbot.SendMessageOpts{Entities: normTxt.Entities})
 	}
 	if err != nil {
 		j, _ := res.MarshalJSON()
-		log.Warn("gemini response",
-			zap.ByteString("resp", j),
-			zap.Error(err))
+		log.Warn("gemini response", "resp", string(j), "err", err)
 		return err
 	}
 	err = session.AddTgMessage(bot, respMsg)
@@ -264,7 +262,7 @@ func generate(ctx context.Context, session *GeminiSession, config *genai.Generat
 	return
 }
 
-func Init(bot *gotgbot.Bot, logger *zap.Logger) {
+func Init(bot *gotgbot.Bot, logger *slog.Logger) {
 	mainBot = bot
 	log = logger
 }

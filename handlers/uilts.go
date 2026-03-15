@@ -46,7 +46,7 @@ func MakeDebounceReply(bot *gotgbot.Bot, ctx *ext.Context, interval time.Duratio
 					timer.Stop()
 				}
 				timer = nil
-				log.Infof("debounce reply %s", s)
+				log.Info("debounce reply", "text", s)
 				if sent == nil {
 					sent, err = ctx.EffectiveMessage.Reply(bot, s, nil)
 				} else {
@@ -88,17 +88,17 @@ func MakeAnswerCallback(bot *gotgbot.Bot, ctx *ext.Context) func(string, bool) {
 		l.Lock()
 		defer l.Unlock()
 		if answerRan {
-			log.Warnf("answer %s[%s] callback ran twice", ctx.CallbackQuery.Id, ctx.CallbackQuery.Data)
+			log.Warn("answer callback ran twice", "callback_id", ctx.CallbackQuery.Id, "callback_data", ctx.CallbackQuery.Data)
 			return
 		}
 		answerRan = true
-		log.Infof("answer %s[%s] callback %s", ctx.CallbackQuery.Id, ctx.CallbackQuery.Data, text)
+		log.Info("answer callback", "callback_id", ctx.CallbackQuery.Id, "callback_data", ctx.CallbackQuery.Data, "text", text)
 		_, err := ctx.CallbackQuery.Answer(bot, &gotgbot.AnswerCallbackQueryOpts{
 			Text:      text,
 			ShowAlert: alert,
 		})
 		if err != nil {
-			log.Error(err)
+			log.Error("answer callback failed", "err", err)
 		}
 
 	}

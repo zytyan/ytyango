@@ -5,11 +5,11 @@ import (
 	"errors"
 	g "main/globalcfg"
 	"main/globalcfg/msgs"
+	"runtime/debug"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 	"github.com/google/uuid"
-	"go.uber.org/zap"
 )
 
 type MeiliMsg struct {
@@ -24,17 +24,15 @@ type MeiliMsg struct {
 }
 
 func saveMessage(bot *gotgbot.Bot, ctx *ext.Context) {
-	updateId := zap.Int64("update_id", ctx.UpdateId)
+	updateFields := []any{"update_id", ctx.UpdateId}
 	defer func() {
 		if r := recover(); r != nil {
-			logD.Error("save message panic",
-				zap.Any("panic", r),
-				zap.Stack("stack"),
-				updateId)
+			fields := append(updateFields, "panic", r, "stack", string(debug.Stack()))
+			logD.Error("save message panic", fields...)
 		}
 	}()
 	if err := UpdateUser(bot, ctx); err != nil {
-		logD.Warn("save user error", zap.Error(err), updateId)
+		logD.Warn("save user error", append(updateFields, "err", err)...)
 	}
 	msg := ctx.EffectiveMessage
 	if msg == nil {
@@ -42,11 +40,11 @@ func saveMessage(bot *gotgbot.Bot, ctx *ext.Context) {
 	}
 	if shouldPersistMessages(ctx) {
 		if err := persistSavedMessage(ctx, msg); err != nil {
-			logD.Warn("persist saved message", zap.Error(err), updateId)
+			logD.Warn("persist saved message", append(updateFields, "err", err)...)
 		}
 	}
 	if err := saveMessageToMeilisearch(bot, msg); err != nil {
-		logD.Error("save message error", zap.Error(err), updateId)
+		logD.Error("save message error", append(updateFields, "err", err)...)
 	}
 }
 
@@ -84,15 +82,15 @@ func saveMessageToMeilisearch(bot *gotgbot.Bot, msg *gotgbot.Message) (err error
 		QrResult:  "",
 	}
 	logger := logD.With(
-		zap.Int64("message_id", msg.MessageId),
-		zap.Int64("chat_id", msg.GetChat().Id),
-		zap.String("mongo_id", mongoId),
+		"message_id", msg.MessageId,
+		"chat_id", msg.GetChat().Id,
+		"mongo_id", mongoId,
 	)
 
 	if chatCfg(msg.GetChat().Id).AutoOcr {
 		err = setImageText(bot, msg, meiliMsg)
 		if err != nil {
-			logger.Warn("set image text", zap.Error(err))
+			logger.Warn("set image text", "err", err)
 		}
 	}
 	if meiliMsg.Message == "" && meiliMsg.ImageText == "" && meiliMsg.QrResult == "" {
@@ -101,12 +99,12 @@ func saveMessageToMeilisearch(bot *gotgbot.Bot, msg *gotgbot.Message) (err error
 	}
 	err = g.Meili().AddDocument(meiliMsg)
 	if err != nil {
-		logger.Warn("save message to meilisearch", zap.Error(err))
+		logger.Warn("save message to meilisearch", "err", err)
 	}
 	chat := msg.GetChat()
 	err = g.Q.UpdateChatAttr(context.Background(), &chat)
 	if err != nil {
-		logD.Warn("update chat error", zap.Error(err))
+		logD.Warn("update chat error", "err", err)
 	}
 	return err
 }
@@ -149,6 +147,6 @@ func persistRawUpdate(ctx *ext.Context, mdb *msgs.Queries) {
 		return
 	}
 	if err := mdb.SaveRawUpdate(ctx); err != nil {
-		logD.Warn("save raw update failed", zap.Error(err))
+		logD.Warn("save raw update failed", "err", err)
 	}
 }

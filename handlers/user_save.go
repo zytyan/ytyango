@@ -38,19 +38,19 @@ func UpdateUser(bot *gotgbot.Bot, ctx *ext.Context) error {
 		return err
 	}
 	if err = user.TryUpdate(g.Q, ctx.EffectiveUser); err != nil {
-		log.Warnf("update user name failed: %v", err)
+		log.Warn("update user name failed", "err", err)
 	}
 	if !profileNeedUpdate(user) {
 		return nil
 	}
 	photo, err := botGetUserProfilePhotoFileId(bot, user.UserID)
 	if err != nil {
-		log.Warnf("get user profile photo failed: %v", err)
+		log.Warn("get user profile photo failed", "err", err)
 		return nil
 	}
 	err = g.Q.UpdateUserProfilePhoto(context.Background(), user.UserID, photo)
 	if err != nil {
-		log.Warnf("update profile photo failed: %v", err)
+		log.Warn("update profile photo failed", "err", err)
 		return nil
 	}
 	user.ProfileUpdateAt = q.UnixTime{Time: time.Now()}

@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
+	"log/slog"
 	g "main/globalcfg"
 	"net/http"
 	"net/http/httptest"
@@ -14,14 +15,12 @@ import (
 	"time"
 
 	"github.com/klauspost/compress/zstd"
-	"go.uber.org/zap"
 )
 
 func newTestServer() *httptest.Server {
-	logger := g.GetLogger("inner-http-test", zap.InfoLevel)
-	logger.Info("???????")
-
-	return httptest.NewServer(buildHandler(logger.Desugar()))
+	logger := g.GetLogger("inner-http-test", slog.LevelInfo)
+	logger.Info("inner http test server start")
+	return httptest.NewServer(buildHandler(logger))
 }
 
 func tarZstdEntries(t *testing.T, data []byte) map[string][]byte {

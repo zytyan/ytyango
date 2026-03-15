@@ -21,7 +21,6 @@ import (
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
-	"go.uber.org/zap"
 	"golang.org/x/sync/singleflight"
 )
 
@@ -102,7 +101,7 @@ func (d *dlKey) downloadToFile() (*DlResult, error) {
 		result.cleanup = func() {
 			err1 := req.Clean()
 			if err1 != nil {
-				logD.Warn("cleanup function error", zap.Error(err1))
+				logD.Warn("cleanup function error", "err", err1)
 			}
 		}
 		return result, nil
@@ -116,7 +115,7 @@ func (d *dlKey) downloadToFile() (*DlResult, error) {
 func (d *dlKey) findInDb() *DlResult {
 	result, err := g.Q.GetYtDlpDbCache(context.Background(), d.Url, d.AudioOnly, d.Resolution)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		log.Warnf("query database %s err %v", d.Url, err)
+		log.Warn("query database error", "url", d.Url, "err", err)
 	}
 	if err != nil {
 		return nil
@@ -279,11 +278,11 @@ func downloadMedia(bot *gotgbot.Bot, key *dlKey, user *gotgbot.User, msgId, chat
 			}
 		}
 		if err != nil {
-			log.Warnf("download send media error: %v", err)
+			log.Warn("download send media error", "err", err)
 			return
 		}
 		if saveErr := result.Save(context.Background(), g.Q); saveErr != nil {
-			log.Warnf("save download result to database error: %v", saveErr)
+			log.Warn("save download result to database error", "err", saveErr)
 		}
 	})
 	if err != nil {

@@ -8,7 +8,6 @@ import (
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
-	"go.uber.org/zap"
 )
 
 const defaultDBTimeout = 2 * time.Second
@@ -30,8 +29,7 @@ func marshalJSON(v any) ([]byte, error) {
 
 func (q *Queries) marshalWithWarn(v any, field string) []byte {
 	js, err := marshalJSON(v)
-	if err != nil && q.logger != nil {
-		q.logger.Warn("marshal json failed", zap.String("field", field), zap.Error(err))
+	if err != nil {
 		return nil
 	}
 	return js

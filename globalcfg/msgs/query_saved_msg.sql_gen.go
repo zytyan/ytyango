@@ -8,9 +8,6 @@ package msgs
 import (
 	"context"
 	"database/sql"
-	"time"
-
-	"go.uber.org/zap"
 )
 
 const getSavedMessageById = `-- name: GetSavedMessageById :one
@@ -40,20 +37,6 @@ WHERE chat_id = ?
 `
 
 func (q *Queries) GetSavedMessageById(ctx context.Context, chatID int64, messageID int64) (SavedMsg, error) {
-	var logFields []zap.Field
-	var start time.Time
-	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 8)
-		start = time.Now()
-		if q.LogArgument {
-			logFields = append(logFields,
-				zap.Dict("fields",
-					zap.Int64("chat_id", chatID),
-					zap.Int64("message_id", messageID),
-				),
-			)
-		}
-	}
 	row := q.queryRow(ctx, q.getSavedMessageByIdStmt, getSavedMessageById, chatID, messageID)
 	var i SavedMsg
 	err := row.Scan(
@@ -78,7 +61,6 @@ func (q *Queries) GetSavedMessageById(ctx context.Context, chatID int64, message
 		&i.ExtraData,
 		&i.ExtraType,
 	)
-	q.logQuery(getSavedMessageById, "GetSavedMessageById", logFields, err, start)
 	return i, err
 }
 
@@ -88,23 +70,7 @@ VALUES (?, ?, ?)
 `
 
 func (q *Queries) InsertRawUpdate(ctx context.Context, chatID sql.NullInt64, messageID sql.NullInt64, rawUpdate []byte) error {
-	var logFields []zap.Field
-	var start time.Time
-	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 8)
-		start = time.Now()
-		if q.LogArgument {
-			logFields = append(logFields,
-				zap.Dict("fields",
-					zapNullInt64("chat_id", chatID),
-					zapNullInt64("message_id", messageID),
-					zap.ByteString("raw_update", rawUpdate),
-				),
-			)
-		}
-	}
 	_, err := q.exec(ctx, q.insertRawUpdateStmt, insertRawUpdate, chatID, messageID, rawUpdate)
-	q.logQuery(insertRawUpdate, "InsertRawUpdate", logFields, err, start)
 	return err
 }
 
@@ -145,38 +111,6 @@ type InsertSavedMessageParams struct {
 
 // encoding: utf-8
 func (q *Queries) InsertSavedMessage(ctx context.Context, arg InsertSavedMessageParams) error {
-	var logFields []zap.Field
-	var start time.Time
-	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 8)
-		start = time.Now()
-		if q.LogArgument {
-			logFields = append(logFields,
-				zap.Dict("fields",
-					zap.Int64("message_id", arg.MessageID),
-					zap.Int64("chat_id", arg.ChatID),
-					zapNullInt64("from_user_id", arg.FromUserID),
-					zapNullInt64("sender_chat_id", arg.SenderChatID),
-					arg.Date.ZapObject("date"),
-					zapNullString("forward_origin_name", arg.ForwardOriginName),
-					zapNullInt64("forward_origin_id", arg.ForwardOriginID),
-					zapNullInt64("message_thread_id", arg.MessageThreadID),
-					zapNullInt64("reply_to_message_id", arg.ReplyToMessageID),
-					zapNullInt64("reply_to_chat_id", arg.ReplyToChatID),
-					zapNullInt64("via_bot_id", arg.ViaBotID),
-					zapNullOf("edit_date", arg.EditDate),
-					zapNullString("media_group_id", arg.MediaGroupID),
-					zapNullString("text", arg.Text),
-					zap.ByteString("entities_json", arg.EntitiesJson),
-					zapNullString("media_id", arg.MediaID),
-					zapNullString("media_uid", arg.MediaUid),
-					zapNullString("media_type", arg.MediaType),
-					zap.ByteString("extra_data", arg.ExtraData),
-					zapNullString("extra_type", arg.ExtraType),
-				),
-			)
-		}
-	}
 	_, err := q.exec(ctx, q.insertSavedMessageStmt, insertSavedMessage,
 		arg.MessageID,
 		arg.ChatID,
@@ -199,7 +133,6 @@ func (q *Queries) InsertSavedMessage(ctx context.Context, arg InsertSavedMessage
 		arg.ExtraData,
 		arg.ExtraType,
 	)
-	q.logQuery(insertSavedMessage, "InsertSavedMessage", logFields, err, start)
 	return err
 }
 
@@ -215,24 +148,7 @@ ORDER BY edit_id
 `
 
 func (q *Queries) ListEditHistoryByMessage(ctx context.Context, chatID int64, messageID int64) ([]EditHistory, error) {
-	var logFields []zap.Field
-	var start time.Time
-	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 8)
-		start = time.Now()
-		if q.LogArgument {
-			logFields = append(logFields,
-				zap.Dict("fields",
-					zap.Int64("chat_id", chatID),
-					zap.Int64("message_id", messageID),
-				),
-			)
-		}
-	}
 	rows, err := q.query(ctx, q.listEditHistoryByMessageStmt, listEditHistoryByMessage, chatID, messageID)
-	defer func() {
-		q.logQuery(listEditHistoryByMessage, "ListEditHistoryByMessage", logFields, err, start)
-	}()
 	if err != nil {
 		return nil, err
 	}
@@ -240,7 +156,7 @@ func (q *Queries) ListEditHistoryByMessage(ctx context.Context, chatID int64, me
 	var items []EditHistory
 	for rows.Next() {
 		var i EditHistory
-		if err = rows.Scan(
+		if err := rows.Scan(
 			&i.ChatID,
 			&i.MessageID,
 			&i.EditID,
@@ -250,10 +166,10 @@ func (q *Queries) ListEditHistoryByMessage(ctx context.Context, chatID int64, me
 		}
 		items = append(items, i)
 	}
-	if err = rows.Close(); err != nil {
+	if err := rows.Close(); err != nil {
 		return nil, err
 	}
-	if err = rows.Err(); err != nil {
+	if err := rows.Err(); err != nil {
 		return nil, err
 	}
 	return items, nil
@@ -277,23 +193,6 @@ type UpdateMessageTextParams struct {
 }
 
 func (q *Queries) UpdateMessageText(ctx context.Context, arg UpdateMessageTextParams) error {
-	var logFields []zap.Field
-	var start time.Time
-	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 8)
-		start = time.Now()
-		if q.LogArgument {
-			logFields = append(logFields,
-				zap.Dict("fields",
-					zapNullString("text", arg.Text),
-					zap.ByteString("entities_json", arg.EntitiesJson),
-					zapNullOf("edit_date", arg.EditDate),
-					zap.Int64("chat_id", arg.ChatID),
-					zap.Int64("message_id", arg.MessageID),
-				),
-			)
-		}
-	}
 	_, err := q.exec(ctx, q.updateMessageTextStmt, updateMessageText,
 		arg.Text,
 		arg.EntitiesJson,
@@ -301,6 +200,5 @@ func (q *Queries) UpdateMessageText(ctx context.Context, arg UpdateMessageTextPa
 		arg.ChatID,
 		arg.MessageID,
 	)
-	q.logQuery(updateMessageText, "UpdateMessageText", logFields, err, start)
 	return err
 }

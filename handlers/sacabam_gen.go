@@ -24,7 +24,7 @@ func GenSacabam(bot *gotgbot.Bot, ctx *ext.Context) error {
 			_, err = ctx.EffectiveMessage.Reply(bot, text, nil)
 			return err
 		}
-		log.Warnf("genSacabam err: %v", err)
+		log.Warn("genSacabam err", "err", err)
 		return err
 	}
 	buf := &bytes.Buffer{}

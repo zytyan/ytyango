@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
-	"go.uber.org/zap"
 	"golang.org/x/time/rate"
 )
 
@@ -22,7 +21,7 @@ var ocrCache = lrusf.NewStringKeyCache[*azure.OcrResult](500, nil)
 var ocrRateLimiter = rate.NewLimiter(5, 1)
 
 func ocrMsg(bot *gotgbot.Bot, file *gotgbot.PhotoSize) (string, error) {
-	logger := logD.With(zap.String("file_id", file.FileId))
+	logger := logD.With("file_id", file.FileId)
 	res, err := ocrCache.Get(file.FileId, func() (*azure.OcrResult, error) {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 		defer cancel()
@@ -37,7 +36,7 @@ func ocrMsg(bot *gotgbot.Bot, file *gotgbot.PhotoSize) (string, error) {
 		return g.Ocr().OcrData(data)
 	})
 	if err != nil {
-		logger.Warn("ocr file error", zap.Error(err))
+		logger.Warn("ocr file error", "err", err)
 		return "", err
 	}
 	return res.Text(), nil
@@ -47,7 +46,7 @@ var moderatorMsgCache = lrusf.NewStringKeyCache[*azure.ModeratorV2Result](500, n
 var moderatorRateLimiter = rate.NewLimiter(5, 1)
 
 func moderatorMsg(bot *gotgbot.Bot, file *gotgbot.PhotoSize) (*azure.ModeratorV2Result, error) {
-	logger := logD.With(zap.String("file_id", file.FileId))
+	logger := logD.With("file_id", file.FileId)
 	result, err := moderatorMsgCache.Get(file.FileId, func() (*azure.ModeratorV2Result, error) {
 		data, err := h.DownloadToMemoryCached(bot, file.FileId)
 		if err != nil {
@@ -69,7 +68,7 @@ func moderatorMsg(bot *gotgbot.Bot, file *gotgbot.PhotoSize) (*azure.ModeratorV2
 		return g.Moderator().EvalData(data)
 	})
 	if err != nil {
-		logger.Warn("moderator file error", zap.Error(err))
+		logger.Warn("moderator file error", "err", err)
 	}
 	return result, err
 }

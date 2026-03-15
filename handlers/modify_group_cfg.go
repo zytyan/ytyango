@@ -156,7 +156,7 @@ func ModifyGroupConfigByButton(bot *gotgbot.Bot, ctx *ext.Context) error {
 		return err
 	}
 	if err = cfg.Save(context.Background(), g.Q); err != nil {
-		log.Warnf("update chat cfg failed: %v", err)
+		log.Warn("update chat cfg failed", "err", err)
 	}
 	_, _, err = ctx.EffectiveMessage.EditReplyMarkup(bot, &gotgbot.EditMessageReplyMarkupOpts{
 		ReplyMarkup: generateGroupModifyReplyMarkup(cfg),

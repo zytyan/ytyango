@@ -8,9 +8,6 @@ package q
 import (
 	"context"
 	"database/sql"
-	"time"
-
-	"go.uber.org/zap"
 )
 
 const addGeminiMessage = `-- name: AddGeminiMessage :exec
@@ -47,31 +44,6 @@ type AddGeminiMessageParams struct {
 }
 
 func (q *Queries) AddGeminiMessage(ctx context.Context, arg AddGeminiMessageParams) error {
-	var logFields []zap.Field
-	var start time.Time
-	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 8)
-		start = time.Now()
-		if q.LogArgument {
-			logFields = append(logFields,
-				zap.Dict("fields",
-					zap.Int64("session_id", arg.SessionID),
-					zap.Int64("chat_id", arg.ChatID),
-					zap.Int64("msg_id", arg.MsgID),
-					zap.String("role", arg.Role),
-					arg.SentTime.ZapObject("sent_time"),
-					zap.String("username", arg.Username),
-					zap.String("msg_type", arg.MsgType),
-					zapNullInt64("reply_to_msg_id", arg.ReplyToMsgID),
-					zapNullString("text", arg.Text),
-					zap.ByteString("blob", arg.Blob),
-					zapNullString("mime_type", arg.MimeType),
-					zapNullString("quote_part", arg.QuotePart),
-					zapNullString("thought_signature", arg.ThoughtSignature),
-				),
-			)
-		}
-	}
 	_, err := q.exec(ctx, q.addGeminiMessageStmt, addGeminiMessage,
 		arg.SessionID,
 		arg.ChatID,
@@ -87,7 +59,6 @@ func (q *Queries) AddGeminiMessage(ctx context.Context, arg AddGeminiMessagePara
 		arg.QuotePart,
 		arg.ThoughtSignature,
 	)
-	q.logQuery(addGeminiMessage, "AddGeminiMessage", logFields, err, start)
 	return err
 }
 
@@ -98,21 +69,6 @@ RETURNING id, chat_id, topic_id, content
 `
 
 func (q *Queries) CreateGeminiMemory(ctx context.Context, chatID int64, topicID int64, content string) (GeminiMemory, error) {
-	var logFields []zap.Field
-	var start time.Time
-	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 8)
-		start = time.Now()
-		if q.LogArgument {
-			logFields = append(logFields,
-				zap.Dict("fields",
-					zap.Int64("chat_id", chatID),
-					zap.Int64("topic_id", topicID),
-					zap.String("content", content),
-				),
-			)
-		}
-	}
 	row := q.queryRow(ctx, q.createGeminiMemoryStmt, createGeminiMemory, chatID, topicID, content)
 	var i GeminiMemory
 	err := row.Scan(
@@ -121,7 +77,6 @@ func (q *Queries) CreateGeminiMemory(ctx context.Context, chatID int64, topicID 
 		&i.TopicID,
 		&i.Content,
 	)
-	q.logQuery(createGeminiMemory, "CreateGeminiMemory", logFields, err, start)
 	return i, err
 }
 
@@ -134,21 +89,6 @@ RETURNING id, chat_id, chat_name, chat_type, frozen, total_input_tokens, total_o
 
 // encoding: utf-8
 func (q *Queries) CreateNewGeminiSession(ctx context.Context, chatID int64, chatName string, chatType string) (GeminiSession, error) {
-	var logFields []zap.Field
-	var start time.Time
-	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 8)
-		start = time.Now()
-		if q.LogArgument {
-			logFields = append(logFields,
-				zap.Dict("fields",
-					zap.Int64("chat_id", chatID),
-					zap.String("chat_name", chatName),
-					zap.String("chat_type", chatType),
-				),
-			)
-		}
-	}
 	row := q.queryRow(ctx, q.createNewGeminiSessionStmt, createNewGeminiSession, chatID, chatName, chatType)
 	var i GeminiSession
 	err := row.Scan(
@@ -160,7 +100,6 @@ func (q *Queries) CreateNewGeminiSession(ctx context.Context, chatID int64, chat
 		&i.TotalInputTokens,
 		&i.TotalOutputTokens,
 	)
-	q.logQuery(createNewGeminiSession, "CreateNewGeminiSession", logFields, err, start)
 	return i, err
 }
 
@@ -171,23 +110,7 @@ ON CONFLICT DO UPDATE SET prompt=excluded.prompt
 `
 
 func (q *Queries) CreateOrUpdateGeminiSystemPrompt(ctx context.Context, chatID int64, threadID int64, prompt string) error {
-	var logFields []zap.Field
-	var start time.Time
-	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 8)
-		start = time.Now()
-		if q.LogArgument {
-			logFields = append(logFields,
-				zap.Dict("fields",
-					zap.Int64("chat_id", chatID),
-					zap.Int64("thread_id", threadID),
-					zap.String("prompt", prompt),
-				),
-			)
-		}
-	}
 	_, err := q.exec(ctx, q.createOrUpdateGeminiSystemPromptStmt, createOrUpdateGeminiSystemPrompt, chatID, threadID, prompt)
-	q.logQuery(createOrUpdateGeminiSystemPrompt, "CreateOrUpdateGeminiSystemPrompt", logFields, err, start)
 	return err
 }
 
@@ -198,21 +121,7 @@ WHERE id = ?
 `
 
 func (q *Queries) DeleteGeminiMemory(ctx context.Context, id int64) error {
-	var logFields []zap.Field
-	var start time.Time
-	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 8)
-		start = time.Now()
-		if q.LogArgument {
-			logFields = append(logFields,
-				zap.Dict("fields",
-					zap.Int64("id", id),
-				),
-			)
-		}
-	}
 	_, err := q.exec(ctx, q.deleteGeminiMemoryStmt, deleteGeminiMemory, id)
-	q.logQuery(deleteGeminiMemory, "DeleteGeminiMemory", logFields, err, start)
 	return err
 }
 
@@ -224,24 +133,9 @@ WHERE chat_id = ?
 `
 
 func (q *Queries) GetGeminiSystemPrompt(ctx context.Context, chatID int64, threadID int64) (string, error) {
-	var logFields []zap.Field
-	var start time.Time
-	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 8)
-		start = time.Now()
-		if q.LogArgument {
-			logFields = append(logFields,
-				zap.Dict("fields",
-					zap.Int64("chat_id", chatID),
-					zap.Int64("thread_id", threadID),
-				),
-			)
-		}
-	}
 	row := q.queryRow(ctx, q.getGeminiSystemPromptStmt, getGeminiSystemPrompt, chatID, threadID)
 	var prompt string
 	err := row.Scan(&prompt)
-	q.logQuery(getGeminiSystemPrompt, "GetGeminiSystemPrompt", logFields, err, start)
 	return prompt, err
 }
 
@@ -252,19 +146,6 @@ WHERE id = ?
 `
 
 func (q *Queries) GetSessionById(ctx context.Context, id int64) (GeminiSession, error) {
-	var logFields []zap.Field
-	var start time.Time
-	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 8)
-		start = time.Now()
-		if q.LogArgument {
-			logFields = append(logFields,
-				zap.Dict("fields",
-					zap.Int64("id", id),
-				),
-			)
-		}
-	}
 	row := q.queryRow(ctx, q.getSessionByIdStmt, getSessionById, id)
 	var i GeminiSession
 	err := row.Scan(
@@ -276,7 +157,6 @@ func (q *Queries) GetSessionById(ctx context.Context, id int64) (GeminiSession, 
 		&i.TotalInputTokens,
 		&i.TotalOutputTokens,
 	)
-	q.logQuery(getSessionById, "GetSessionById", logFields, err, start)
 	return i, err
 }
 
@@ -288,24 +168,9 @@ WHERE chat_id = ?
 `
 
 func (q *Queries) GetSessionIdByMessage(ctx context.Context, chatID int64, msgID int64) (int64, error) {
-	var logFields []zap.Field
-	var start time.Time
-	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 8)
-		start = time.Now()
-		if q.LogArgument {
-			logFields = append(logFields,
-				zap.Dict("fields",
-					zap.Int64("chat_id", chatID),
-					zap.Int64("msg_id", msgID),
-				),
-			)
-		}
-	}
 	row := q.queryRow(ctx, q.getSessionIdByMessageStmt, getSessionIdByMessage, chatID, msgID)
 	var session_id int64
 	err := row.Scan(&session_id)
-	q.logQuery(getSessionIdByMessage, "GetSessionIdByMessage", logFields, err, start)
 	return session_id, err
 }
 
@@ -317,23 +182,7 @@ WHERE id = ?
 `
 
 func (q *Queries) IncrementSessionTokenCounters(ctx context.Context, totalInputTokens int64, totalOutputTokens int64, iD int64) error {
-	var logFields []zap.Field
-	var start time.Time
-	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 8)
-		start = time.Now()
-		if q.LogArgument {
-			logFields = append(logFields,
-				zap.Dict("fields",
-					zap.Int64("total_input_tokens", totalInputTokens),
-					zap.Int64("total_output_tokens", totalOutputTokens),
-					zap.Int64("id", iD),
-				),
-			)
-		}
-	}
 	_, err := q.exec(ctx, q.incrementSessionTokenCountersStmt, incrementSessionTokenCounters, totalInputTokens, totalOutputTokens, iD)
-	q.logQuery(incrementSessionTokenCounters, "IncrementSessionTokenCounters", logFields, err, start)
 	return err
 }
 
@@ -346,25 +195,7 @@ LIMIT ?
 `
 
 func (q *Queries) ListGeminiMemory(ctx context.Context, chatID int64, topicID int64, limit int64) ([]GeminiMemory, error) {
-	var logFields []zap.Field
-	var start time.Time
-	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 8)
-		start = time.Now()
-		if q.LogArgument {
-			logFields = append(logFields,
-				zap.Dict("fields",
-					zap.Int64("chat_id", chatID),
-					zap.Int64("topic_id", topicID),
-					zap.Int64("limit", limit),
-				),
-			)
-		}
-	}
 	rows, err := q.query(ctx, q.listGeminiMemoryStmt, listGeminiMemory, chatID, topicID, limit)
-	defer func() {
-		q.logQuery(listGeminiMemory, "ListGeminiMemory", logFields, err, start)
-	}()
 	if err != nil {
 		return nil, err
 	}
@@ -372,7 +203,7 @@ func (q *Queries) ListGeminiMemory(ctx context.Context, chatID int64, topicID in
 	var items []GeminiMemory
 	for rows.Next() {
 		var i GeminiMemory
-		if err = rows.Scan(
+		if err := rows.Scan(
 			&i.ID,
 			&i.ChatID,
 			&i.TopicID,
@@ -382,10 +213,10 @@ func (q *Queries) ListGeminiMemory(ctx context.Context, chatID int64, topicID in
 		}
 		items = append(items, i)
 	}
-	if err = rows.Close(); err != nil {
+	if err := rows.Close(); err != nil {
 		return nil, err
 	}
-	if err = rows.Err(); err != nil {
+	if err := rows.Err(); err != nil {
 		return nil, err
 	}
 	return items, nil
@@ -399,22 +230,7 @@ WHERE chat_id = ?
 `
 
 func (q *Queries) ResetGeminiSystemPrompt(ctx context.Context, chatID int64, threadID int64) error {
-	var logFields []zap.Field
-	var start time.Time
-	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 8)
-		start = time.Now()
-		if q.LogArgument {
-			logFields = append(logFields,
-				zap.Dict("fields",
-					zap.Int64("chat_id", chatID),
-					zap.Int64("thread_id", threadID),
-				),
-			)
-		}
-	}
 	_, err := q.exec(ctx, q.resetGeminiSystemPromptStmt, resetGeminiSystemPrompt, chatID, threadID)
-	q.logQuery(resetGeminiSystemPrompt, "ResetGeminiSystemPrompt", logFields, err, start)
 	return err
 }
 
@@ -425,22 +241,7 @@ WHERE id = ?1
 `
 
 func (q *Queries) UpdateGeminiMemory(ctx context.Context, iD int64, content string) error {
-	var logFields []zap.Field
-	var start time.Time
-	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 8)
-		start = time.Now()
-		if q.LogArgument {
-			logFields = append(logFields,
-				zap.Dict("fields",
-					zap.Int64("id", iD),
-					zap.String("content", content),
-				),
-			)
-		}
-	}
 	_, err := q.exec(ctx, q.updateGeminiMemoryStmt, updateGeminiMemory, iD, content)
-	q.logQuery(updateGeminiMemory, "UpdateGeminiMemory", logFields, err, start)
 	return err
 }
 
@@ -453,24 +254,7 @@ LIMIT ?
 `
 
 func (q *Queries) getAllMsgInSessionReversed(ctx context.Context, sessionID int64, limit int64) ([]GeminiContent, error) {
-	var logFields []zap.Field
-	var start time.Time
-	if q.logger != nil {
-		logFields = make([]zap.Field, 0, 8)
-		start = time.Now()
-		if q.LogArgument {
-			logFields = append(logFields,
-				zap.Dict("fields",
-					zap.Int64("session_id", sessionID),
-					zap.Int64("limit", limit),
-				),
-			)
-		}
-	}
 	rows, err := q.query(ctx, q.getAllMsgInSessionReversedStmt, getAllMsgInSessionReversed, sessionID, limit)
-	defer func() {
-		q.logQuery(getAllMsgInSessionReversed, "getAllMsgInSessionReversed", logFields, err, start)
-	}()
 	if err != nil {
 		return nil, err
 	}
@@ -478,7 +262,7 @@ func (q *Queries) getAllMsgInSessionReversed(ctx context.Context, sessionID int6
 	var items []GeminiContent
 	for rows.Next() {
 		var i GeminiContent
-		if err = rows.Scan(
+		if err := rows.Scan(
 			&i.SessionID,
 			&i.ChatID,
 			&i.MsgID,
@@ -499,10 +283,10 @@ func (q *Queries) getAllMsgInSessionReversed(ctx context.Context, sessionID int6
 		}
 		items = append(items, i)
 	}
-	if err = rows.Close(); err != nil {
+	if err := rows.Close(); err != nil {
 		return nil, err
 	}
-	if err = rows.Err(); err != nil {
+	if err := rows.Err(); err != nil {
 		return nil, err
 	}
 	return items, nil

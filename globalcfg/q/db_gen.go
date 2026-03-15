@@ -7,11 +7,7 @@ package q
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
-	"time"
-
-	"go.uber.org/zap"
 )
 
 type DBTX interface {
@@ -455,11 +451,6 @@ func (q *Queries) queryRow(ctx context.Context, stmt *sql.Stmt, query string, ar
 
 type Queries struct {
 	db                                   DBTX
-	logger                               *zap.Logger
-	SlowQueryThreshold                   time.Duration
-	txID                                 string
-	LogRawSqlString                      bool
-	LogArgument                          bool
 	tx                                   *sql.Tx
 	addGeminiMessageStmt                 *sql.Stmt
 	createBiliInlineDataStmt             *sql.Stmt
@@ -514,11 +505,6 @@ type Queries struct {
 func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 	return &Queries{
 		db:                                   tx,
-		logger:                               q.logger,
-		SlowQueryThreshold:                   q.SlowQueryThreshold,
-		txID:                                 fmt.Sprintf("%p", tx),
-		LogRawSqlString:                      q.LogRawSqlString,
-		LogArgument:                          q.LogArgument,
 		tx:                                   tx,
 		addGeminiMessageStmt:                 q.addGeminiMessageStmt,
 		createBiliInlineDataStmt:             q.createBiliInlineDataStmt,
@@ -569,91 +555,4 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		updateUserProfilePhotoStmt:           q.updateUserProfilePhotoStmt,
 		updateUserTimeZoneStmt:               q.updateUserTimeZoneStmt,
 	}
-}
-
-func (q *Queries) logQuery(sqlString, query string, params []zap.Field, err error, start time.Time) {
-	if q.logger == nil {
-		return
-	}
-
-	duration := time.Since(start)
-	fields := make([]zap.Field, 0, len(params)+4)
-	fields = append(fields,
-		zap.Time("ts", start),
-		zap.String("query_name", query),
-	)
-	if q.LogRawSqlString {
-		fields = append(fields, zap.String("sql", sqlString))
-	}
-	if q.txID != "" {
-		fields = append(fields, zap.String("txID", q.txID))
-	}
-	fields = append(fields, params...)
-	fields = append(fields, zap.Duration("duration", duration))
-	if err != nil {
-		fields = append(fields, zap.Error(err))
-	}
-
-	if q.SlowQueryThreshold > 0 && duration > q.SlowQueryThreshold {
-		q.logger.Warn("slow query", fields...)
-		return
-	}
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		q.logger.Error("query failed", fields...)
-		return
-	}
-	q.logger.Info("query", fields...)
-}
-
-func zapNullString(key string, v sql.NullString) zap.Field {
-	if v.Valid {
-		return zap.String(key, v.String)
-	}
-	return zap.Any(key, nil)
-}
-
-func zapNullBool(key string, v sql.NullBool) zap.Field {
-	if v.Valid {
-		return zap.Bool(key, v.Bool)
-	}
-	return zap.Any(key, nil)
-}
-
-func zapNullInt32(key string, v sql.NullInt32) zap.Field {
-	if v.Valid {
-		return zap.Int32(key, v.Int32)
-	}
-	return zap.Any(key, nil)
-}
-
-func zapNullInt64(key string, v sql.NullInt64) zap.Field {
-	if v.Valid {
-		return zap.Int64(key, v.Int64)
-	}
-	return zap.Any(key, nil)
-}
-
-func zapNullFloat64(key string, v sql.NullFloat64) zap.Field {
-	if v.Valid {
-		return zap.Float64(key, v.Float64)
-	}
-	return zap.Any(key, nil)
-}
-
-func zapNullTime(key string, v sql.NullTime) zap.Field {
-	if v.Valid {
-		return zap.Time(key, v.Time)
-	}
-	return zap.Any(key, nil)
-}
-
-type zapObj interface {
-	ZapObject(name string) zap.Field
-}
-
-func zapNullOf[T zapObj](name string, optObj sql.Null[T]) zap.Field {
-	if optObj.Valid {
-		return optObj.V.ZapObject(name)
-	}
-	return zap.Any(name, nil)
 }

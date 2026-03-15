@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"hash/fnv"
 	"html"
+	"log/slog"
 	g "main/globalcfg"
 	"main/globalcfg/q"
 	"main/helpers/bili"
@@ -15,11 +16,10 @@ import (
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
-	"go.uber.org/zap"
 )
 
-var log = g.GetLogger("handlers", zap.InfoLevel)
-var logD = log.Desugar()
+var log = g.GetLogger("handlers", slog.LevelInfo)
+var logD = log
 
 func chatCfg(id int64) *q.ChatCfg {
 	return g.Q.GetChatCfgByIdOrDefault(id)
@@ -41,12 +41,11 @@ func BiliMsgFilter(msg *gotgbot.Message) bool {
 func BiliMsgConverter(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
 	prepare, err := bili.ConvertBilibiliLinks(ctx.Message.Text)
 	if err != nil || !prepare.NeedClean {
-		logD.Info("Bilibili Links Error", zap.Error(err),
-			zap.String("text", ctx.Message.Text))
+		logD.Info("bilibili links error", "err", err, "text", ctx.Message.Text)
 		// 没有B站链接
 		return nil
 	}
-	logD.Info("convert bilibili link", zap.String("text", ctx.Message.Text))
+	logD.Info("convert bilibili link", "text", ctx.Message.Text)
 
 	bv := html.EscapeString(prepare.BvText)
 	text := fmt.Sprintf(`来自<a href="tg://user?id=%d">%s</a>的消息，其中的链接已自动转换%s%s`,
@@ -63,13 +62,13 @@ func BiliMsgConverter(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
 		},
 	})
 	if err != nil {
-		log.Infof("convert bilibili link send message %s failed, error %s", text, err)
+		log.Info("convert bilibili link send message failed", "text", text, "err", err)
 		return err
 	}
 	_, err = ctx.Message.Delete(bot, nil)
 
 	if err != nil {
-		log.Infof("convert bilibili link delete original message %s failed, error %s", ctx.Message.Text, err)
+		log.Info("convert bilibili link delete original message failed", "text", ctx.Message.Text, "err", err)
 	}
 	return err
 }
@@ -106,7 +105,7 @@ func BiliMsgConverterInline(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
 			buildQueryResult("这个家伙什么也没有说", "这个家伙什么也没有说", nil)}, nil)
 		return err
 	}
-	log.Debugf("convert bilibili link %s", ctx.InlineQuery.Query)
+	log.Debug("convert bilibili link", "query", ctx.InlineQuery.Query)
 	links, err := bili.ConvertBilibiliLinks(ctx.InlineQuery.Query)
 	if err != nil || !links.CanConvert() {
 		_, err := ctx.InlineQuery.Answer(bot,
@@ -118,7 +117,7 @@ func BiliMsgConverterInline(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
 
 	uid, err := g.Q.CreateBiliInlineData(context.Background())
 	if err != nil {
-		logD.Warn("insert to bilibili error", zap.Error(err))
+		logD.Warn("insert to bilibili error", "err", err)
 		return err
 	}
 	callbackData := biliInlineCallbackPrefix + strconv.FormatInt(uid, 16)
@@ -148,7 +147,8 @@ func getBiliCallbackDataInMsg(ctx *ext.Context) (uid int64) {
 			}
 		}
 	}
-	log.Panicf("%s(%d)/%dno bili inline button", msg.Chat.Title, msg.Chat.Id, msg.MessageId)
+	log.Error("no bili inline button", "chat_title", msg.Chat.Title, "chat_id", msg.Chat.Id, "message_id", msg.MessageId)
+	panic(fmt.Sprintf("%s(%d)/%dno bili inline button", msg.Chat.Title, msg.Chat.Id, msg.MessageId))
 	return
 }
 func SaveBiliMsgCallbackMsgId(_ *gotgbot.Bot, ctx *ext.Context) (err error) {

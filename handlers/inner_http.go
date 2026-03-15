@@ -7,12 +7,14 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	g "main/globalcfg"
 	"net"
 	"net/http"
 	"net/http/pprof"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"time"
@@ -20,8 +22,6 @@ import (
 	json "github.com/json-iterator/go"
 	"github.com/klauspost/compress/zstd"
 	sqlite3 "github.com/mattn/go-sqlite3"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 )
 
 const (
@@ -217,7 +217,7 @@ func setLoggerLevel(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		_, _ = w.Write([]byte(err.Error()))
 	}
-	logger.Level.SetLevel(zapcore.Level(newLevel))
+	logger.Level.Set(slog.Level(newLevel))
 }
 
 func backupSQLiteDB(ctx context.Context, src *sql.DB, dstPath string) error {
@@ -314,7 +314,7 @@ func writeManifest(tw *tar.Writer, manifest backupManifest) error {
 	return err
 }
 
-func backupDBHandler(logger *zap.Logger) http.HandlerFunc {
+func backupDBHandler(logger *slog.Logger) http.HandlerFunc {
 	type backupTarget struct {
 		name     string
 		path     string
@@ -370,7 +370,7 @@ func backupDBHandler(logger *zap.Logger) http.HandlerFunc {
 
 		tmpDir, err := os.MkdirTemp("", "backupdb-*")
 		if err != nil {
-			logger.Error("create backup temp dir", zap.Error(err))
+			logger.Error("create backup temp dir", "err", err)
 			http.Error(w, "failed to create temp dir", http.StatusInternalServerError)
 			return
 		}
@@ -388,13 +388,13 @@ func backupDBHandler(logger *zap.Logger) http.HandlerFunc {
 		for i := range targets {
 			targets[i].destPath = filepath.Join(tmpDir, targets[i].name+".db")
 			if err := backupSQLiteDB(ctx, targets[i].db, targets[i].destPath); err != nil {
-				logger.Error("backup sqlite database", zap.String("db", targets[i].name), zap.Error(err))
+				logger.Error("backup sqlite database", "db", targets[i].name, "err", err)
 				http.Error(w, "backup failed", http.StatusInternalServerError)
 				return
 			}
 			info, err := os.Stat(targets[i].destPath)
 			if err != nil {
-				logger.Error("stat backup file", zap.String("file", targets[i].destPath), zap.Error(err))
+				logger.Error("stat backup file", "file", targets[i].destPath, "err", err)
 				http.Error(w, "backup failed", http.StatusInternalServerError)
 				return
 			}
@@ -415,7 +415,7 @@ func backupDBHandler(logger *zap.Logger) http.HandlerFunc {
 			zstd.WithWindowSize(32<<20),
 		)
 		if err != nil {
-			logger.Error("create zstd encoder", zap.Error(err))
+			logger.Error("create zstd encoder", "err", err)
 			http.Error(w, "failed to create encoder", http.StatusInternalServerError)
 			return
 		}
@@ -423,28 +423,28 @@ func backupDBHandler(logger *zap.Logger) http.HandlerFunc {
 		tarWriter := tar.NewWriter(encoder)
 		for _, target := range targets {
 			if err := addFileToTar(tarWriter, target.name+".db", target.destPath); err != nil {
-				logger.Error("write backup tar entry", zap.String("db", target.name), zap.Error(err))
+				logger.Error("write backup tar entry", "db", target.name, "err", err)
 				return
 			}
 		}
 		if err := writeManifest(tarWriter, manifest); err != nil {
-			logger.Error("write backup manifest", zap.Error(err))
+			logger.Error("write backup manifest", "err", err)
 			return
 		}
 		if err := tarWriter.Close(); err != nil {
-			logger.Error("close backup tar", zap.Error(err))
+			logger.Error("close backup tar", "err", err)
 			return
 		}
 		if err := encoder.Close(); err != nil {
-			logger.Error("close zstd encoder", zap.Error(err))
+			logger.Error("close zstd encoder", "err", err)
 			return
 		}
 
 		logger.Info("backup completed",
-			zap.String("filename", filename),
-			zap.Duration("duration", time.Since(start)),
-			zap.Int64("compressed_bytes", counter.written),
-			zap.Any("databases", manifest.Databases),
+			"filename", filename,
+			"duration", time.Since(start),
+			"compressed_bytes", counter.written,
+			"databases", manifest.Databases,
 		)
 	}
 }
@@ -457,7 +457,7 @@ func listAllRoutes(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write([]byte("GET /loggers\nPUT /loggers/<name>/<:level,int8>\nGET /backupdb\n"))
 }
 
-func withLoggingAndRecovery(logger *zap.Logger, next http.Handler) http.Handler {
+func withLoggingAndRecovery(logger *slog.Logger, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		recorder := &statusRecorder{ResponseWriter: w}
 		start := time.Now()
@@ -467,10 +467,7 @@ func withLoggingAndRecovery(logger *zap.Logger, next http.Handler) http.Handler 
 				if recorder.status == 0 {
 					recorder.WriteHeader(http.StatusInternalServerError)
 				}
-				logger.Error("inner http panic",
-					zap.Any("panic", rec),
-					zap.Stack("stack"),
-				)
+				logger.Error("inner http panic", "panic", rec, "stack", string(debug.Stack()))
 			}
 
 			if recorder.status == 0 {
@@ -478,10 +475,10 @@ func withLoggingAndRecovery(logger *zap.Logger, next http.Handler) http.Handler 
 			}
 
 			logger.Info("inner http request",
-				zap.String("method", r.Method),
-				zap.String("path", r.URL.Path),
-				zap.Int("status", recorder.status),
-				zap.Duration("duration", time.Since(start)),
+				"method", r.Method,
+				"path", r.URL.Path,
+				"status", recorder.status,
+				"duration", time.Since(start),
 			)
 		}()
 
@@ -497,7 +494,7 @@ func pprofHandlers(mux *http.ServeMux) {
 	mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
 }
 
-func buildHandler(logger *zap.Logger) http.Handler {
+func buildHandler(logger *slog.Logger) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/mars-counter", marsCounter)
 	mux.HandleFunc("/dio-ban", dioBan)
@@ -523,22 +520,22 @@ func resolveInnerHTTPAddr(envValue string) (addr string, enabled bool) {
 }
 
 func HttpListen4019() {
-	logger := g.GetLogger("inner-http", zap.WarnLevel)
+	logger := g.GetLogger("inner-http", slog.LevelWarn)
 	addr, enabled := resolveInnerHTTPAddr(os.Getenv(innerHTTPEnvKey))
 	if !enabled {
-		logger.Infof("%s=OFF, inner http server disabled", innerHTTPEnvKey)
+		logger.Info("inner http server disabled", "env", innerHTTPEnvKey)
 		return
 	}
 
-	handler := buildHandler(logger.Desugar())
+	handler := buildHandler(logger)
 	server := &http.Server{
 		Addr:              addr,
 		Handler:           handler,
 		ReadHeaderTimeout: 3 * time.Second,
 	}
 
-	logger.Infof("inner http server listening on %s", addr)
+	logger.Info("inner http server listening", "addr", addr)
 	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-		logger.Fatalf("inner http server error: %s", err)
+		logger.Error("inner http server error", "err", err)
 	}
 }

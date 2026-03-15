@@ -10,7 +10,6 @@ import (
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
-	"go.uber.org/zap"
 )
 
 func NewGeminiSession(bot *gotgbot.Bot, ctx *ext.Context) error {
@@ -83,6 +82,6 @@ func setReaction(bot *gotgbot.Bot, msg *gotgbot.Message, emoji string) {
 		Reaction: []gotgbot.ReactionType{gotgbot.ReactionTypeEmoji{Emoji: emoji}},
 	})
 	if err != nil {
-		log.Warn("set reaction", zap.Error(err))
+		log.Warn("set reaction", "err", err)
 	}
 }

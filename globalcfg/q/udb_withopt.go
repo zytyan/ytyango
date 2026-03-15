@@ -2,20 +2,18 @@ package q
 
 import (
 	"context"
+	"log/slog"
 	"main/helpers/lrusf"
 	"strconv"
 	"sync"
 	"time"
-
-	"go.uber.org/zap"
 )
 
-func PrepareWithLogger(ctx context.Context, db DBTX, logger *zap.Logger) (*Queries, error) {
+func PrepareWithLogger(ctx context.Context, db DBTX, _ *slog.Logger) (*Queries, error) {
 	query, err := Prepare(ctx, db)
 	if err != nil {
 		return nil, err
 	}
-	query.logger = logger
 	InitCache(query)
 	return query, nil
 }

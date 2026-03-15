@@ -147,7 +147,7 @@ func sendMyChatsStat() {
 	bot := GetMainBot()
 	for _, chatId := range g.GetConfig().MyChats {
 		if err := sendChatStat(bot, chatId, time.Now().Add(-24*time.Hour)); err != nil {
-			log.Warnf("send stat of yesterday to chat %d failed: %s", chatId, err)
+			log.Warn("send stat of yesterday failed", "chat_id", chatId, "err", err)
 		}
 	}
 }
@@ -161,7 +161,7 @@ func StartChatStatScheduler() {
 	var err error
 	statJob, err = statScheduler.Every(1).Day().At("08:00").Do(sendMyChatsStat)
 	if err != nil {
-		log.Warnf("start chat stat scheduler failed: %s", err)
+		log.Warn("start chat stat scheduler failed", "err", err)
 		return
 	}
 	statScheduler.StartAsync()

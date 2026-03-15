@@ -56,7 +56,7 @@ func Roll(bot *gotgbot.Bot, ctx *ext.Context) error {
 			ReplyMarkup: h.NewInlineKeyboardButtonBuilder().Callback("删除该消息", callbackDataDelMe).Build(),
 		})
 	if err != nil {
-		log.Warnf("reply failed: %s", err)
+		log.Warn("reply failed", "err", err)
 		return err
 	}
 	return nil

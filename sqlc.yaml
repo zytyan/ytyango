@@ -20,8 +20,7 @@ overrides:
         engine: "sqlite"
         nullable: true
         go_type:
-          type: "NullString"
-          import: "database/sql"
+          type: "[]byte"
 sql:
   - engine: "sqlite"
     queries:
@@ -40,10 +39,8 @@ sql:
       - "sql/schema_gemini.sql"
       - "sql/schema_user.sql"
       - "sql/schema_ytdl.sql"
-    codegen:
-    - out: globalcfg/q
-      plugin: mygen
-      options:
+    gen:
+      go:
         package: "q"
         out: "globalcfg/q"
         output_files_suffix: "_gen"
@@ -59,7 +56,6 @@ sql:
         overrides:
         - db_type: "INT_UNIX_SEC"
           engine: "sqlite"
-          zap_field_method: true
           go_type:
             type: "UnixTime"
         - db_type: "INT_BOOL"
@@ -86,10 +82,8 @@ sql:
      - "sql/query_saved_msg.sql"
     schema:
      - "sql/schema_saved_msg.sql"
-    codegen:
-      - out: globalcfg/msgs
-        plugin: mygen
-        options:
+    gen:
+      go:
           package: "msgs"
           out: "globalcfg/msgs"
           output_files_suffix: "_gen"
@@ -105,13 +99,11 @@ sql:
           overrides:
             - db_type: "INT_UNIX_SEC"
               engine: "sqlite"
-              zap_field_method: true
               go_type:
                 type: "UnixTime"
             - db_type: "INT_UNIX_SEC"
               engine: "sqlite"
               nullable: true
-              zap_field_method: true
               go_type:
                 type: "Null[UnixTime]"
                 import: "database/sql"

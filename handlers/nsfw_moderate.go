@@ -69,7 +69,7 @@ func HasImage(msg *gotgbot.Message) bool {
 func saveNsfw(fileUid, fileId string, severity int) {
 	err := g.Q.AddPic(context.Background(), fileUid, fileId, severity)
 	if err != nil {
-		log.Warnf("save nsfw failed for fileId=%s err=%s", fileId, err)
+		log.Warn("save nsfw failed", "file_id", fileId, "err", err)
 	}
 }
 
@@ -109,12 +109,12 @@ func replyNsfw(bot *gotgbot.Bot, msg *gotgbot.Message, result *azure.ModeratorV2
 func moderateDetectOne(bot *gotgbot.Bot, msg *gotgbot.Message) (replied bool) {
 	moderatorResult, err := moderatorMsg(bot, &msg.Photo[len(msg.Photo)-1])
 	if err != nil {
-		log.Warnf("moderate msg failed, err: %s", err)
+		log.Warn("moderate msg failed", "err", err)
 		return
 	}
 	replied, err = replyNsfw(bot, msg, moderatorResult)
 	if err != nil {
-		log.Warnf("reply message failed, err: %s", err)
+		log.Warn("reply message failed", "err", err)
 	}
 	return
 }
@@ -170,7 +170,7 @@ func CmdScore(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
 	} else {
 		_, err := ctx.Message.Reply(bot, "没有图片", nil)
 		if err != nil {
-			log.Warnf("reply message failed, err: %s", err)
+			log.Warn("reply message failed", "err", err)
 		}
 		return err
 	}
@@ -178,7 +178,7 @@ func CmdScore(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
 	if err != nil {
 		_, err := ctx.Message.Reply(bot, "识别失败", nil)
 		if err != nil {
-			log.Warnf("reply message failed, err: %s", err)
+			log.Warn("reply message failed", "err", err)
 		}
 		return err
 	}
@@ -195,7 +195,7 @@ func CmdScore(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
 		ReplyMarkup: replyMarkup,
 	})
 	if err != nil {
-		log.Warnf("reply message failed, err: %s", err)
+		log.Warn("reply message failed", "err", err)
 	}
 	return
 }
@@ -219,7 +219,7 @@ func refreshMsgFromBtn(bot *gotgbot.Bot, ctx *ext.Context, fileUid, cmd string) 
 	if cmd == nsfwCallbackButtonCmdScore && ok {
 		pic, err := g.Q.GetNsfwPicByFileUid(context.Background(), fileUid)
 		if err != nil {
-			log.Warnf("GetPicRateDetailsByFileUid failed, err: %s", err)
+			log.Warn("GetPicRateDetailsByFileUid failed", "err", err)
 			return
 		}
 		userRate := float64(pic.UserRate)
@@ -230,7 +230,7 @@ func refreshMsgFromBtn(bot *gotgbot.Bot, ctx *ext.Context, fileUid, cmd string) 
 			reUserRateInMsg.ReplaceAllString(iMsg.Text, fmt.Sprintf("用户评分: %.1f/6", userRate)),
 			&gotgbot.EditMessageTextOpts{ReplyMarkup: *BuildNsfwRateButton(fileUid, cmd)})
 		if err != nil {
-			log.Warnf("reply message failed, err: %s", err)
+			log.Warn("reply message failed", "err", err)
 		}
 		return
 	}
@@ -239,7 +239,7 @@ func refreshMsgFromBtn(bot *gotgbot.Bot, ctx *ext.Context, fileUid, cmd string) 
 	}
 	_, _, err := msg.EditReplyMarkup(bot, opts)
 	if err != nil {
-		log.Warnf("edit message button failed, err: %s", err)
+		log.Warn("edit message button failed", "err", err)
 	}
 }
 
