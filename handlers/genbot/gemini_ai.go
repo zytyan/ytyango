@@ -101,8 +101,7 @@ func getSysPrompt(msg *gotgbot.Message) *Replacer {
 }
 
 func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
-	if !slices.Contains([]int64{-1001471592463, -1001282155019, -1001126241898,
-		-1001170816274, -1003612476571}, ctx.EffectiveChat.Id) {
+	if !slices.Contains(g.GetConfig().AIChats, ctx.EffectiveChat.Id) {
 		return nil
 	}
 	msg := ctx.EffectiveMessage
