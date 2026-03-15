@@ -23,7 +23,7 @@ import (
 var mainBot *gotgbot.Bot
 var log *zap.Logger
 var client = g.NewPtrLinkedCfg(func(old, new *g.Config) (*genai.Client, bool) {
-	if old.GeminiKey == new.GeminiKey {
+	if old != nil && new != nil && old.GeminiKey == new.GeminiKey {
 		return nil, false
 	}
 	ctx := context.Background()

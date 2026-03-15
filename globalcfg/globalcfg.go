@@ -93,7 +93,7 @@ func NewPtrLinkedCfg[T any](getterFn func(old, new *Config) (*T, bool)) PtrLinke
 }
 
 var ocr = NewPtrLinkedCfg(func(old, new *Config) (*azure.Ocr, bool) {
-	if old.Ocr == new.Ocr {
+	if old != nil && new != nil && old.Ocr == new.Ocr {
 		return nil, false
 	}
 	return &azure.Ocr{
@@ -109,7 +109,7 @@ var ocr = NewPtrLinkedCfg(func(old, new *Config) (*azure.Ocr, bool) {
 })
 
 var moderator = NewPtrLinkedCfg(func(old, new *Config) (*azure.ModeratorV2, bool) {
-	if old.ContentModerator == new.ContentModerator {
+	if old != nil && new != nil && old.ContentModerator == new.ContentModerator {
 		return nil, false
 	}
 	return &azure.ModeratorV2{
@@ -122,7 +122,7 @@ var moderator = NewPtrLinkedCfg(func(old, new *Config) (*azure.ModeratorV2, bool
 })
 
 var meili = NewPtrLinkedCfg(func(old, new *Config) (*meilisearch.Client, bool) {
-	if old.MeiliConfig == new.MeiliConfig {
+	if old != nil && new != nil && old.MeiliConfig == new.MeiliConfig {
 		return nil, false
 	}
 	return meilisearch.NewMeiliClient(
