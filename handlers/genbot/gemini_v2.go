@@ -43,7 +43,7 @@ func tgMsgToGenaiContent(bot *gotgbot.Bot, msg *gotgbot.Message) (*genai.Content
 		}
 	} else if video := msg.Video; video != nil {
 		if video.Duration >= 5*60 || video.FileSize > 15*1024*1024 {
-			addTextPart(fmt.Sprintf("用户发送了一个视频，但是太长看不到"))
+			addTextPart("用户发送了一个视频，但是太长看不到")
 			return contents, nil
 		}
 		addTextPart("[video]")
@@ -51,7 +51,7 @@ func tgMsgToGenaiContent(bot *gotgbot.Bot, msg *gotgbot.Message) (*genai.Content
 		mimeType = "video/mp4"
 	} else if ani := msg.Animation; ani != nil {
 		if ani.Duration >= 5*60 || ani.FileSize > 15*1024*1024 {
-			addTextPart(fmt.Sprintf("用户发送了一个视频，但是太长看不到"))
+			addTextPart("用户发送了一个视频，但是太长看不到")
 			return contents, nil
 		}
 		addTextPart("[video]")
