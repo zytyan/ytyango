@@ -22,7 +22,10 @@ import (
 
 var mainBot *gotgbot.Bot
 var log *zap.Logger
-var client = g.NewPtrLinkedCfg(func(config *g.Config) *genai.Client {
+var client = g.NewPtrLinkedCfg(func(old, new *g.Config) (*genai.Client, bool) {
+	if old.GeminiKey == new.GeminiKey {
+		return nil, false
+	}
 	ctx := context.Background()
 	c, err := genai.NewClient(ctx, &genai.ClientConfig{
 		APIKey:  g.GetConfig().GeminiKey,
@@ -31,7 +34,7 @@ var client = g.NewPtrLinkedCfg(func(config *g.Config) *genai.Client {
 	if err != nil {
 		panic(err)
 	}
-	return c
+	return c, true
 })
 
 func getGenAiClient() *genai.Client {
