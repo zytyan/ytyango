@@ -68,7 +68,7 @@ var config atomic.Pointer[Config]
 type PtrLinkedCfg[T any] struct {
 	cfg *Config
 	ptr *T
-	fn  func(*Config) *T
+	fn  func(old, new *Config) (*T, bool)
 }
 
 func (p *PtrLinkedCfg[T]) Get() *T {
@@ -76,20 +76,60 @@ func (p *PtrLinkedCfg[T]) Get() *T {
 	if p.cfg != cfg {
 		gMu.Lock()
 		defer gMu.Unlock()
-		p.cfg = config.Load()
-		p.ptr = p.fn(p.cfg)
+		old := p.cfg
+		p.cfg = cfg
+		newPtr, replace := p.fn(old, p.cfg)
+		if replace {
+			p.ptr = newPtr
+		}
 	}
 	return p.ptr
 }
-func NewPtrLinkedCfg[T any](getterFn func(*Config) *T) PtrLinkedCfg[T] {
+func NewPtrLinkedCfg[T any](getterFn func(old, new *Config) (*T, bool)) PtrLinkedCfg[T] {
 	return PtrLinkedCfg[T]{
 		fn: getterFn,
 	}
 }
 
-var ocr PtrLinkedCfg[azure.Ocr]
-var moderator PtrLinkedCfg[azure.ModeratorV2]
-var meili PtrLinkedCfg[meilisearch.Client]
+var ocr = NewPtrLinkedCfg(func(old, new *Config) (*azure.Ocr, bool) {
+	if old.Ocr == new.Ocr {
+		return nil, false
+	}
+	return &azure.Ocr{
+		Client: *azure.NewClient(
+			new.Ocr.Endpoint,
+			new.Ocr.ApiKey,
+			azure.OcrPath,
+		),
+		ApiVer:   new.Ocr.ApiVer,
+		Language: new.Ocr.Language,
+		Features: new.Ocr.Features,
+	}, true
+})
+
+var moderator = NewPtrLinkedCfg(func(old, new *Config) (*azure.ModeratorV2, bool) {
+	if old.ContentModerator == new.ContentModerator {
+		return nil, false
+	}
+	return &azure.ModeratorV2{
+		Client: *azure.NewClient(
+			new.ContentModerator.Endpoint,
+			new.ContentModerator.ApiKey,
+			azure.ContentModeratorV2Path,
+		),
+	}, true
+})
+
+var meili = NewPtrLinkedCfg(func(old, new *Config) (*meilisearch.Client, bool) {
+	if old.MeiliConfig == new.MeiliConfig {
+		return nil, false
+	}
+	return meilisearch.NewMeiliClient(
+		new.MeiliConfig.BaseUrl,
+		new.MeiliConfig.IndexName,
+		new.MeiliConfig.MasterKey,
+	), true
+})
 
 var loggers = make(map[string]LoggerWithLevel)
 
@@ -146,36 +186,6 @@ func InitConfig() {
 		panic(err)
 	}
 	config.Store(cfg)
-
-	ocr.fn = func(cfg *Config) *azure.Ocr {
-		return &azure.Ocr{
-			Client: *azure.NewClient(
-				cfg.Ocr.Endpoint,
-				cfg.Ocr.ApiKey,
-				azure.OcrPath,
-			),
-			ApiVer:   cfg.Ocr.ApiVer,
-			Language: cfg.Ocr.Language,
-			Features: cfg.Ocr.Features,
-		}
-	}
-	moderator.fn = func(cfg *Config) *azure.ModeratorV2 {
-		return &azure.ModeratorV2{
-			Client: *azure.NewClient(
-				cfg.ContentModerator.Endpoint,
-				cfg.ContentModerator.ApiKey,
-				azure.ContentModeratorV2Path,
-			),
-		}
-	}
-	meili.fn = func(cfg *Config) *meilisearch.Client {
-		client := meilisearch.NewMeiliClient(
-			cfg.MeiliConfig.BaseUrl,
-			cfg.MeiliConfig.IndexName,
-			cfg.MeiliConfig.MasterKey,
-		)
-		return client
-	}
 	gWriteSyncer = initWriteSyncer()
 	db = getSqliteConn(config.Load().DatabasePath)
 	msgDb = getSqliteConn(config.Load().MsgDbPath)
