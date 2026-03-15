@@ -74,7 +74,7 @@ type PtrLinkedCfg[T any] struct {
 
 func (p *PtrLinkedCfg[T]) Get() *T {
 	cfg := GetConfig()
-	if p.cfg != cfg {
+	if p.ptr == nil || p.cfg != cfg {
 		gMu.Lock()
 		defer gMu.Unlock()
 		old := p.cfg
