@@ -22,20 +22,22 @@ import (
 
 var mainBot *gotgbot.Bot
 var log *zap.Logger
-var client = g.NewPtrLinkedCfg(func(old, new *g.Config) (*genai.Client, bool) {
-	if old != nil && new != nil && old.GeminiKey == new.GeminiKey {
-		return nil, false
-	}
-	ctx := context.Background()
-	c, err := genai.NewClient(ctx, &genai.ClientConfig{
-		APIKey:  g.GetConfig().GeminiKey,
-		Backend: genai.BackendGeminiAPI,
-	})
-	if err != nil {
-		panic(err)
-	}
-	return c, true
-})
+var client = g.NewPtrLinkedCfg(
+	func(old, new *g.Config) bool {
+		return old.GeminiKey != new.GeminiKey
+	},
+	func(new *g.Config) *genai.Client {
+		ctx := context.Background()
+		c, err := genai.NewClient(ctx, &genai.ClientConfig{
+			APIKey:  new.GeminiKey,
+			Backend: genai.BackendGeminiAPI,
+		})
+		if err != nil {
+			panic(err)
+		}
+		return c
+	},
+)
 
 func getGenAiClient() *genai.Client {
 	return client.Get()
