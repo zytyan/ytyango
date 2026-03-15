@@ -69,7 +69,7 @@ func (h *Handler) meiliSearch(ctx context.Context, query searchQuery) (*api.Sear
 		Sort:   []string{"date:desc"},
 	}
 	var result searchResult
-	err = g.MeiliClient.Search(meiliQ, &result)
+	err = g.Meili().Search(meiliQ, &result)
 	if err != nil {
 		return nil, err
 	}

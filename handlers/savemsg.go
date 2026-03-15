@@ -99,7 +99,7 @@ func saveMessageToMeilisearch(bot *gotgbot.Bot, msg *gotgbot.Message) (err error
 		logger.Debug("skip save message to meilisearch, no text")
 		return nil
 	}
-	err = g.MeiliClient.AddDocument(meiliMsg)
+	err = g.Meili().AddDocument(meiliMsg)
 	if err != nil {
 		logger.Warn("save message to meilisearch", zap.Error(err))
 	}

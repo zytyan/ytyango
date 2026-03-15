@@ -1,137 +1,208 @@
 package g
 
 import (
+	"context"
 	"database/sql"
+	"fmt"
+	"log"
 	"main/globalcfg/msgs"
 	"main/globalcfg/q"
 	"main/helpers/azure"
+	"main/helpers/meilisearch"
 	"os"
+	"path/filepath"
 	"sync"
+	"sync/atomic"
+	"testing"
 
+	"github.com/knadh/koanf/parsers/yaml"
+	"github.com/knadh/koanf/providers/file"
+	"github.com/knadh/koanf/v2"
 	_ "github.com/mattn/go-sqlite3"
-	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"gopkg.in/natefinch/lumberjack.v2"
-	"gopkg.in/yaml.v3"
 )
 
 type Azure struct {
-	Endpoint string `yaml:"endpoint"`
-	ApiKey   string `yaml:"api-key"`
+	Endpoint string `koanf:"endpoint"`
+	ApiKey   string `koanf:"api-key"`
 }
+
 type OcrConfig struct {
-	Azure    `yaml:",inline"`
-	ApiVer   string `yaml:"api-ver"`
-	Language string `yaml:"language"`
-	Features string `yaml:"features"`
+	Azure    `koanf:",squash"`
+	ApiVer   string `koanf:"api-ver"`
+	Language string `koanf:"language"`
+	Features string `koanf:"features"`
+}
+
+type MeiliConfig struct {
+	BaseUrl    string `koanf:"base-url"`
+	IndexName  string `koanf:"index-name"`
+	PrimaryKey string `koanf:"primary-key"`
+	MasterKey  string `koanf:"master-key"`
 }
 
 type Config struct {
-	BotToken           string      `yaml:"bot-token"`
-	God                int64       `yaml:"god"`
-	MyChats            []int64     `yaml:"my-chats"`
-	MeiliConfig        MeiliConfig `yaml:"meili-config"`
-	ContentModerator   Azure       `yaml:"content-moderator"`
-	Ocr                OcrConfig   `yaml:"ocr"`
-	QrScanUrl          string      `yaml:"qr-scan-url"`
-	SaveMessage        bool        `yaml:"save-message"`
-	TgApiUrl           string      `yaml:"tg-api-url"`
-	DropPendingUpdates bool        `yaml:"drop-pending-updates"`
-	LogLevel           int8        `yaml:"log-level"`
-	LocalKvDbPath      string      `yaml:"local-kv-db-path"`
-	TmpPath            string      `yaml:"tmp-path"`
-	DatabasePath       string      `yaml:"database-path"`
-	GeminiKey          string      `yaml:"gemini-key"`
-	MsgDbPath          string      `yaml:"msg-db-path"`
+	BotToken           string      `koanf:"bot-token"`
+	God                int64       `koanf:"god"`
+	MyChats            []int64     `koanf:"my-chats"`
+	AIChats            []int64     `koanf:"ai-chats"`
+	MeiliConfig        MeiliConfig `koanf:"meili-config"`
+	ContentModerator   Azure       `koanf:"content-moderator"`
+	Ocr                OcrConfig   `koanf:"ocr"`
+	QrScanUrl          string      `koanf:"qr-scan-url"`
+	SaveMessage        bool        `koanf:"save-message"`
+	TgApiUrl           string      `koanf:"tg-api-url"`
+	DropPendingUpdates bool        `koanf:"drop-pending-updates"`
+	LogLevel           int8        `koanf:"log-level"`
+	DatabasePath       string      `koanf:"database-path"`
+	GeminiKey          string      `koanf:"gemini-key"`
+	MsgDbPath          string      `koanf:"msg-db-path"`
+
+	LogFile  string `koanf:"log-file"`
+	NoStdout bool   `koanf:"no-stdout"`
 }
 
-var Ocr *azure.Ocr
-var Moderator *azure.ModeratorV2
+var gMu sync.Mutex
+var config atomic.Pointer[Config]
+
+type PtrLinkedCfg[T any] struct {
+	cfg *Config
+	ptr *T
+	fn  func(*Config) *T
+}
+
+func (p *PtrLinkedCfg[T]) Get() *T {
+	cfg := GetConfig()
+	if p.cfg != cfg {
+		gMu.Lock()
+		defer gMu.Unlock()
+		p.cfg = config.Load()
+		p.ptr = p.fn(p.cfg)
+	}
+	return p.ptr
+}
+
+var ocr PtrLinkedCfg[azure.Ocr]
+var moderator PtrLinkedCfg[azure.ModeratorV2]
+var meili PtrLinkedCfg[meilisearch.Client]
+
 var loggers = make(map[string]LoggerWithLevel)
-var gLoggerMu sync.Mutex
-var config *Config
 
-func initConfig() *Config {
-	var cfg Config
-	configFile, exists := os.LookupEnv("GOYTYAN_CONFIG")
-	if !exists {
-		return &cfg
-	}
-	data, err := os.ReadFile(configFile)
+func loadConfig(k *koanf.Koanf, provider *file.File) (*Config, error) {
+	err := k.Load(provider, yaml.Parser())
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
-	err = yaml.Unmarshal(data, &cfg)
+	var newCfg Config
+	err = k.Unmarshal("", &newCfg)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
-	Ocr = &azure.Ocr{
-		Client:   *azure.NewClient(cfg.Ocr.Endpoint, cfg.Ocr.ApiKey, azure.OcrPath),
-		ApiVer:   cfg.Ocr.ApiVer,
-		Language: cfg.Ocr.Language,
-		Features: cfg.Ocr.Features,
-	}
-	Moderator = &azure.ModeratorV2{
-		Client:     *azure.NewClient(cfg.ContentModerator.Endpoint, cfg.ContentModerator.ApiKey, azure.ContentModeratorV2Path),
-		Categories: []string{azure.ModerateV2CatSexual}, // 也只查涩图
-		OutputType: "FourSeverityLevels",                // Azure仅支持这个参数，所以硬编码
-	}
-	return &cfg
+	return &newCfg, nil
 }
 
-var gWriteSyncer zapcore.WriteSyncer
-
-func initWriteSyncer() zapcore.WriteSyncer {
-	logfile, exists := os.LookupEnv("GOYTYAN_LOG_FILE")
-	if !exists {
-		return zapcore.AddSync(os.Stderr)
+func getCfgFilename() string {
+	cfgFile := os.Getenv("YTYAN_CONFIG_FILE")
+	if cfgFile == "" {
+		if testing.Testing() {
+			return filepath.Join(mustGetProjectRootDir(), "config.example.yaml")
+		}
+		cfgFile = "config.yaml"
 	}
-	w := zapcore.AddSync(&lumberjack.Logger{
-		Filename:   logfile,
-		MaxSize:    1, // megabytes
-		MaxBackups: 10,
-		MaxAge:     100, // days
-		Compress:   true,
-		LocalTime:  true,
+	return cfgFile
+}
+
+func InitConfig() {
+	k := koanf.New(".")
+	cfgFile := getCfgFilename()
+	provider := file.Provider(cfgFile)
+	cfg, err := loadConfig(k, provider)
+	if err != nil {
+		panic(fmt.Sprintf("load config file failed: %v", err))
+	}
+	err = provider.Watch(func(event any, err error) {
+		if err != nil {
+			log.Printf("watch error: %v", err)
+			return
+		}
+		cfg2, err := loadConfig(k, provider)
+		if err != nil {
+			log.Printf("load config file failed: %v", err)
+			return
+		}
+		oldCfg := config.Swap(cfg2)
+		if oldCfg.DatabasePath != cfg2.DatabasePath || oldCfg.MsgDbPath != cfg2.MsgDbPath {
+			log.Printf("database path cannot be changed without restart, old: %s, new: %s", oldCfg.DatabasePath, cfg2.DatabasePath)
+			log.Printf("message database path cannot be changed without restart, old: %s, new: %s", oldCfg.MsgDbPath, cfg2.MsgDbPath)
+			return
+		}
 	})
-	_, noStdout := os.LookupEnv("GOYTYAN_NO_STDOUT")
-	if !noStdout {
-		w = zapcore.NewMultiWriteSyncer(w, zapcore.AddSync(os.Stdout))
+	if err != nil {
+		panic(err)
 	}
-	return w
-}
+	config.Store(cfg)
 
-type LoggerWithLevel struct {
-	Level  *zap.AtomicLevel
-	Logger *zap.SugaredLogger
-}
-
-func GetLogger(name string, level zapcore.Level) *zap.SugaredLogger {
-	gLoggerMu.Lock()
-	defer gLoggerMu.Unlock()
-	if logger, ok := loggers[name]; ok {
-		return logger.Logger
+	ocr.fn = func(cfg *Config) *azure.Ocr {
+		return &azure.Ocr{
+			Client: *azure.NewClient(
+				cfg.Ocr.Endpoint,
+				cfg.Ocr.ApiKey,
+				azure.OcrPath,
+			),
+			ApiVer:   cfg.Ocr.ApiVer,
+			Language: cfg.Ocr.Language,
+			Features: cfg.Ocr.Features,
+		}
 	}
-	lvl := zap.NewAtomicLevel()
-	lvl.SetLevel(level)
-	core := zapcore.NewCore(
-		zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig()),
-		gWriteSyncer,
-		lvl,
-	)
-	logger := zap.New(core)
-	newLogger := logger.
-		With(zap.String("name", name)).
-		Sugar()
-	loggers[name] = LoggerWithLevel{
-		Level:  &lvl,
-		Logger: newLogger,
+	moderator.fn = func(cfg *Config) *azure.ModeratorV2 {
+		return &azure.ModeratorV2{
+			Client: *azure.NewClient(
+				cfg.ContentModerator.Endpoint,
+				cfg.ContentModerator.ApiKey,
+				azure.ContentModeratorV2Path,
+			),
+		}
 	}
-	return newLogger
+	meili.fn = func(cfg *Config) *meilisearch.Client {
+		client := meilisearch.NewMeiliClient(
+			cfg.MeiliConfig.BaseUrl,
+			cfg.MeiliConfig.IndexName,
+			cfg.MeiliConfig.MasterKey,
+		)
+		return client
+	}
+	gWriteSyncer = initWriteSyncer()
+	db = getSqliteConn(config.Load().DatabasePath)
+	msgDb = getSqliteConn(config.Load().MsgDbPath)
+	if testing.Testing() {
+		initMainDatabaseInMemory(db)
+		_ = msgDb.Close()
+		msgDb = db
+	}
+	Q, err = q.PrepareWithLogger(context.Background(), db, GetLogger("sql", zapcore.DebugLevel).Desugar())
+	if err != nil {
+		panic(err)
+	}
+	Msgs, err = msgs.PrepareWithLogger(context.Background(), msgDb, GetLogger("sql", zapcore.DebugLevel).Desugar())
+	if err != nil {
+		panic(err)
+	}
 }
 
 func GetConfig() *Config {
-	return config
+	return config.Load()
+}
+
+func Ocr() *azure.Ocr {
+	return ocr.Get()
+}
+
+func Moderator() *azure.ModeratorV2 {
+	return moderator.Get()
+}
+
+func Meili() *meilisearch.Client {
+	return meili.Get()
 }
 
 func GetAllLoggers() map[string]LoggerWithLevel {
@@ -144,7 +215,7 @@ var msgDb *sql.DB
 var Q *q.Queries
 var Msgs *msgs.Queries
 
-func initDatabase(dbPath string) *sql.DB {
+func getSqliteConn(dbPath string) *sql.DB {
 	check := func(_ sql.Result, e error) {
 		if e != nil {
 			panic(e)
@@ -170,4 +241,8 @@ func RawMainDb() *sql.DB {
 
 func RawMsgsDb() *sql.DB {
 	return msgDb
+}
+
+func init() {
+	InitConfig()
 }

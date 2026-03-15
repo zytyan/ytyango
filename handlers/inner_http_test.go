@@ -19,6 +19,8 @@ import (
 
 func newTestServer() *httptest.Server {
 	logger := g.GetLogger("inner-http-test", zap.InfoLevel)
+	logger.Info("???????")
+
 	return httptest.NewServer(buildHandler(logger.Desugar()))
 }
 

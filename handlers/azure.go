@@ -5,7 +5,7 @@ import (
 	"context"
 	"errors"
 	"image"
-	"main/globalcfg"
+	g "main/globalcfg"
 	"main/globalcfg/h"
 	"main/helpers/azure"
 	"main/helpers/lrusf"
@@ -34,7 +34,7 @@ func ocrMsg(bot *gotgbot.Bot, file *gotgbot.PhotoSize) (string, error) {
 		if err != nil {
 			return nil, err
 		}
-		return g.Ocr.OcrData(data)
+		return g.Ocr().OcrData(data)
 	})
 	if err != nil {
 		logger.Warn("ocr file error", zap.Error(err))
@@ -66,7 +66,7 @@ func moderatorMsg(bot *gotgbot.Bot, file *gotgbot.PhotoSize) (*azure.ModeratorV2
 		if err != nil {
 			return nil, err
 		}
-		return g.Moderator.EvalData(data)
+		return g.Moderator().EvalData(data)
 	})
 	if err != nil {
 		logger.Warn("moderator file error", zap.Error(err))

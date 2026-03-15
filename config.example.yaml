@@ -1,0 +1,34 @@
+# 此处token已经废弃，但是为了测试Telegram的hmac功能，需要保留一个真实token
+bot-token: 554277510:AAEKxRdcRfhEjtSIfxpaYtL19XFgdDcY23U
+
+god: 123456789
+
+
+content-moderator:
+  endpoint: "https://example-ocr.cognitiveservices.azure.com"
+  api-key: "1234567890abcdef"
+ocr:
+  endpoint: "https://example-ocr.cognitiveservices.azure.com"
+  api-key: '1234567890abcdef'
+  api-ver: "2023-10-01"
+  language: ""
+  features: "Read"
+
+
+qr-scan-url: http://localhost:4023/scanqr
+save-message: true
+tg-api-url: http://localhost:8081
+drop-pending-updates: false
+gemini-key: ABCDEFGHIJKLMNOPQRST
+
+meili-config:
+  base-url: http://localhost:7700
+  index-name: tgmsgs
+  primary-key: mongo_id
+  master-key: ABCDEFGHIJKLMNOPQRST
+
+
+log-level: -1
+database-path: ":memory:"
+msg-db-path: ":memory:"
+my-chats: [-1001471592463]
