@@ -22,18 +22,21 @@ import (
 
 var mainBot *gotgbot.Bot
 var log *zap.Logger
-
-var getGenAiClient = sync.OnceValue(func() *genai.Client {
+var client = g.NewPtrLinkedCfg(func(config *g.Config) *genai.Client {
 	ctx := context.Background()
-	client, err := genai.NewClient(ctx, &genai.ClientConfig{
+	c, err := genai.NewClient(ctx, &genai.ClientConfig{
 		APIKey:  g.GetConfig().GeminiKey,
 		Backend: genai.BackendGeminiAPI,
 	})
 	if err != nil {
 		panic(err)
 	}
-	return client
+	return c
 })
+
+func getGenAiClient() *genai.Client {
+	return client.Get()
+}
 
 const (
 	geminiSessionContentLimit = 150

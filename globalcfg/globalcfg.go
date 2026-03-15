@@ -81,6 +81,11 @@ func (p *PtrLinkedCfg[T]) Get() *T {
 	}
 	return p.ptr
 }
+func NewPtrLinkedCfg[T any](getterFn func(*Config) *T) PtrLinkedCfg[T] {
+	return PtrLinkedCfg[T]{
+		fn: getterFn,
+	}
+}
 
 var ocr PtrLinkedCfg[azure.Ocr]
 var moderator PtrLinkedCfg[azure.ModeratorV2]
