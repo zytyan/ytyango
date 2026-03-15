@@ -67,9 +67,10 @@ var gMu sync.Mutex
 var config atomic.Pointer[Config]
 
 type PtrLinkedCfg[T any] struct {
-	cfg *Config
-	ptr *T
-	fn  func(old, new *Config) (*T, bool)
+	cfg     *Config
+	ptr     *T
+	fn      func(new *Config) *T
+	checker func(old, new *Config) bool
 }
 
 func (p *PtrLinkedCfg[T]) Get() *T {
@@ -77,60 +78,73 @@ func (p *PtrLinkedCfg[T]) Get() *T {
 	if p.ptr == nil || p.cfg != cfg {
 		gMu.Lock()
 		defer gMu.Unlock()
-		old := p.cfg
-		p.cfg = cfg
-		newPtr, replace := p.fn(old, p.cfg)
-		if replace {
-			p.ptr = newPtr
+		if p.checker(p.cfg, cfg) {
+			p.cfg = cfg
+			p.ptr = p.fn(p.cfg)
 		}
 	}
 	return p.ptr
 }
-func NewPtrLinkedCfg[T any](getterFn func(old, new *Config) (*T, bool)) PtrLinkedCfg[T] {
+func NewPtrLinkedCfg[T any](checker func(old, new *Config) bool, getter func(new *Config) *T) PtrLinkedCfg[T] {
 	return PtrLinkedCfg[T]{
-		fn: getterFn,
+		fn: getter,
+		checker: func(old, new *Config) bool {
+			if new == nil {
+				return false
+			}
+			if old == nil {
+				return true
+			}
+			return checker(old, new)
+		},
 	}
 }
 
-var ocr = NewPtrLinkedCfg(func(old, new *Config) (*azure.Ocr, bool) {
-	if old != nil && new != nil && old.Ocr == new.Ocr {
-		return nil, false
-	}
-	return &azure.Ocr{
-		Client: *azure.NewClient(
-			new.Ocr.Endpoint,
-			new.Ocr.ApiKey,
-			azure.OcrPath,
-		),
-		ApiVer:   new.Ocr.ApiVer,
-		Language: new.Ocr.Language,
-		Features: new.Ocr.Features,
-	}, true
-})
+var ocr = NewPtrLinkedCfg(
+	func(old, new *Config) bool {
+		return old.Ocr != new.Ocr
+	},
+	func(new *Config) *azure.Ocr {
+		return &azure.Ocr{
+			Client: *azure.NewClient(
+				new.Ocr.Endpoint,
+				new.Ocr.ApiKey,
+				azure.OcrPath,
+			),
+			ApiVer:   new.Ocr.ApiVer,
+			Language: new.Ocr.Language,
+			Features: new.Ocr.Features,
+		}
+	},
+)
 
-var moderator = NewPtrLinkedCfg(func(old, new *Config) (*azure.ModeratorV2, bool) {
-	if old != nil && new != nil && old.ContentModerator == new.ContentModerator {
-		return nil, false
-	}
-	return &azure.ModeratorV2{
-		Client: *azure.NewClient(
-			new.ContentModerator.Endpoint,
-			new.ContentModerator.ApiKey,
-			azure.ContentModeratorV2Path,
-		),
-	}, true
-})
+var moderator = NewPtrLinkedCfg(
+	func(old, new *Config) bool {
+		return old.ContentModerator != new.ContentModerator
+	},
+	func(new *Config) *azure.ModeratorV2 {
+		return &azure.ModeratorV2{
+			Client: *azure.NewClient(
+				new.ContentModerator.Endpoint,
+				new.ContentModerator.ApiKey,
+				azure.ContentModeratorV2Path,
+			),
+		}
+	},
+)
 
-var meili = NewPtrLinkedCfg(func(old, new *Config) (*meilisearch.Client, bool) {
-	if old != nil && new != nil && old.MeiliConfig == new.MeiliConfig {
-		return nil, false
-	}
-	return meilisearch.NewMeiliClient(
-		new.MeiliConfig.BaseUrl,
-		new.MeiliConfig.IndexName,
-		new.MeiliConfig.MasterKey,
-	), true
-})
+var meili = NewPtrLinkedCfg(
+	func(old, new *Config) bool {
+		return old.MeiliConfig != new.MeiliConfig
+	},
+	func(new *Config) *meilisearch.Client {
+		return meilisearch.NewMeiliClient(
+			new.MeiliConfig.BaseUrl,
+			new.MeiliConfig.IndexName,
+			new.MeiliConfig.MasterKey,
+		)
+	},
+)
 
 var loggers = make(map[string]LoggerWithLevel)
 
