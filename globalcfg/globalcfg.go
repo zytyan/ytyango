@@ -129,6 +129,8 @@ var moderator = NewPtrLinkedCfg(
 				new.ContentModerator.ApiKey,
 				azure.ContentModeratorV2Path,
 			),
+			Categories: []string{azure.ModerateV2CatSexual},
+			OutputType: "FourSeverityLevels",
 		}
 	},
 )
