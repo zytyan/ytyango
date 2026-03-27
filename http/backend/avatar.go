@@ -7,40 +7,59 @@ import (
 	"fmt"
 	"image"
 	_ "image/jpeg"
+	"io"
+	"net/http"
 	"os"
 
 	g "main/globalcfg"
-	api "main/http/backend/ogen"
 
+	"github.com/gin-gonic/gin"
 	"github.com/kolesa-team/go-webp/encoder"
 	"github.com/kolesa-team/go-webp/webp"
 )
 
-func (h *Handler) GetUserAvatar(ctx context.Context, params api.GetUserAvatarParams) (api.GetUserAvatarRes, error) {
-	if err := h.verifyTgAuth(params.Tgauth); err != nil {
-		return &api.GetUserAvatarUnauthorized{Message: err.Error()}, nil
+func (h *Handler) handleGetUserAvatar(c *gin.Context) {
+	var params avatarURIParams
+	if err := c.ShouldBindUri(&params); err != nil {
+		c.JSON(http.StatusBadRequest, apiError{Message: err.Error()})
+		return
 	}
-	path, err := h.getUserProfilePhotoWebp(ctx, params.UserId)
+	var query avatarQuery
+	if err := c.ShouldBindQuery(&query); err != nil {
+		c.JSON(http.StatusUnauthorized, apiError{Message: err.Error()})
+		return
+	}
+	if err := h.verifyTgAuth(query.TgAuth); err != nil {
+		c.JSON(http.StatusUnauthorized, apiError{Message: err.Error()})
+		return
+	}
+	path, err := h.getUserProfilePhotoWebp(c.Request.Context(), params.UserID)
 	if err != nil {
 		switch {
 		case errors.Is(err, errUserNotFound):
-			return &api.GetUserAvatarNotFound{Message: "user not found"}, nil
+			c.JSON(http.StatusNotFound, apiError{Message: "user not found"})
 		case errors.Is(err, errUserNoPhoto):
-			return &api.GetUserAvatarNotFound{Message: "user has no profile photo"}, nil
+			c.JSON(http.StatusNotFound, apiError{Message: "user has no profile photo"})
 		case errors.Is(err, errBotUnavailable):
-			return &api.GetUserAvatarInternalServerError{Message: err.Error()}, nil
+			c.JSON(http.StatusInternalServerError, apiError{Message: err.Error()})
 		default:
-			return &api.GetUserAvatarInternalServerError{Message: err.Error()}, nil
+			c.JSON(http.StatusInternalServerError, apiError{Message: err.Error()})
 		}
+		return
 	}
 	file, err := os.Open(path)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return &api.GetUserAvatarNotFound{Message: "avatar not found"}, nil
+			c.JSON(http.StatusNotFound, apiError{Message: "avatar not found"})
+			return
 		}
-		return &api.GetUserAvatarInternalServerError{Message: err.Error()}, nil
+		c.JSON(http.StatusInternalServerError, apiError{Message: err.Error()})
+		return
 	}
-	return &api.GetUserAvatarOK{Data: file}, nil
+	c.Header("Content-Type", "image/webp")
+	c.Status(http.StatusOK)
+	_, _ = io.Copy(c.Writer, file)
+	_ = file.Close()
 }
 
 func (h *Handler) getUserProfilePhotoWebp(ctx context.Context, userId int64) (string, error) {

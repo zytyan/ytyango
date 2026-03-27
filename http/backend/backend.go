@@ -6,11 +6,15 @@ import (
 	"log"
 	"log/slog"
 	"net/http"
+	"strconv"
+	"sync"
 
 	g "main/globalcfg"
-	api "main/http/backend/ogen"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
+	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
+	"github.com/go-playground/validator/v10"
 )
 
 // Handler implements ogen-generated interfaces.
@@ -19,6 +23,8 @@ type Handler struct {
 	bot       *gotgbot.Bot
 	log       *slog.Logger
 }
+
+var registerValidatorOnce sync.Once
 
 // NewHandler builds a handler using the configured bot token hash and bot provider.
 func NewHandler(bot *gotgbot.Bot) *Handler {
@@ -32,10 +38,30 @@ func NewHandler(bot *gotgbot.Bot) *Handler {
 	}
 }
 
-// NewServer wires the ogen server with the backend handler.
-func NewServer(bot *gotgbot.Bot) (*api.Server, error) {
+func registerValidators() {
+	registerValidatorOnce.Do(func() {
+		validate, ok := binding.Validator.Engine().(*validator.Validate)
+		if !ok {
+			return
+		}
+		_ = validate.RegisterValidation("int64str", func(fl validator.FieldLevel) bool {
+			_, err := strconv.ParseInt(fl.Field().String(), 10, 64)
+			return err == nil
+		})
+	})
+}
+
+// NewServer wires the gin router with the backend handler.
+func NewServer(bot *gotgbot.Bot) (http.Handler, error) {
+	registerValidators()
 	h := NewHandler(bot)
-	return api.NewServer(h, h)
+	gin.SetMode(gin.ReleaseMode)
+	r := gin.New()
+	r.Use(gin.Recovery())
+	r.POST("/search", h.requireHeaderAuth("SearchMessages"), h.handleSearchMessages)
+	r.POST("/users/info", h.requireHeaderAuth("GetUsersInfo"), h.handleGetUsersInfo)
+	r.GET("/users/:userId/avatar", h.handleGetUserAvatar)
+	return r, nil
 }
 
 func ListenAndServe(addr string, bot *gotgbot.Bot) error {

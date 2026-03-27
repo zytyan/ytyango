@@ -5,11 +5,13 @@ import (
 	"database/sql"
 	"errors"
 	"main/helpers/meilisearch"
+	"net/http"
 	"strconv"
 
 	g "main/globalcfg"
 	"main/handlers"
-	api "main/http/backend/ogen"
+
+	"github.com/gin-gonic/gin"
 )
 
 type searchQuery struct {
@@ -19,7 +21,7 @@ type searchQuery struct {
 	Limit int
 }
 
-type searchResult struct {
+type meiliSearchResult struct {
 	Hits []handlers.MeiliMsg `json:"hits"`
 
 	Query              string `json:"query"`
@@ -29,18 +31,27 @@ type searchResult struct {
 	EstimatedTotalHits int    `json:"estimatedTotalHits"`
 }
 
-func (h *Handler) SearchMessages(ctx context.Context, req *api.SearchRequest) (api.SearchMessagesRes, error) {
+func (h *Handler) handleSearchMessages(c *gin.Context) {
+	var req searchRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, securityError{ErrorMessage: err.Error()})
+		return
+	}
 	insID, err := strconv.ParseInt(req.InsID, 10, 64)
 	if err != nil {
-		return &api.SearchMessagesBadRequest{Message: "invalid ins_id"}, nil
+		c.JSON(http.StatusBadRequest, apiError{Message: "invalid ins_id"})
+		return
 	}
-	page := int(req.Page)
+	page := req.Page
 	if page <= 0 {
 		page = 1
 	}
-	limit := int(req.Limit.Or(20))
+	limit := 20
+	if req.Limit != nil {
+		limit = *req.Limit
+	}
 
-	res, err := h.meiliSearch(ctx, searchQuery{
+	res, err := h.meiliSearch(c.Request.Context(), searchQuery{
 		Query: req.Q,
 		InsID: insID,
 		Page:  page,
@@ -48,14 +59,16 @@ func (h *Handler) SearchMessages(ctx context.Context, req *api.SearchRequest) (a
 	})
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return &api.SearchMessagesBadRequest{Message: "group not found"}, nil
+			c.JSON(http.StatusBadRequest, apiError{Message: "group not found"})
+			return
 		}
-		return &api.SearchMessagesInternalServerError{Message: err.Error()}, nil
+		c.JSON(http.StatusInternalServerError, apiError{Message: err.Error()})
+		return
 	}
-	return res, nil
+	c.JSON(http.StatusOK, res)
 }
 
-func (h *Handler) meiliSearch(ctx context.Context, query searchQuery) (*api.SearchResult, error) {
+func (h *Handler) meiliSearch(ctx context.Context, query searchQuery) (*searchResult, error) {
 	limit := query.Limit
 	chat, err := g.Q.GetChatByWebId(ctx, query.InsID)
 	if err != nil {
@@ -68,34 +81,34 @@ func (h *Handler) meiliSearch(ctx context.Context, query searchQuery) (*api.Sear
 		Offset: (query.Page - 1) * limit,
 		Sort:   []string{"date:desc"},
 	}
-	var result searchResult
+	var result meiliSearchResult
 	err = g.Meili().Search(meiliQ, &result)
 	if err != nil {
 		return nil, err
 	}
-	hits := make([]api.MeiliMsg, 0, len(result.Hits))
+	hits := make([]meiliMsg, 0, len(result.Hits))
 	for _, hit := range result.Hits {
 		hits = append(hits, mapMeiliMsg(hit))
 	}
-	return &api.SearchResult{
+	return &searchResult{
 		Hits:               hits,
 		Query:              result.Query,
-		ProcessingTimeMs:   int32(result.ProcessingTimeMs),
-		Limit:              int32(result.Limit),
-		Offset:             int32(result.Offset),
-		EstimatedTotalHits: int32(result.EstimatedTotalHits),
+		ProcessingTimeMs:   result.ProcessingTimeMs,
+		Limit:              result.Limit,
+		Offset:             result.Offset,
+		EstimatedTotalHits: result.EstimatedTotalHits,
 	}, nil
 }
 
-func mapMeiliMsg(src handlers.MeiliMsg) api.MeiliMsg {
-	return api.MeiliMsg{
+func mapMeiliMsg(src handlers.MeiliMsg) meiliMsg {
+	return meiliMsg{
 		MongoID:   src.MongoId,
 		PeerID:    src.PeerId,
 		FromID:    src.FromId,
 		MsgID:     src.MsgId,
 		Date:      src.Date,
-		Message:   api.NewOptString(src.Message),
-		ImageText: api.NewOptString(src.ImageText),
-		QrResult:  api.NewOptString(src.QrResult),
+		Message:   src.Message,
+		ImageText: src.ImageText,
+		QrResult:  src.QrResult,
 	}
 }
