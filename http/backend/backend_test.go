@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"io"
 	"log"
-	api "main/http/backend/ogen"
 	"net"
 	"net/http"
 	"net/url"
@@ -15,7 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var testServer *api.Server
+var testServer http.Handler
 
 const baseAddr = "127.0.0.1:9892"
 
@@ -84,4 +83,22 @@ func TestSecurity(t *testing.T) {
 	as.NoError(err)
 	as.Equal(404, resp.StatusCode)
 	as.Equal(`{"message":"user has no profile photo"}`, string(respData))
+}
+
+func TestSearchValidation(t *testing.T) {
+	as := assert.New(t)
+
+	req, err := http.NewRequest(http.MethodPost, baseUrl+"search", bytes.NewReader([]byte(`{"q":"","ins_id":"1","page":1}`)))
+	as.NoError(err)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Telegram-Init-Data", hAuthData)
+
+	resp, err := http.DefaultClient.Do(req)
+	as.NoError(err)
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	as.NoError(err)
+	as.Equal(400, resp.StatusCode)
+	as.Contains(string(body), "error_message")
 }

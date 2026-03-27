@@ -6,13 +6,14 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	api "main/http/backend/ogen"
+	"net/http"
 	"net/url"
 	"slices"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	jsoniter "github.com/json-iterator/go"
 )
 
@@ -101,9 +102,19 @@ func (h *Handler) verifyTgAuth(raw string) error {
 	return err
 }
 
-func (h *Handler) HandleTgAuth(ctx context.Context,
-	_ api.OperationName, t api.TgAuth) (context.Context, error) {
-	authData := t.GetAPIKey()
-	auth, err := checkTelegramAuth(authData, h.verifyKey)
-	return context.WithValue(ctx, authCtxKey, auth), err
+func (h *Handler) requireHeaderAuth(operationName string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		authData := c.GetHeader("X-Telegram-Init-Data")
+		auth, err := checkTelegramAuth(authData, h.verifyKey)
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, securityError{
+				ErrorMessage: fmt.Sprintf("operation %s: security \"\": security requirement is not satisfied", operationName),
+			})
+			return
+		}
+		c.Set("tg_auth_raw", authData)
+		c.Set("tg_auth", auth)
+		c.Request = c.Request.WithContext(context.WithValue(c.Request.Context(), authCtxKey, auth))
+		c.Next()
+	}
 }
