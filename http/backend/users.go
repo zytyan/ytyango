@@ -22,12 +22,12 @@ func (h *Handler) handleGetUsersInfo(c *gin.Context) {
 		var user *q.User
 		var err error
 		if userID <= 0 {
-			apiUser.Error = stringPtr("user id invalid")
+			apiUser.Error = new("user id invalid")
 			goto addUser
 		}
 		user, err = g.Q.GetUserById(c.Request.Context(), userID)
 		if err != nil {
-			apiUser.Error = stringPtr("user not found")
+			apiUser.Error = new("user not found")
 			goto addUser
 		}
 		apiUser.Name = user.Name()

@@ -57,7 +57,3 @@ type avatarURIParams struct {
 type avatarQuery struct {
 	TgAuth string `form:"tgauth" binding:"required,min=8"`
 }
-
-func stringPtr(s string) *string {
-	return &s
-}
