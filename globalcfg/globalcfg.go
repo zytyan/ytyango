@@ -58,10 +58,17 @@ type Config struct {
 	DatabasePath       string      `koanf:"database-path"`
 	GeminiKey          string      `koanf:"gemini-key"`
 	MsgDbPath          string      `koanf:"msg-db-path"`
+	MeiliWalDbPath     string      `koanf:"meili-wal-db-path"`
+	MeiliWalBatchSize  int         `koanf:"meili-wal-batch-size"`
 
 	LogFile  string `koanf:"log-file"`
 	NoStdout bool   `koanf:"no-stdout"`
 }
+
+const (
+	DefaultMeiliWalDbPath    = "meili-wal.db"
+	DefaultMeiliWalBatchSize = 500
+)
 
 var gMu sync.Mutex
 var config atomic.Pointer[Config]
@@ -144,6 +151,7 @@ var meili = NewPtrLinkedCfg(
 			new.MeiliConfig.BaseUrl,
 			new.MeiliConfig.IndexName,
 			new.MeiliConfig.MasterKey,
+			new.MeiliConfig.PrimaryKey,
 		)
 	},
 )
@@ -160,7 +168,17 @@ func loadConfig(k *koanf.Koanf, provider *file.File) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
+	normalizeConfig(&newCfg)
 	return &newCfg, nil
+}
+
+func normalizeConfig(cfg *Config) {
+	if cfg.MeiliWalDbPath == "" {
+		cfg.MeiliWalDbPath = DefaultMeiliWalDbPath
+	}
+	if cfg.MeiliWalBatchSize <= 0 {
+		cfg.MeiliWalBatchSize = DefaultMeiliWalBatchSize
+	}
 }
 
 func getCfgFilename() string {
@@ -192,12 +210,14 @@ func InitConfig() {
 			log.Printf("load config file failed: %v", err)
 			return
 		}
-		oldCfg := config.Swap(cfg2)
-		if oldCfg.DatabasePath != cfg2.DatabasePath || oldCfg.MsgDbPath != cfg2.MsgDbPath {
+		oldCfg := config.Load()
+		if oldCfg.DatabasePath != cfg2.DatabasePath || oldCfg.MsgDbPath != cfg2.MsgDbPath || oldCfg.MeiliWalDbPath != cfg2.MeiliWalDbPath {
 			log.Printf("database path cannot be changed without restart, old: %s, new: %s", oldCfg.DatabasePath, cfg2.DatabasePath)
 			log.Printf("message database path cannot be changed without restart, old: %s, new: %s", oldCfg.MsgDbPath, cfg2.MsgDbPath)
+			log.Printf("meili wal database path cannot be changed without restart, old: %s, new: %s", oldCfg.MeiliWalDbPath, cfg2.MeiliWalDbPath)
 			return
 		}
+		config.Store(cfg2)
 		log.Printf("config changed at %s", time.Now())
 	})
 	if err != nil {
@@ -206,6 +226,14 @@ func InitConfig() {
 	config.Store(cfg)
 	db = getSqliteConn(config.Load().DatabasePath)
 	msgDb = getSqliteConn(config.Load().MsgDbPath)
+	meiliWalDbPath := config.Load().MeiliWalDbPath
+	if testing.Testing() {
+		meiliWalDbPath = ":memory:"
+	}
+	meiliWalDb = getSqliteConn(meiliWalDbPath)
+	if err := InitMeiliWalDbSchema(meiliWalDb); err != nil {
+		panic(err)
+	}
 	if testing.Testing() {
 		initMainDatabaseInMemory(db)
 		_ = msgDb.Close()
@@ -244,9 +272,22 @@ func GetAllLoggers() map[string]LoggerWithLevel {
 
 var db *sql.DB
 var msgDb *sql.DB
+var meiliWalDb *sql.DB
 
 var Q *q.Queries
 var Msgs *msgs.Queries
+
+const meiliWalSchema = `
+CREATE TABLE IF NOT EXISTS meili_wal
+(
+	id      INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+	content TEXT    NOT NULL CHECK (json_valid(content))
+);`
+
+func InitMeiliWalDbSchema(database *sql.DB) error {
+	_, err := database.Exec(meiliWalSchema)
+	return err
+}
 
 func getSqliteConn(dbPath string) *sql.DB {
 	check := func(_ sql.Result, e error) {
@@ -274,6 +315,10 @@ func RawMainDb() *sql.DB {
 
 func RawMsgsDb() *sql.DB {
 	return msgDb
+}
+
+func RawMeiliWalDb() *sql.DB {
+	return meiliWalDb
 }
 
 func init() {

@@ -2,10 +2,13 @@ package handlers
 
 import (
 	"context"
+	"database/sql"
+	"encoding/json"
 	"errors"
 	g "main/globalcfg"
 	"main/globalcfg/msgs"
 	"runtime/debug"
+	"sync/atomic"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
@@ -22,6 +25,13 @@ type MeiliMsg struct {
 	ImageText string  `json:"image_text,omitempty"`
 	QrResult  string  `json:"qr_result,omitempty"`
 }
+
+type meiliWALRow struct {
+	id      int64
+	content string
+}
+
+var meiliWALFlushing atomic.Bool
 
 func saveMessage(bot *gotgbot.Bot, ctx *ext.Context) {
 	updateFields := []any{"update_id", ctx.UpdateId}
@@ -97,16 +107,136 @@ func saveMessageToMeilisearch(bot *gotgbot.Bot, msg *gotgbot.Message) (err error
 		logger.Debug("skip save message to meilisearch, no text")
 		return nil
 	}
-	err = g.Meili().AddDocument(meiliMsg)
+	content, err := json.Marshal(meiliMsg)
 	if err != nil {
-		logger.Warn("save message to meilisearch", "err", err)
+		return err
 	}
+	meiliErr := g.Meili().AddDocument(meiliMsg)
+	if meiliErr != nil {
+		logger.Warn("save message to meilisearch", "err", meiliErr)
+		if err := insertMeiliWAL(context.Background(), g.RawMeiliWalDb(), string(content)); err != nil {
+			logger.Warn("save message to meilisearch wal", "err", err)
+		}
+	} else if err := flushMeiliWAL(context.Background(), g.RawMeiliWalDb(), meiliWALBatchSize(), g.Meili().AddDocuments); err != nil {
+		logger.Warn("flush meilisearch wal", "err", err)
+	}
+
 	chat := msg.GetChat()
 	err = g.Q.UpdateChatAttr(context.Background(), &chat)
 	if err != nil {
 		logD.Warn("update chat error", "err", err)
+		return err
 	}
+	return meiliErr
+}
+
+func meiliWALBatchSize() int {
+	cfg := g.GetConfig()
+	if cfg == nil || cfg.MeiliWalBatchSize <= 0 {
+		return g.DefaultMeiliWalBatchSize
+	}
+	return cfg.MeiliWalBatchSize
+}
+
+func insertMeiliWAL(ctx context.Context, db *sql.DB, content string) error {
+	if db == nil {
+		return errors.New("meili wal db is nil")
+	}
+	_, err := db.ExecContext(ctx, `INSERT INTO meili_wal (content) VALUES (?)`, content)
 	return err
+}
+
+func flushMeiliWAL(ctx context.Context, db *sql.DB, batchSize int, addDocuments func(any) error) error {
+	if db == nil {
+		return errors.New("meili wal db is nil")
+	}
+	if addDocuments == nil {
+		return errors.New("meili add documents func is nil")
+	}
+	if batchSize <= 0 {
+		batchSize = g.DefaultMeiliWalBatchSize
+	}
+	if !meiliWALFlushing.CompareAndSwap(false, true) {
+		return nil
+	}
+	defer meiliWALFlushing.Store(false)
+
+	for {
+		flushed, err := flushMeiliWALBatch(ctx, db, batchSize, addDocuments)
+		if err != nil {
+			return err
+		}
+		if flushed < batchSize {
+			return nil
+		}
+	}
+}
+
+func flushMeiliWALBatch(ctx context.Context, db *sql.DB, batchSize int, addDocuments func(any) error) (int, error) {
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, err
+	}
+	committed := false
+	defer func() {
+		if !committed {
+			_ = tx.Rollback()
+		}
+	}()
+
+	rows, err := tx.QueryContext(ctx, `SELECT id, content FROM meili_wal ORDER BY id LIMIT ?`, batchSize)
+	if err != nil {
+		return 0, err
+	}
+	walRows, err := readMeiliWALRows(rows)
+	if err != nil {
+		return 0, err
+	}
+	if len(walRows) == 0 {
+		if err := tx.Commit(); err != nil {
+			return 0, err
+		}
+		committed = true
+		return 0, nil
+	}
+
+	docs := make([]MeiliMsg, 0, len(walRows))
+	for _, row := range walRows {
+		var doc MeiliMsg
+		if err := json.Unmarshal([]byte(row.content), &doc); err != nil {
+			return 0, err
+		}
+		docs = append(docs, doc)
+	}
+	if err := addDocuments(docs); err != nil {
+		return 0, err
+	}
+	for _, row := range walRows {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM meili_wal WHERE id = ?`, row.id); err != nil {
+			return 0, err
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return 0, err
+	}
+	committed = true
+	return len(walRows), nil
+}
+
+func readMeiliWALRows(rows *sql.Rows) ([]meiliWALRow, error) {
+	defer rows.Close()
+	var walRows []meiliWALRow
+	for rows.Next() {
+		var row meiliWALRow
+		if err := rows.Scan(&row.id, &row.content); err != nil {
+			return nil, err
+		}
+		walRows = append(walRows, row)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return walRows, nil
 }
 
 func shouldPersistMessages(ctx *ext.Context) bool {

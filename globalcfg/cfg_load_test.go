@@ -39,6 +39,8 @@ func TestLoadConfig(t *testing.T) {
 	as.Equal(int8(-1), cfg.LogLevel)
 	as.Equal(":memory:", cfg.DatabasePath)
 	as.Equal(":memory:", cfg.MsgDbPath)
+	as.Equal("meili-wal.db", cfg.MeiliWalDbPath)
+	as.Equal(500, cfg.MeiliWalBatchSize)
 	logger := GetLogger("test", -1)
 	fmt.Println(logger)
 	logger.Info("test logger")

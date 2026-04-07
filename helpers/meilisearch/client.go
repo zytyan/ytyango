@@ -17,12 +17,13 @@ type Client struct {
 	PrimaryKey string
 }
 
-func NewMeiliClient(baseUrl, index, masterKey string) *Client {
+func NewMeiliClient(baseUrl, index, masterKey, primaryKey string) *Client {
 	return &Client{
 		httpClient: &http.Client{},
 		Index:      index,
 		BaseUrl:    baseUrl,
 		MasterKey:  masterKey,
+		PrimaryKey: primaryKey,
 	}
 }
 func validStatusCode(statusCode int) bool {
@@ -59,7 +60,7 @@ func (c *Client) postJsonData(u string, data io.Reader, ignoreOutput bool) ([]by
 	return outBuf.Bytes(), nil
 }
 
-func (c *Client) AddDocument(data any) error {
+func (c *Client) addDocuments(data any) error {
 	buf := bytes.NewBuffer(nil)
 	err := jsoniter.NewEncoder(buf).Encode(data)
 	if err != nil {
@@ -68,6 +69,14 @@ func (c *Client) AddDocument(data any) error {
 	u := fmt.Sprintf("%s/indexes/%s/documents?primaryKey=%s", c.BaseUrl, c.Index, c.PrimaryKey)
 	_, err = c.postJsonData(u, buf, true)
 	return err
+}
+
+func (c *Client) AddDocument(data any) error {
+	return c.addDocuments(data)
+}
+
+func (c *Client) AddDocuments(data any) error {
+	return c.addDocuments(data)
 }
 
 type SearchQuery struct {
