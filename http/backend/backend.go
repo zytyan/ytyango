@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strconv"
 	"sync"
+	"time"
 
 	g "main/globalcfg"
 
@@ -51,13 +52,48 @@ func registerValidators() {
 	})
 }
 
+func slogGinLogger(log *slog.Logger) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		start := time.Now()
+		c.Next()
+
+		path := c.FullPath()
+		if path == "" {
+			path = c.Request.URL.Path
+		}
+
+		attrs := []slog.Attr{
+			slog.String("method", c.Request.Method),
+			slog.String("path", path),
+			slog.Int("status", c.Writer.Status()),
+			slog.Duration("latency", time.Since(start)),
+			slog.String("client_ip", c.ClientIP()),
+			slog.String("user_agent", c.Request.UserAgent()),
+		}
+		if rawQuery := c.Request.URL.RawQuery; rawQuery != "" {
+			attrs = append(attrs, slog.String("query", rawQuery))
+		}
+		if len(c.Errors) > 0 {
+			attrs = append(attrs, slog.String("errors", c.Errors.String()))
+		}
+
+		level := slog.LevelInfo
+		if c.Writer.Status() >= http.StatusInternalServerError {
+			level = slog.LevelError
+		} else if c.Writer.Status() >= http.StatusBadRequest {
+			level = slog.LevelWarn
+		}
+		log.LogAttrs(c.Request.Context(), level, "gin request", attrs...)
+	}
+}
+
 // NewServer wires the gin router with the backend handler.
 func NewServer(bot *gotgbot.Bot) (http.Handler, error) {
 	registerValidators()
 	h := NewHandler(bot)
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
-	r.Use(gin.Recovery())
+	r.Use(slogGinLogger(h.log), gin.Recovery())
 	r.POST("/search", h.requireHeaderAuth("SearchMessages"), h.handleSearchMessages)
 	r.POST("/users/info", h.requireHeaderAuth("GetUsersInfo"), h.handleGetUsersInfo)
 	r.GET("/users/:userId/avatar", h.handleGetUserAvatar)
