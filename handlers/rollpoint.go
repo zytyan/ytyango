@@ -50,7 +50,7 @@ func Roll(bot *gotgbot.Bot, ctx *ext.Context) error {
 		}
 	}
 	rd := rand.Intn(end-start+1) + start
-	reply := fmt.Sprintf("在%d-%d的roll点中，你掷出了%d\n本消息将在五分钟后删除", start, end, rd)
+	reply := fmt.Sprintf("在%d-%d的roll点中，你掷出了%d", start, end, rd)
 	_, err := ctx.Message.Reply(bot, reply,
 		&gotgbot.SendMessageOpts{
 			ReplyMarkup: h.NewInlineKeyboardButtonBuilder().Callback("删除该消息", callbackDataDelMe).Build(),
