@@ -149,7 +149,6 @@ func getBiliCallbackDataInMsg(ctx *ext.Context) (uid int64) {
 	}
 	log.Error("no bili inline button", "chat_title", msg.Chat.Title, "chat_id", msg.Chat.Id, "message_id", msg.MessageId)
 	panic(fmt.Sprintf("%s(%d)/%dno bili inline button", msg.Chat.Title, msg.Chat.Id, msg.MessageId))
-	return
 }
 func SaveBiliMsgCallbackMsgId(_ *gotgbot.Bot, ctx *ext.Context) (err error) {
 	uid := getBiliCallbackDataInMsg(ctx)
