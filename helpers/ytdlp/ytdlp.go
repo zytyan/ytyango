@@ -126,20 +126,25 @@ func (c *Req) Clean() error {
 	}
 	return os.RemoveAll(c.tmpPath)
 }
+
 func isVideoFile(name string) bool {
-	videoSuffixes := []string{".mp4", ".mkv", ".flv"}
+	videoSuffixes := []string{".mp4", ".mkv", ".flv", ".ts", ".avi", ".webm"}
 	return slices.Contains(videoSuffixes, strings.ToLower(filepath.Ext(name)))
 
 }
+
 func getFirstFile(path string) (string, error) {
-	files, err := os.ReadDir(path)
+	files, err := filepath.Glob(filepath.Join(path, "**/*"))
 	if err != nil {
 		return "", fmt.Errorf("读取目录 %s 失败", path)
 	}
 	for _, file := range files {
-		if !file.IsDir() && isVideoFile(file.Name()) {
-			firstFile := filepath.Join(path, file.Name())
-			return firstFile, nil
+		info, err := os.Stat(file)
+		if err != nil {
+			continue
+		}
+		if !info.IsDir() && isVideoFile(info.Name()) {
+			return file, nil
 		}
 	}
 	return "", fmt.Errorf("%s 目录中没有文件", path)
@@ -235,6 +240,7 @@ func (c *Req) runWithCtxBBDown(ctx context.Context) (resp *Resp, err error) {
 	errBuf := new(bytes.Buffer)
 	cmd.Stdout = outBuf
 	cmd.Stderr = errBuf
+	cmd.Dir = tmp
 	err = cmd.Run()
 	var exitErr *exec.ExitError
 	if err != nil && errors.As(err, &exitErr) {
