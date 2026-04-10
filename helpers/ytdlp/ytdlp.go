@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"net/http"
 	"os"
 	"os/exec"
@@ -134,18 +135,24 @@ func isVideoFile(name string) bool {
 }
 
 func getFirstFile(path string) (string, error) {
-	files, err := filepath.Glob(filepath.Join(path, "**/*"))
+	var file string
+	err := filepath.WalkDir(path, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if !d.IsDir() && isVideoFile(d.Name()){
+			file = path
+			return filepath.SkipAll
+		}
+
+		return nil
+	})
 	if err != nil {
 		return "", fmt.Errorf("读取目录 %s 失败", path)
 	}
-	for _, file := range files {
-		info, err := os.Stat(file)
-		if err != nil {
-			continue
-		}
-		if !info.IsDir() && isVideoFile(info.Name()) {
-			return file, nil
-		}
+	if file != "" {
+		return file, nil
 	}
 	return "", fmt.Errorf("%s 目录中没有文件", path)
 }

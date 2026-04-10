@@ -19,13 +19,18 @@ linters:
       exclude-functions:
         - io.Copy(*bytes.Buffer)
         - io.Copy(os.Stdout)
-        -
+        - (*bytes.Buffer).Write
+        - (*bytes.Buffer).WriteString
         - (*os.File).Close
         - (*net/http.Response).Body.Close
         - (*gzip.Reader).Close
         - (*gzip.Writer).Close
         - (*zip.ReadCloser).Close
         - (io.Closer).Close
+        - (*database/sql.DB).Close
+        - (*database/sql.Rows).Close
+        - (*database/sql.Stmt).Close
+        - (*database/sql.Conn).Close
 
         - (*strings.Builder).WriteString
         - (*strings.Builder).WriteByte
