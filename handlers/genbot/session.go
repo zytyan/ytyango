@@ -232,7 +232,7 @@ func GeminiGetSession(ctx context.Context, msg *gotgbot.Message, createNewSessio
 	defer geminiSessions.mu.Unlock()
 	session := &GeminiSession{}
 	topic := newTopic(msg)
-	if msg.ReplyToMessage != nil && !createNewSession {
+	if (mentionSessionId != 0 || msg.ReplyToMessage != nil) && !createNewSession {
 		var sessionId int64
 		var err error
 		if mentionSessionId == 0 {
