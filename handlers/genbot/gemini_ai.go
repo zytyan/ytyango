@@ -120,7 +120,7 @@ func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 	if strings.Contains(text, "@last") {
 		ignoreSessionTimeout = true
 	} else if found := reReplyToSession.FindString(text); found != "" {
-		replySessionId, _ = strconv.ParseInt(found, 10, 64)
+		replySessionId, _ = strconv.ParseInt(found[1:], 10, 64)
 	}
 	session := GeminiGetSession(genCtx, msg, false, ignoreSessionTimeout, replySessionId)
 	if session == nil {
