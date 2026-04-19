@@ -11,6 +11,7 @@ import (
 	"math/rand/v2"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -20,6 +21,7 @@ import (
 	"google.golang.org/genai"
 )
 
+var reReplyToSession = regexp.MustCompile(`@\d+`)
 var mainBot *gotgbot.Bot
 var log *slog.Logger
 var client = g.NewPtrLinkedCfg(
@@ -45,7 +47,6 @@ func getGenAiClient() *genai.Client {
 
 const (
 	geminiSessionContentLimit = 150
-	geminiInterval            = time.Second * 30
 	geminiMemoriesLimit       = 60
 )
 
@@ -114,14 +115,14 @@ func GeminiReply(bot *gotgbot.Bot, ctx *ext.Context) error {
 	genCtx, cancel := context.WithTimeout(context.Background(), time.Minute*15)
 	defer cancel()
 	text := msg.GetText()
-	createNewSession := false
 	ignoreSessionTimeout := false
-	if strings.Contains(text, "@new") {
-		createNewSession = true
-	} else if strings.Contains(text, "@last") {
+	replySessionId := int64(0)
+	if strings.Contains(text, "@last") {
 		ignoreSessionTimeout = true
+	} else if found := reReplyToSession.FindString(text); found != "" {
+		replySessionId, _ = strconv.ParseInt(found, 10, 64)
 	}
-	session := GeminiGetSession(genCtx, msg, createNewSession, ignoreSessionTimeout)
+	session := GeminiGetSession(genCtx, msg, false, ignoreSessionTimeout, replySessionId)
 	if session == nil {
 		return nil
 	}
