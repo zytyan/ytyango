@@ -2,6 +2,7 @@ package mathparser
 
 import (
 	"math/big"
+	"regexp"
 	"unicode"
 )
 
@@ -57,6 +58,8 @@ func isAllowedFastCheckRune(r rune) bool {
 	return false
 }
 
+var rePlusNum = regexp.MustCompile(`^\+\d+$`)
+
 func FastCheck(expr string) bool {
 	onlyDigits := true
 	for _, c := range expr {
@@ -71,5 +74,8 @@ func FastCheck(expr string) bool {
 			return false
 		}
 	}
-	return !onlyDigits
+	if onlyDigits {
+		return false
+	}
+	return !rePlusNum.MatchString(expr)
 }

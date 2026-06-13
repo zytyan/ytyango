@@ -283,4 +283,6 @@ func TestFastCheck(t *testing.T) {
 	as.False(FastCheck("hello=1+2"))
 	as.True(FastCheck("3.14 ×（2＋1）"))
 	as.True(FastCheck("√9 + |1-5|"))
+	as.False(FastCheck("+1"))
+	as.True(FastCheck("+1+1"))
 }
