@@ -2,6 +2,7 @@ package g
 
 import (
 	"fmt"
+	"log/slog"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -44,4 +45,8 @@ func TestLoadConfig(t *testing.T) {
 	logger := GetLogger("test", -1)
 	fmt.Println(logger)
 	logger.Info("test logger")
+
+	namedLogger := GetLogger("test-config-log-level", slog.LevelInfo)
+	as.NotNil(namedLogger)
+	as.Equal(slog.Level(-1), GetAllLoggers()["test-config-log-level"].Level.Level())
 }

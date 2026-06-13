@@ -13,10 +13,13 @@ import (
 )
 
 func GenPrpr(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
-	var userID int64
-	userID = ctx.EffectiveUser.Id
-	if ctx.Message.ReplyToMessage != nil {
-		userID = ctx.Message.ReplyToMessage.From.Id
+	msg := ctx.Message
+	if msg == nil || ctx.EffectiveChat == nil || ctx.EffectiveUser == nil {
+		return nil
+	}
+	userID := ctx.EffectiveUser.Id
+	if msg.ReplyToMessage != nil && msg.ReplyToMessage.From != nil {
+		userID = msg.ReplyToMessage.From.Id
 	}
 	if userID == 0 {
 		return
@@ -25,8 +28,8 @@ func GenPrpr(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
 	if err != nil {
 		return err
 	}
-	if len(photos.Photos) == 0 {
-		_, err = ctx.Message.Reply(bot, "没有头像", nil)
+	if len(photos.Photos) == 0 || len(photos.Photos[0]) == 0 {
+		_, err = msg.Reply(bot, "没有头像", nil)
 		return
 	}
 	photo := photos.Photos[0][0]

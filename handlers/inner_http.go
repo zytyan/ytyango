@@ -207,7 +207,7 @@ func setLoggerLevel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	logger, exists := g.GetAllLoggers()[loggerName]
+	_, exists := g.GetAllLoggers()[loggerName]
 	if !exists {
 		_, _ = fmt.Fprintf(w, "logger %s not found\n%s", loggerName, formatLoggers())
 		return
@@ -215,9 +215,11 @@ func setLoggerLevel(w http.ResponseWriter, r *http.Request) {
 
 	newLevel, err := strconv.ParseInt(levelParam, 10, 8)
 	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
 		_, _ = w.Write([]byte(err.Error()))
+		return
 	}
-	logger.Level.Set(slog.Level(newLevel))
+	g.SetLoggerLevel(loggerName, slog.Level(newLevel))
 }
 
 func backupSQLiteDB(ctx context.Context, src *sql.DB, dstPath string) error {

@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	jsoniter "github.com/json-iterator/go"
@@ -14,7 +15,12 @@ import (
 
 type Rate map[string]float64
 
-var exchangeCache = map[string]*ApiResp{}
+var (
+	exchangeCache     = map[string]*ApiResp{}
+	exchangeMu        sync.Mutex
+	exchangeHTTP      = &http.Client{Timeout: 10 * time.Second}
+	exchangeAPIURLFmt = "https://open.er-api.com/v6/latest/%s"
+)
 
 type ApiResp struct {
 	Result             string `json:"result"`
@@ -37,12 +43,14 @@ type Resp struct {
 }
 
 func getExchangeRateFromNet(base string) (*ApiResp, error) {
-	get, err := http.Get(fmt.Sprintf("https://open.er-api.com/v6/latest/%s", base))
+	get, err := exchangeHTTP.Get(fmt.Sprintf(exchangeAPIURLFmt, base))
 	if err != nil {
 		return nil, err
 	}
-	lastReqTime = time.Now()
 	defer get.Body.Close()
+	if get.StatusCode < http.StatusOK || get.StatusCode >= http.StatusMultipleChoices {
+		return nil, fmt.Errorf("exchange api returned status %d", get.StatusCode)
+	}
 	var exchangeApi ApiResp
 	err = jsoniter.NewDecoder(get.Body).Decode(&exchangeApi)
 	if err != nil {
@@ -102,6 +110,7 @@ var lastReqTime = time.Unix(0, 0)
 func globalCanUpdate() bool {
 	return time.Since(lastReqTime) > 1*time.Hour
 }
+
 func findLeastAvailableExchangeRate(prefer string) string {
 	if prefer != "" {
 		_, ok := exchangeCache[prefer]
@@ -129,9 +138,14 @@ func refreshCache(req Req) error {
 		if err != nil {
 			return err
 		}
+		lastReqTime = time.Now()
 		exchangeCache[req.From] = resp
 	} else {
-		return apiResp.Update()
+		err := apiResp.Update()
+		if err == nil {
+			lastReqTime = time.Now()
+		}
+		return err
 	}
 	return nil
 }
@@ -155,6 +169,8 @@ func GetExchangeRate(req Req) (Resp, error) {
 	if !IsAvailableCash(req.From) || !IsAvailableCash(req.To) {
 		return resp, ErrCashNotAvail
 	}
+	exchangeMu.Lock()
+	defer exchangeMu.Unlock()
 	err := refreshCache(req)
 	if err != nil {
 		return resp, err

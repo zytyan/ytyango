@@ -217,12 +217,14 @@ func InitConfig() {
 			return
 		}
 		config.Store(cfg2)
+		SetAllLoggerLevels(slog.Level(cfg2.LogLevel))
 		log.Printf("config changed at %s", time.Now())
 	})
 	if err != nil {
 		panic(err)
 	}
 	config.Store(cfg)
+	SetAllLoggerLevels(slog.Level(cfg.LogLevel))
 	db = getSqliteConn(config.Load().DatabasePath)
 	msgDb = getSqliteConn(config.Load().MsgDbPath)
 	meiliWalDbPath := config.Load().MeiliWalDbPath
@@ -259,10 +261,6 @@ func Moderator() *azure.ModeratorV2 {
 
 func Meili() *meilisearch.Client {
 	return meili.Get()
-}
-
-func GetAllLoggers() map[string]LoggerWithLevel {
-	return loggers
 }
 
 var db *sql.DB
