@@ -23,31 +23,25 @@ func TestTokenize(t *testing.T) {
 	as.Equal(IDENT, tokens[6].typ)
 }
 
-func TestShuntingYard(t *testing.T) {
+func TestTokenizeLongestMatchAndNewOperators(t *testing.T) {
 	as := require.New(t)
-	expr := "1 + 2 * 3"
-	toks, err := tokenize(expr)
+
+	toks, err := tokenize("2 ** 3 // 2 √9 |1-5|")
 	as.NoError(err)
-	rpn, err := shuntingYard(toks)
-	as.NoError(err)
-	// Expected RPN: 1 2 3 * +
-	types := []TokenType{NUMBER, NUMBER, NUMBER, MUL, PLUS}
+	types := []TokenType{NUMBER, POW, NUMBER, FLOORDIV, NUMBER, SQRT, NUMBER, PIPE, NUMBER, MINUS, NUMBER, PIPE, EOF}
 	for i, tp := range types {
-		as.Equal(tp, rpn[i].typ)
+		as.Equal(tp, toks[i].typ)
 	}
 }
 
-func TestEvalRPN(t *testing.T) {
+func TestParse(t *testing.T) {
 	as := require.New(t)
-	// RPN for (1+2)*3 => 1 2 + 3 *
-	rpn := []Token{
-		{typ: NUMBER, num: big.NewRat(1, 1)},
-		{typ: NUMBER, num: big.NewRat(2, 1)},
-		{typ: PLUS, str: "+"},
-		{typ: NUMBER, num: big.NewRat(3, 1)},
-		{typ: MUL, str: "*"},
-	}
-	res, err := evalRPN(rpn)
+
+	toks, err := tokenize("(1+2)*3")
+	as.NoError(err)
+	ast, err := parse(toks)
+	as.NoError(err)
+	res, err := ast.eval()
 	as.NoError(err)
 	as.Equal(big.NewRat(9, 1), res)
 }
@@ -77,6 +71,11 @@ func TestEvaluate(t *testing.T) {
 		"085161313395870091994536705997276431050332778874671087204270866459209290636957209904296387111707222119192461312")
 	as.True(ok)
 	as.Equal(expResult, res)
+
+	expr = "2 ** 9999"
+	res, err = Evaluate(expr)
+	as.NoError(err)
+	as.Equal(10000, res.Num().BitLen())
 
 	expr = "1.02 ** 2"
 	res, err = Evaluate(expr)
@@ -123,6 +122,44 @@ func TestEvaluate(t *testing.T) {
 	res, err = Evaluate(expr)
 	as.NoError(err)
 	as.Equal(big.NewRat(720, 1), res)
+}
+
+func TestEvaluateUnaryAndPrecedence(t *testing.T) {
+	as := require.New(t)
+
+	tests := map[string]*big.Rat{
+		"-1+2":    big.NewRat(1, 1),
+		"2*-3":    big.NewRat(-6, 1),
+		"-(1+2)":  big.NewRat(-3, 1),
+		"+2":      big.NewRat(2, 1),
+		"2^3^2":   big.NewRat(512, 1),
+		"(2^3)^2": big.NewRat(64, 1),
+		"-2^2":    big.NewRat(-4, 1),
+	}
+	for expr, expected := range tests {
+		res, err := Evaluate(expr)
+		as.NoError(err, expr)
+		as.Equal(expected, res, expr)
+	}
+}
+
+func TestEvaluateNewOperators(t *testing.T) {
+	as := require.New(t)
+
+	tests := map[string]*big.Rat{
+		"50%":      big.NewRat(1, 2),
+		"100 + 5%": big.NewRat(2001, 20),
+		"5 % 2":    big.NewRat(1, 1),
+		"√9":       big.NewRat(3, 1),
+		"√0.25":    big.NewRat(1, 2),
+		"|-3|":     big.NewRat(3, 1),
+		"|1-5|":    big.NewRat(4, 1),
+	}
+	for expr, expected := range tests {
+		res, err := Evaluate(expr)
+		as.NoError(err, expr)
+		as.Equal(expected, res, expr)
+	}
 }
 
 func TestTokenizeErrors(t *testing.T) {
@@ -205,13 +242,45 @@ func TestEvaluateErrors(t *testing.T) {
 	ce, ok = err.(*CalcError)
 	as.True(ok)
 	as.Equal(ErrorResultTooBig, ce.Typ)
+
+	_, err = Evaluate("2 ^ 10000")
+	as.Error(err)
+	ce, ok = err.(*CalcError)
+	as.True(ok)
+	as.Equal(ErrorResultTooBig, ce.Typ)
+
+	_, err = Evaluate("1200!")
+	as.Error(err)
+	ce, ok = err.(*CalcError)
+	as.True(ok)
+	as.Equal(ErrorResultTooBig, ce.Typ)
+
+	_, err = Evaluate("√-1")
+	as.Error(err)
+	ce, ok = err.(*CalcError)
+	as.True(ok)
+	as.Equal(ErrorInfiniteResult, ce.Typ)
+
+	_, err = Evaluate("|1+2")
+	as.Error(err)
+	ce, ok = err.(*CalcError)
+	as.True(ok)
+	as.Equal(ErrorMismatchedParentheses, ce.Typ)
+
+	_, err = Evaluate("1 2")
+	as.Error(err)
+	ce, ok = err.(*CalcError)
+	as.True(ok)
+	as.Equal(ErrorUnexpectedToken, ce.Typ)
 }
 
 func TestFastCheck(t *testing.T) {
 	as := require.New(t)
 
 	as.False(FastCheck("1234567890"))
+	as.False(FastCheck("154.54"))
 	as.True(FastCheck("1 + 2 * 3"))
 	as.False(FastCheck("hello=1+2"))
 	as.True(FastCheck("3.14 ×（2＋1）"))
+	as.True(FastCheck("√9 + |1-5|"))
 }
