@@ -86,13 +86,9 @@ func SetDndAttr(bot *gotgbot.Bot, ctx *ext.Context) (err error) {
 		oldVal := val
 
 		switch matches[2] {
-		case "+":
-			fallthrough
-		case "+=":
+		case "+", "+=":
 			val = strconv.Itoa(defaultAtoi(val, 0) + defaultAtoi(matches[3], 0))
-		case "-":
-			fallthrough
-		case "-=":
+		case "-", "-=":
 			val = strconv.Itoa(defaultAtoi(val, 0) - defaultAtoi(matches[3], 0))
 		default:
 			val = matches[3]

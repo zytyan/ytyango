@@ -94,9 +94,6 @@ func NewServer(bot *gotgbot.Bot) (http.Handler, error) {
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
 	r.Use(slogGinLogger(h.log), gin.Recovery())
-	r.POST("/search", h.requireHeaderAuth("SearchMessages"), h.handleSearchMessages)
-	r.POST("/users/info", h.requireHeaderAuth("GetUsersInfo"), h.handleGetUsersInfo)
-	r.GET("/users/:userId/avatar", h.handleGetUserAvatar)
 	return r, nil
 }
 

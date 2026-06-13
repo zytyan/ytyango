@@ -233,23 +233,10 @@ func main() {
 	)
 	genBotLogger := g.GetLogger("genbot", slog.LevelInfo)
 	genbot.Init(b, genBotLogger)
-	hMsg := handlers.NewMessage(message.All, hdrs.SaveMessage)
-	hMsg.AllowChannel = true
-	hMsg.AllowEdited = true
-	wrappedHMsg := &HookedHandler{
-		Handler:     hMsg,
-		logger:      dp.logger,
-		hitCounter:  atomic.Int64{},
-		funcName:    funcName(hdrs.SaveMessage),
-		checkerName: "any message",
-	}
-	dp.AddHandler(wrappedHMsg)
-
 	dp.NewMessage(message.All, hdrs.StatMessage)
 	dp.NewInlineQuery(inlinequery.All, hdrs.BiliMsgConverterInline)
 
 	dp.Command("roll", hdrs.Roll)
-	dp.Command("hhsh", hdrs.Hhsh)
 	dp.Command("ocr", hdrs.OcrMessage)
 	dp.Command("score", hdrs.CmdScore)
 	dp.Command("prpr", hdrs.GenPrpr)
@@ -258,7 +245,6 @@ func main() {
 	dp.Command("downloadaudio", hdrs.DownloadAudio)
 	dp.Command("getrank", hdrs.GetRank)
 	dp.Command("diag_sendstat", hdrs.SendGroupStat)
-	dp.Command("searchmsg", hdrs.SearchMessage)
 	dp.Command("cochelp", hdrs.CoCHelp)
 	dp.Command("list_attr", hdrs.ListDndAttr)
 	dp.Command("del_attr", hdrs.DelDndAttr)

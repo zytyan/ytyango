@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"log/slog"
-	"main/globalcfg/msgs"
 	"main/globalcfg/q"
 	"main/helpers/azure"
 	"main/helpers/meilisearch"
@@ -244,10 +243,6 @@ func InitConfig() {
 		panic(err)
 	}
 	slog.Info("")
-	Msgs, err = msgs.PrepareWithLogger(context.Background(), msgDb, nil)
-	if err != nil {
-		panic(err)
-	}
 }
 
 func GetConfig() *Config {
@@ -275,7 +270,6 @@ var msgDb *sql.DB
 var meiliWalDb *sql.DB
 
 var Q *q.Queries
-var Msgs *msgs.Queries
 
 const meiliWalSchema = `
 CREATE TABLE IF NOT EXISTS meili_wal
