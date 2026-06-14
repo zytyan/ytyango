@@ -1,13 +1,11 @@
 package q
 
 import (
-	"cmp"
 	"context"
 	"database/sql"
 	"errors"
 	"fmt"
 	"math/rand/v2"
-	"slices"
 	"sort"
 	"sync"
 	"time"
@@ -16,12 +14,34 @@ import (
 )
 
 var psMu sync.RWMutex
+var rateCounterRefreshOnce sync.Once
 
-// prefix sum: ps[i] = rate=(minRate+i) 的累计数量
+const (
+	minPicRate   = 0
+	maxPicRate   = 7
+	picRateCount = maxPicRate - minPicRate + 1
+)
+
+// prefix sum: ps[i] = rate=(minPicRate+i) 的累计图片数量
 var countByRatePrefixSum []int64
-var minCountRate int // prefixSum 的偏移量
 
 func (q *Queries) BuildCountByRatePrefixSum() error {
+	if err := q.rebuildCountByRatePrefixSum(); err != nil {
+		return err
+	}
+	rateCounterRefreshOnce.Do(func() {
+		go func() {
+			ticker := time.NewTicker(6 * time.Hour)
+			defer ticker.Stop()
+			for range ticker.C {
+				_ = q.rebuildCountByRatePrefixSum()
+			}
+		}()
+	})
+	return nil
+}
+
+func (q *Queries) rebuildCountByRatePrefixSum() error {
 	psMu.Lock()
 	defer psMu.Unlock()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -31,27 +51,17 @@ func (q *Queries) BuildCountByRatePrefixSum() error {
 		return err
 	}
 	buildPrefixSumFromSparse(counts)
-	go func() {
-		for range time.Tick(6 * time.Hour) {
-			_ = q.BuildCountByRatePrefixSum()
-		}
-	}()
 	return nil
 }
 
 func buildPrefixSumFromSparse(counts []PicRateCounter) []int64 {
-	slices.SortFunc(counts, func(a, b PicRateCounter) int {
-		return cmp.Compare(a.Rate, b.Rate)
-	})
-
-	minRate := counts[0].Rate
-	maxRate := counts[len(counts)-1].Rate
-	size := maxRate - minRate + 1
-	histogram := make([]int64, size)
+	histogram := make([]int64, picRateCount)
 	for _, c := range counts {
-		histogram[c.Rate-minRate] = c.Count
+		if c.Rate < minPicRate || c.Rate > maxPicRate || c.Count <= 0 {
+			continue
+		}
+		histogram[c.Rate-minPicRate] = c.Count
 	}
-	minCountRate = int(minRate)
 	countByRatePrefixSum = buildPrefixSum(histogram)
 	return countByRatePrefixSum
 }
@@ -65,14 +75,13 @@ func buildPrefixSum(counts []int64) []int64 {
 	return r
 }
 
-// getRandomRangeByWeight 按照rate中的数量获取 [start, end)
+// getRandomRangeByWeight 按照每个 rate 的图片数量获取 [start, end) 中的 rate。
 func getRandomRangeByWeight(start, end int) (int, error) {
-	if start < minCountRate || end < minCountRate || start > end ||
-		start > len(countByRatePrefixSum) ||
-		end > len(countByRatePrefixSum) {
+	if start < minPicRate || end > maxPicRate+1 || start >= end ||
+		len(countByRatePrefixSum) != picRateCount+1 {
 		return 0, fmt.Errorf("invalid range: start %d end %d", start, end)
 	}
-	start, end = start-minCountRate, end-minCountRate
+	start, end = start-minPicRate, end-minPicRate
 	rndStart, rndEnd := countByRatePrefixSum[start], countByRatePrefixSum[end]
 	if rndStart >= rndEnd {
 		return 0, fmt.Errorf("invalid range: start %d end %d", start, end)
@@ -81,7 +90,7 @@ func getRandomRangeByWeight(start, end int) (int, error) {
 	idx := sort.Search(len(countByRatePrefixSum), func(i int) bool {
 		return countByRatePrefixSum[i] > rnd
 	})
-	return idx - 1 + minCountRate, nil
+	return idx - 1 + minPicRate, nil
 }
 
 func (q *Queries) GetPicByUserRate(ctx context.Context, rate int) (SavedPic, error) {
@@ -94,6 +103,15 @@ func (q *Queries) GetPicByUserRate(ctx context.Context, rate int) (SavedPic, err
 }
 
 func (q *Queries) GetPicByUserRateRange(ctx context.Context, start, end int) (save SavedPic, err error) {
+	psMu.RLock()
+	initialized := len(countByRatePrefixSum) == picRateCount+1
+	psMu.RUnlock()
+	if !initialized {
+		if err = q.BuildCountByRatePrefixSum(); err != nil {
+			return
+		}
+	}
+
 	psMu.RLock()
 	defer psMu.RUnlock()
 	rate, err := getRandomRangeByWeight(start, end)

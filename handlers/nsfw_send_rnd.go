@@ -14,13 +14,20 @@ var reRank = regexp.MustCompile(`(\d)(.*\b(\d))?`)
 func SendRandRacy(bot *gotgbot.Bot, ctx *ext.Context) error {
 	submatch := reRank.FindStringSubmatch(ctx.Message.GetText())
 	start := 2
+	end := 6
 	if submatch != nil {
 		start = defaultAtoi(submatch[1], 2)
+		end = defaultAtoi(submatch[3], start)
 	}
 	start = max(start, 0)
-	start = min(start, 6)
+	start = min(start, 7)
+	end = max(end, 0)
+	end = min(end, 7)
+	if end < start {
+		start, end = end, start
+	}
 
-	photo, err := g.Q.GetPicByUserRate(context.Background(), start)
+	photo, err := g.Q.GetPicByUserRateRange(context.Background(), start, end+1)
 	if err != nil {
 		_, _ = ctx.EffectiveMessage.Reply(bot, "没有涩图~", nil)
 		return err

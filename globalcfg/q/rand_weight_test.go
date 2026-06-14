@@ -9,31 +9,33 @@ import (
 func TestGetRandomRangeByWeight(t *testing.T) {
 	as := assert.New(t)
 	data := []PicRateCounter{
-		{-1, 0},
 		{0, 100},
 		{2, 100},
 		{4, 100},
 		{6, 300},
 	}
 	countByRatePrefixSum = buildPrefixSumFromSparse(data)
-	as.Equal(-1, minCountRate)
-	table := make([]int64, len(countByRatePrefixSum)-1)
+	table := make([]int64, picRateCount)
 	const totalCnt = 40000
-	as.Equal(6-(-1)+1 /*包含0值*/ +1 /*包含二分搜索的起始值*/, len(countByRatePrefixSum))
+	as.Equal(picRateCount+1, len(countByRatePrefixSum))
 	for range totalCnt {
-		idx, err := getRandomRangeByWeight(minCountRate, len(countByRatePrefixSum)-1+minCountRate)
+		idx, err := getRandomRangeByWeight(0, 7)
 		as.Nil(err)
-		as.True(idx < len(countByRatePrefixSum)-1+minCountRate)
-		as.True(idx >= minCountRate)
-		table[idx-minCountRate]++
+		as.True(idx < 7)
+		as.True(idx >= 0)
+		table[idx]++
 	}
-	probabilityTable := make([]float64, len(countByRatePrefixSum)-1)
+	probabilityTable := make([]float64, picRateCount)
 	sum := 0
 	for _, d := range data {
-		sum += int(d.Count)
+		if d.Rate < 7 {
+			sum += int(d.Count)
+		}
 	}
 	for _, d := range data {
-		probabilityTable[int(d.Rate)-minCountRate] = float64(d.Count) / float64(sum)
+		if d.Rate < 7 {
+			probabilityTable[int(d.Rate)] = float64(d.Count) / float64(sum)
+		}
 	}
 	for i := range table {
 		delta := float64(table[i])/totalCnt - probabilityTable[i]
@@ -41,4 +43,27 @@ func TestGetRandomRangeByWeight(t *testing.T) {
 		as.Less(delta, 0.05)
 	}
 
+}
+
+func TestGetRandomRangeByWeightRange(t *testing.T) {
+	as := assert.New(t)
+	countByRatePrefixSum = buildPrefixSumFromSparse([]PicRateCounter{
+		{0, 100},
+		{1, 100},
+		{2, 100},
+		{3, 100},
+	})
+
+	for range 1000 {
+		idx, err := getRandomRangeByWeight(1, 3)
+		as.Nil(err)
+		as.True(idx >= 1)
+		as.True(idx < 3)
+	}
+	_, err := getRandomRangeByWeight(3, 3)
+	as.Error(err)
+	_, err = getRandomRangeByWeight(-1, 3)
+	as.Error(err)
+	_, err = getRandomRangeByWeight(0, 9)
+	as.Error(err)
 }
