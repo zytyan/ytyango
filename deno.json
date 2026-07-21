@@ -1,0 +1,36 @@
+{
+  "name": "@zytyan/ytyanbot-ts",
+  "version": "0.1.0",
+  "exports": "./src/main.ts",
+  "imports": {
+    "grammy": "npm:grammy@1.45.1/web",
+    "@grammyjs/runner": "https://deno.land/x/grammy_runner@v2.0.3/mod.ts",
+    "https://lib.deno.dev/x/grammy@v1/mod.ts": "npm:grammy@1.45.1/web",
+    "https://lib.deno.dev/x/grammy@v1/types.ts": "npm:grammy@1.45.1/web/types",
+    "@std/assert": "jsr:@std/assert@1.0.19",
+    "@std/yaml": "jsr:@std/yaml@1.1.2",
+    "zod": "npm:zod@4.4.3"
+  },
+  "compilerOptions": {
+    "strict": true,
+    "noImplicitOverride": true,
+    "noUncheckedIndexedAccess": true
+  },
+  "fmt": {
+    "lineWidth": 100,
+    "semiColons": true,
+    "singleQuote": false
+  },
+  "lint": {
+    "rules": {
+      "tags": ["recommended"]
+    }
+  },
+  "tasks": {
+    "check": "deno fmt --check && deno lint && deno check src/main.ts",
+    "test:unit": "deno test tests/unit",
+    "test:integration": "deno test --allow-read --allow-write --allow-env tests/integration",
+    "test": "deno task test:unit && deno task test:integration",
+    "compile": "deno compile --target x86_64-unknown-linux-gnu --output dist/ytyanbot-linux-x86_64 --allow-env=YTYAN_CONFIG_FILE,YTYAN_BOT_TOKEN,GEMINI_API_KEY,DEEPSEEK_API_KEY,TZ --allow-net --allow-read=/opt/tgbots/ytyanbot/build,/opt/tgbots/ytyanbot-ts/run,/tmp --allow-write=/opt/tgbots/ytyanbot-ts/run,/tmp --allow-run=/usr/local/bin/yt-dlp,/usr/local/bin/dotnet-tools/BBDown,/usr/bin/ffprobe src/main.ts"
+  }
+}

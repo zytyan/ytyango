@@ -1,0 +1,678 @@
+import { run, type RunnerHandle } from "@grammyjs/runner";
+import { Bot, Context } from "grammy";
+import type { InlineKeyboardMarkup, Message, PhotoSize } from "grammy/types";
+import { AiRepository } from "./ai/repository.ts";
+import {
+  AiService,
+  DEFAULT_SYSTEM_PROMPT,
+  type IncomingAiMessage,
+  type IncomingMedia,
+} from "./ai/service.ts";
+import { DeepSeekProvider, GeminiProvider } from "./ai/providers.ts";
+import { type AiProvider, MODEL_OPTIONS, providerForModel } from "./ai/types.ts";
+import { ContentAddressedMediaStore } from "./ai/media_store.ts";
+import type { ConfigStore } from "./config.ts";
+import type { MainDatabase } from "./db/database.ts";
+import { convertBilibiliLinks, hasBilibiliVideo } from "./download/bilibili.ts";
+import { DownloadService, parseDownloadKey } from "./download/service.ts";
+import { type NsfwPhoto, NsfwService } from "./nsfw/service.ts";
+import { DenoProcessRunner } from "./shared/process.ts";
+import { StatsService } from "./stats/service.ts";
+import { GrammyTelegramGateway } from "./telegram/gateway.ts";
+
+const SYSTEM_PROMPT_HELP =
+  `没有找到任何System prompt，请使用 /sysprompt 提示词或使用该命令回复其他消息设置提示词。
+您需要使用 /get_sysprompt 获取当前系统提示词， /reset_sysprompt 恢复默认系统提示词。
+
+你可以通过 %VAR% 使用稳定变量。为提高缓存命中率，逐轮变化的信息只出现在最新用户消息的「[ 显示名 时间 ]」消息头中。
+CHAT_NAME: 当前聊天的名称
+CHAT_ID: 当前聊天 ID
+BOT_NAME: Bot的名字
+BOT_USERNAME: Bot的username
+CHAT_TYPE: 聊天类型(group, private)`;
+
+function messageText(message?: Message): string {
+  return message?.text ?? message?.caption ?? "";
+}
+
+function commandArgument(message?: Message): string {
+  return messageText(message).replace(/^\/\S+\s*/, "").trim();
+}
+
+function escapeHtml(value: string): string {
+  return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+}
+
+function topicId(message?: Message): number {
+  return message?.message_thread_id ?? 0;
+}
+
+function largestPhoto(message?: Message): PhotoSize | undefined {
+  return message?.photo?.at(-1);
+}
+
+function photoInput(photo: PhotoSize): NsfwPhoto {
+  return {
+    fileId: photo.file_id,
+    fileUniqueId: photo.file_unique_id,
+    width: photo.width,
+    height: photo.height,
+  };
+}
+
+function incomingMedia(message: Message): IncomingMedia[] {
+  const photo = largestPhoto(message);
+  if (photo) {
+    return [{
+      fileId: photo.file_id,
+      uniqueId: photo.file_unique_id,
+      kind: "image",
+      mimeType: "image/jpeg",
+      byteSize: photo.file_size,
+    }];
+  }
+  if (message.sticker) {
+    return [{
+      fileId: message.sticker.file_id,
+      uniqueId: message.sticker.file_unique_id,
+      kind: message.sticker.is_video ? "video" : "sticker",
+      mimeType: message.sticker.is_video ? "video/webm" : "image/webp",
+      byteSize: message.sticker.file_size,
+    }];
+  }
+  if (message.video) {
+    return [{
+      fileId: message.video.file_id,
+      uniqueId: message.video.file_unique_id,
+      kind: "video",
+      mimeType: message.video.mime_type ?? "video/mp4",
+      byteSize: message.video.file_size,
+      duration: message.video.duration,
+    }];
+  }
+  if (message.animation) {
+    return [{
+      fileId: message.animation.file_id,
+      uniqueId: message.animation.file_unique_id,
+      kind: "animation",
+      mimeType: message.animation.mime_type ?? "video/mp4",
+      byteSize: message.animation.file_size,
+      duration: message.animation.duration,
+    }];
+  }
+  return [];
+}
+
+function toIncoming(message: Message, withReply = true): IncomingAiMessage {
+  const from = message.from;
+  return {
+    chatId: message.chat.id,
+    chatName: "title" in message.chat
+      ? message.chat.title ?? ""
+      : [message.chat.first_name, message.chat.last_name].filter(Boolean).join(" "),
+    chatType: message.chat.type,
+    topicId: message.is_topic_message ? topicId(message) : undefined,
+    messageId: message.message_id,
+    sentAt: message.date,
+    userId: from?.id ?? message.sender_chat?.id ?? 0,
+    username: from
+      ? [from.first_name, from.last_name].filter(Boolean).join(" ")
+      : message.sender_chat?.title ?? "未知用户",
+    atableUsername: from?.username,
+    text: messageText(message) || undefined,
+    reply: withReply && message.reply_to_message
+      ? toIncoming(message.reply_to_message, false)
+      : undefined,
+    media: incomingMedia(message),
+  };
+}
+
+function replyOptions(message?: Message): Record<string, unknown> {
+  return message ? { reply_parameters: { message_id: message.message_id } } : {};
+}
+
+function configKeyboard(stats: StatsService, chatId: number): InlineKeyboardMarkup {
+  const cfg = stats.config(chatId);
+  return {
+    inline_keyboard: [[
+      {
+        text: `${cfg.autoCvtBili ? "✅" : "❌"} 自动转换Bilibili链接`,
+        callback_data: `gcfg:auto_cvt_bili:${cfg.autoCvtBili ? "T" : "F"}`,
+      },
+    ], [
+      {
+        text: `${cfg.respNsfwMsg ? "✅" : "❌"} 响应来张色图`,
+        callback_data: `gcfg:resp_nsfw_msg:${cfg.respNsfwMsg ? "T" : "F"}`,
+      },
+    ]],
+  };
+}
+
+function modelKeyboard(current: string, sessionId = 0): InlineKeyboardMarkup {
+  return {
+    inline_keyboard: MODEL_OPTIONS.map((option) => [{
+      text: `${option.model === current ? "✅ " : ""}${option.label}`,
+      callback_data: `aimodel:${sessionId}:${option.model}`,
+    }]),
+  };
+}
+
+function userLabel(message: Message): string {
+  const from = message.from;
+  return from ? [from.first_name, from.last_name].filter(Boolean).join(" ") : "未知用户";
+}
+
+async function canAdminister(ctx: Context, god: number): Promise<boolean> {
+  if (!ctx.from || !ctx.chat) return false;
+  if (ctx.from.id === god || ctx.chat.type === "private") return true;
+  const member = await ctx.api.getChatMember(ctx.chat.id, ctx.from.id);
+  return member.status === "administrator" || member.status === "creator";
+}
+
+function formatUsage(usage: Record<string, unknown>): string {
+  const value = (name: string) => Number(usage[name] ?? 0);
+  const count = value("input_message_count");
+  const messages = count > 0
+    ? `${count}（${value("input_first_msg_id")}-${value("input_last_msg_id")}）`
+    : "未记录";
+  const expire = value("cache_expire_at")
+    ? new Date(value("cache_expire_at") * 1000).toLocaleString("zh-CN", {
+      timeZone: "Asia/Shanghai",
+    })
+    : "无显式缓存";
+  const text = `ID: ${value("session_id")}\n消息: ${messages}\n模型: ${
+    String(usage.model)
+  }\n输入: ${(value("input_tokens") / 1000).toFixed(2)} ktoken\n输出: ${
+    (value("output_tokens") / 1000).toFixed(2)
+  } ktoken\n缓存: ${(value("cached_input_tokens") / 1000).toFixed(2)} ktoken\n缓存到期：${expire}`;
+  return [...text].length <= 200 ? text : `${[...text].slice(0, 199).join("")}…`;
+}
+
+export interface Application {
+  readonly bot: Bot;
+  serve(signal: AbortSignal): Promise<void>;
+  flush(): void;
+}
+
+export async function createApplication(
+  db: MainDatabase,
+  configs: ConfigStore,
+): Promise<Application> {
+  const initial = configs.value;
+  if (!initial.botToken) throw new Error("bot-token is empty");
+  const bot = new Bot(initial.botToken, {
+    client: { apiRoot: initial.telegramApiUrl, timeoutSeconds: 130 },
+  });
+  await bot.init();
+  const identity = bot.botInfo;
+  const telegram = new GrammyTelegramGateway(bot, initial.botToken, initial.telegramApiUrl);
+  const repository = new AiRepository(db);
+  const stats = new StatsService(db);
+  const ai = new AiService(
+    repository,
+    new Map<string, AiProvider>([
+      ["gemini", new GeminiProvider(() => configs.value)],
+      ["deepseek", new DeepSeekProvider(() => configs.value)],
+    ]),
+    telegram,
+    new ContentAddressedMediaStore(initial.aiMediaPath),
+    () => configs.value,
+    { id: identity.id, firstName: identity.first_name, username: identity.username },
+  );
+  const downloads = new DownloadService(db, telegram, new DenoProcessRunner());
+  const nsfw = new NsfwService(
+    db,
+    telegram,
+    () => configs.value,
+    (chatId, kind) => stats.increment(chatId, kind),
+  );
+  const now = () => Math.floor(Date.now() / 1000);
+
+  bot.use(async (ctx, next) => {
+    const message = ctx.message;
+    if (message?.from) {
+      stats.record({
+        chatId: message.chat.id,
+        messageId: message.message_id,
+        sentAt: message.date,
+        user: {
+          id: message.from.id,
+          firstName: message.from.first_name,
+          lastName: message.from.last_name,
+          username: message.from.username,
+        },
+        text: messageText(message),
+        photo: Boolean(message.photo),
+        video: Boolean(message.video),
+        sticker: Boolean(message.sticker),
+        forwarded: Boolean(message.forward_origin),
+      });
+    }
+    await next();
+  });
+
+  bot.command("sysprompt", async (ctx) => {
+    const message = ctx.msg!;
+    const prompt = commandArgument(message) ||
+      (message.reply_to_message ? messageText(message.reply_to_message).trim() : "");
+    if (!prompt) return await ctx.reply(SYSTEM_PROMPT_HELP, replyOptions(message));
+    repository.setSystemPrompt(message.chat.id, topicId(message), prompt, now());
+    await ctx.reply(`成功设置系统提示词:\n${prompt}`, replyOptions(message));
+  });
+  bot.command("reset_sysprompt", async (ctx) => {
+    repository.resetSystemPrompt(ctx.chat.id, topicId(ctx.message));
+    await ctx.reply("已恢复默认提示词", replyOptions(ctx.message));
+  });
+  bot.command("get_sysprompt", async (ctx) => {
+    const prompt = repository.getSystemPrompt(ctx.chat.id, topicId(ctx.message)) ??
+      DEFAULT_SYSTEM_PROMPT;
+    await ctx.reply(prompt, replyOptions(ctx.message));
+  });
+  bot.command("new_session", async (ctx) => {
+    ai.resetCurrent(ctx.chat.id, topicId(ctx.message));
+    await ctx.reply("已重新开始session，新建会话不会携带历史记录。", replyOptions(ctx.message));
+  });
+  bot.command("session_id", async (ctx) => {
+    const replied = ctx.msg!.reply_to_message;
+    const session = replied
+      ? ai.sessionForMessage(ctx.chat.id, replied.message_id)?.id
+      : ai.currentSessionId(ctx.chat.id, topicId(ctx.msg));
+    const text = session
+      ? `Session ID: ${session}`
+      : replied
+      ? "您回复的消息不在会话中。"
+      : "当前没有session，您可以回复特定消息来获取该消息的 session ID";
+    await ctx.reply(text, replyOptions(ctx.message));
+  });
+  bot.command("session_help", async (ctx) => {
+    await ctx.reply(
+      "会话相关帮助：\n/new_session 停止当前会话，创建新会话\n/session_id 获取当前会话ID，若回复特定消息，则获取该消息的会话ID",
+      replyOptions(ctx.message),
+    );
+  });
+
+  const showModels = async (ctx: Context) => {
+    if (!ctx.message || !ctx.chat) return;
+    if (!await canAdminister(ctx, configs.value.god)) {
+      await ctx.reply("只有群主或管理员可以切换模型", replyOptions(ctx.message));
+      return;
+    }
+    let sessionId = 0;
+    let current = repository.getSelection(ctx.chat.id).model;
+    if (ctx.message.reply_to_message) {
+      const session = ai.sessionForMessage(ctx.chat.id, ctx.message.reply_to_message.message_id);
+      if (!session) {
+        await ctx.reply("被回复的消息不属于可切换的 AI 会话。", replyOptions(ctx.message));
+        return;
+      }
+      sessionId = session.id;
+      current = session.model;
+    }
+    const prompt = sessionId
+      ? `请选择历史会话 #${sessionId} 使用的 AI 模型：`
+      : "请选择当前聊天使用的 AI 模型：";
+    await ctx.reply(prompt, {
+      ...replyOptions(ctx.message),
+      reply_markup: modelKeyboard(current, sessionId),
+    });
+  };
+  bot.command("change_model", showModels);
+  bot.command("model", showModels);
+  bot.command("show_usage", async (ctx) => {
+    if (!await canAdminister(ctx, configs.value.god)) {
+      await ctx.reply("只有群主或管理员可以修改用量显示设置", replyOptions(ctx.message));
+      return;
+    }
+    const enabled = repository.toggleUsage(ctx.chat.id, now());
+    await ctx.reply(
+      `已${enabled ? "开启" : "关闭"} AI 回复的 Token 用量按钮。`,
+      replyOptions(ctx.message),
+    );
+  });
+
+  const downloadCommand = (audioOnly: boolean) => async (ctx: Context) => {
+    if (!ctx.message || !ctx.from) return;
+    const source = commandArgument(ctx.message) ||
+      (ctx.message.reply_to_message ? messageText(ctx.message.reply_to_message) : "");
+    try {
+      const key = await parseDownloadKey(source, audioOnly);
+      await downloads.deliver({
+        key,
+        chatId: ctx.chat!.id,
+        messageId: ctx.message.message_id,
+        userId: ctx.from.id,
+        userName: userLabel(ctx.message),
+      });
+      stats.increment(ctx.chat!.id, audioOnly ? "download_audio" : "download_video");
+    } catch (error) {
+      await ctx.reply(`下载失败: ${String(error)}`, replyOptions(ctx.message));
+    }
+  };
+  bot.command("downloadvideo", downloadCommand(false));
+  bot.command("downloadaudio", downloadCommand(true));
+
+  bot.command("score", async (ctx) => {
+    const target = largestPhoto(ctx.msg) ? ctx.msg : ctx.msg!.reply_to_message;
+    const photo = target ? largestPhoto(target) : undefined;
+    if (!target || !photo) return await ctx.reply("没有图片", replyOptions(ctx.message));
+    try {
+      const severity = await nsfw.score(photoInput(photo));
+      nsfw.savePicture(photo.file_unique_id, photo.file_id, severity);
+      const saved = nsfw.getPicture(photo.file_unique_id);
+      await telegram.sendMessage(
+        ctx.chat.id,
+        `bot评分: ${severity}/6\n用户评分: ${saved?.userRate ?? severity}/6`,
+        {
+          reply_parameters: { message_id: target.message_id },
+          reply_markup: nsfw.ratingKeyboard(photo.file_unique_id, "score"),
+        },
+      );
+    } catch {
+      await ctx.reply("识别失败", replyOptions(ctx.message));
+    }
+  });
+  bot.command(
+    "getrank",
+    async (ctx) => await ctx.reply(stats.rank(ctx.chat.id), replyOptions(ctx.message)),
+  );
+  bot.command("diag_sendstat", async (ctx) => {
+    stats.flush();
+    await ctx.reply(stats.dailyMessage(ctx.chat.id, now() - 86_400), { parse_mode: "HTML" });
+  });
+  bot.command("chat_config", async (ctx) => {
+    await ctx.reply("当前群组的信息如下", { reply_markup: configKeyboard(stats, ctx.chat.id) });
+  });
+
+  bot.on("inline_query", async (ctx) => {
+    const query = ctx.inlineQuery.query;
+    if (!query) {
+      await ctx.answerInlineQuery([{
+        type: "article",
+        id: "empty",
+        title: "这个家伙什么也没有说",
+        input_message_content: { message_text: "这个家伙什么也没有说" },
+      }], { cache_time: 0 });
+      return;
+    }
+    try {
+      const links = await convertBilibiliLinks(query);
+      const uid = downloads.createInlineContext(now());
+      const markup = hasBilibiliVideo(links.bvText)
+        ? {
+          inline_keyboard: [[{ text: "下载视频", callback_data: `il:bili:${uid.toString(16)}` }]],
+        }
+        : undefined;
+      const result = (id: string, title: string, text: string) => ({
+        type: "article" as const,
+        id,
+        title,
+        input_message_content: { message_text: text },
+        reply_markup: markup,
+      });
+      const results = [result(`bv-${uid}`, "转换后的链接", links.bvText)];
+      if (links.hasAv) results.push(result(`av-${uid}`, "转换后的链接（使用AV号）", links.avText));
+      await ctx.answerInlineQuery(results, { cache_time: 0 });
+    } catch {
+      await ctx.answerInlineQuery([{
+        type: "article",
+        id: "raw",
+        title: "没有检测到可转换的Bilibili链接或出现错误，点击可原样发送",
+        input_message_content: { message_text: query },
+      }], { cache_time: 0 });
+    }
+  });
+
+  bot.on("message", async (ctx) => {
+    const message = ctx.message;
+    const text = messageText(message);
+    const config = stats.config(message.chat.id);
+
+    if (message.via_bot?.id === identity.id && message.reply_markup) {
+      for (const row of message.reply_markup.inline_keyboard) {
+        for (const button of row) {
+          if ("callback_data" in button && button.callback_data?.startsWith("il:bili:")) {
+            const uid = Number.parseInt(button.callback_data.slice(8), 16);
+            downloads.updateInlineContext(uid, text, message.chat.id, message.message_id);
+          }
+        }
+      }
+    }
+    if (
+      config.autoCvtBili && !message.via_bot && !text.startsWith("/") &&
+      /b23\.tv|bilibili\.com|bili2233\.cn/i.test(text)
+    ) {
+      try {
+        const converted = await convertBilibiliLinks(text);
+        if (converted.needClean) {
+          await telegram.sendMessage(
+            message.chat.id,
+            `来自<a href="tg://user?id=${ctx.from?.id ?? 0}">${
+              escapeHtml(userLabel(message))
+            }</a>的消息，其中的链接已自动转换\n\n${escapeHtml(converted.bvText)}`,
+            {
+              parse_mode: "HTML",
+              reply_markup: {
+                inline_keyboard: [[{ text: "下载视频", callback_data: "download:bilibili" }]],
+              },
+            },
+          );
+          await telegram.deleteMessage(message.chat.id, message.message_id);
+          return;
+        }
+      } catch (error) {
+        console.warn("bilibili conversion failed", error);
+      }
+    }
+    const photo = largestPhoto(message);
+    if (photo && config.autoCheckAdult) {
+      try {
+        await nsfw.detectAndReply({
+          chatId: message.chat.id,
+          messageId: message.message_id,
+          mediaGroupId: message.media_group_id,
+          hasMediaSpoiler: message.has_media_spoiler ?? false,
+          photo: photoInput(photo),
+        });
+      } catch (error) {
+        console.warn("NSFW detection failed", error);
+      }
+    }
+    if (config.respNsfwMsg && text.includes("来张色图")) {
+      const picture = nsfw.randomPicture();
+      if (picture) {
+        await telegram.sendPhoto(message.chat.id, picture.fileId, {
+          reply_parameters: { message_id: message.message_id },
+          reply_markup: nsfw.ratingKeyboard(picture.fileUniqueId),
+        });
+        return;
+      }
+    }
+    const aiTrigger = !text.startsWith("/") && (
+      text.includes("@new") || text.includes(`@${identity.username}`) ||
+      message.reply_to_message?.from?.id === identity.id
+    );
+    if (aiTrigger) await ai.handle(toIncoming(message));
+  });
+
+  bot.on("callback_query:data", async (ctx) => {
+    const callback = ctx.callbackQuery;
+    const data = callback.data;
+    const message = callback.message;
+    if (!message) return await ctx.answerCallbackQuery({ text: "消息已不可用", show_alert: true });
+    if (data === "aiusage") {
+      const usage = repository.usageForResponse(message.chat.id, message.message_id);
+      await ctx.answerCallbackQuery(
+        usage
+          ? { text: formatUsage(usage), show_alert: true }
+          : { text: "用量记录不存在或尚未写入，请稍后重试。", show_alert: true },
+      );
+      return;
+    }
+    if (data.startsWith("aimodel:")) {
+      if (!await canAdminister(ctx, configs.value.god)) {
+        return await ctx.answerCallbackQuery({
+          text: "只有群主或管理员可以切换模型",
+          show_alert: true,
+        });
+      }
+      const payload = data.slice(8);
+      const colon = payload.indexOf(":");
+      const sessionId = colon >= 0 ? Number(payload.slice(0, colon)) : 0;
+      const model = colon >= 0 ? payload.slice(colon + 1) : payload;
+      const option = MODEL_OPTIONS.find((item) => item.model === model);
+      if (!option) return await ctx.answerCallbackQuery({ text: "无效模型", show_alert: true });
+      if (option.provider === "deepseek" && !configs.value.deepSeekKey) {
+        return await ctx.answerCallbackQuery({ text: "DeepSeek API Key 未配置", show_alert: true });
+      }
+      if (sessionId) {
+        const session = repository.getSession(sessionId);
+        if (!session || session.chatId !== message.chat.id) {
+          return await ctx.answerCallbackQuery({
+            text: "目标历史会话不存在或不属于当前聊天",
+            show_alert: true,
+          });
+        }
+        repository.setSessionModel(sessionId, providerForModel(model), model, now());
+        await ctx.editMessageText(
+          `历史会话 #${sessionId} 已切换到 ${option.label}；下次继续该会话时将从本地文本历史重建，不重放旧远端链。`,
+          {
+            reply_markup: modelKeyboard(model, sessionId),
+          },
+        );
+      } else {
+        repository.setChatModel(message.chat.id, providerForModel(model), model, now());
+        ai.resetCurrent(message.chat.id, message.message_thread_id ?? 0);
+        await ctx.editMessageText(`当前聊天已切换到 ${option.label}；下一条消息将开始新会话。`, {
+          reply_markup: modelKeyboard(model),
+        });
+      }
+      await ctx.answerCallbackQuery({ text: `已切换到 ${option.label}` });
+      return;
+    }
+    if (data === "download:bilibili" || data.startsWith("il:bili:")) {
+      let source = messageText(message);
+      let replyMessageId = message.message_id;
+      if (data.startsWith("il:bili:")) {
+        const context = downloads.getInlineContext(Number.parseInt(data.slice(8), 16), now());
+        if (!context) {
+          return await ctx.answerCallbackQuery({
+            text: "下载上下文已过期，请重新发送链接",
+            show_alert: true,
+          });
+        }
+        source = context.text;
+        replyMessageId = context.messageId;
+      }
+      await ctx.answerCallbackQuery({ text: "开始下载" });
+      try {
+        await downloads.deliver({
+          key: await parseDownloadKey(source, false),
+          chatId: message.chat.id,
+          messageId: replyMessageId,
+          userId: ctx.from.id,
+          userName: [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(" "),
+        });
+        stats.increment(message.chat.id, "download_video");
+      } catch (error) {
+        await telegram.sendMessage(message.chat.id, `下载失败: ${String(error)}`, {
+          reply_parameters: { message_id: replyMessageId },
+        });
+      }
+      return;
+    }
+    if (data.startsWith("nsfw:")) {
+      const [, ratingText, fileUniqueId] = data.split(":");
+      if (!fileUniqueId) return await ctx.answerCallbackQuery({ text: "Bot出现错误" });
+      const result = nsfw.rate(fileUniqueId, ctx.from.id, Number(ratingText));
+      await telegram.editReplyMarkup(
+        message.chat.id,
+        message.message_id,
+        nsfw.ratingKeyboard(fileUniqueId, data.split(":")[3] ?? ""),
+      );
+      const text = !result.changed
+        ? "您不能重复评分"
+        : result.existed
+        ? `您的评分已由${result.oldRating}修改为${ratingText}`
+        : "评分成功";
+      await ctx.answerCallbackQuery({ text, show_alert: !result.changed });
+      return;
+    }
+    if (data.startsWith("gcfg:")) {
+      const [, rawField, old] = data.split(":");
+      const aliases: Record<string, "auto_cvt_bili" | "resp_nsfw_msg"> = {
+        auto_cvt_bili: "auto_cvt_bili",
+        AutoCvtBili: "auto_cvt_bili",
+        resp_nsfw_msg: "resp_nsfw_msg",
+        RespNsfwMsg: "resp_nsfw_msg",
+      };
+      const field = rawField ? aliases[rawField] : undefined;
+      if (!field) {
+        return await ctx.answerCallbackQuery({ text: "本版本暂未上线", show_alert: true });
+      }
+      stats.setConfigField(message.chat.id, field, old !== "T");
+      await telegram.editReplyMarkup(
+        message.chat.id,
+        message.message_id,
+        configKeyboard(stats, message.chat.id),
+      );
+      await ctx.answerCallbackQuery({ text: "设置已更新" });
+      return;
+    }
+    await ctx.answerCallbackQuery({ text: "本版本暂未上线", show_alert: true });
+  });
+
+  bot.catch((error) => console.error("update failed", error.error));
+
+  let runner: RunnerHandle | undefined;
+  return {
+    bot,
+    flush: () => stats.flush(),
+    async serve(signal: AbortSignal): Promise<void> {
+      await downloads.checkExecutables();
+      if (configs.value.dropPendingUpdates) {
+        await bot.api.getUpdates({ offset: -1, limit: 1, timeout: 0 });
+      }
+      const flushTimer = setInterval(() => {
+        try {
+          stats.flush();
+          downloads.cleanupInline(now());
+        } catch (error) {
+          console.error("periodic flush failed", error);
+        }
+      }, 60_000);
+      let sentDay = "";
+      const dailyTimer = setInterval(async () => {
+        const current = new Date();
+        const day = current.toISOString().slice(0, 10);
+        if (current.getHours() !== 8 || sentDay === day) return;
+        sentDay = day;
+        for (const chatId of configs.value.myChats) {
+          try {
+            stats.flush();
+            await telegram.sendMessage(chatId, stats.dailyMessage(chatId, now() - 86_400), {
+              parse_mode: "HTML",
+            });
+          } catch (error) {
+            console.error("daily statistics failed", chatId, error);
+          }
+        }
+      }, 30_000);
+      // Both sides implement the Web AbortSignal API. Their declaration files
+      // refer to different copies of the same compatibility type.
+      const runnerBot = bot as unknown as Parameters<typeof run>[0];
+      runner = run(runnerBot, {
+        runner: { fetch: { timeout: 120 } },
+        sink: { concurrency: 16 },
+      });
+      console.log(`bot started @${identity.username}`);
+      await new Promise<void>((resolve) =>
+        signal.addEventListener("abort", () => resolve(), { once: true })
+      );
+      clearInterval(flushTimer);
+      clearInterval(dailyTimer);
+      await runner.stop();
+      await runner.task();
+      stats.flush();
+    },
+  };
+}

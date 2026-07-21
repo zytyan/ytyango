@@ -1,0 +1,19 @@
+[Unit]
+Description=ytyanbot TypeScript migration test instance
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/tgbots/ytyanbot-ts
+Environment=TZ=Asia/Shanghai
+Environment=YTYAN_CONFIG_FILE=/opt/tgbots/ytyanbot-ts/run/test-config.yaml
+ExecStart=/opt/tgbots/ytyanbot-ts/dist/ytyanbot-linux-x86_64 serve
+Restart=on-failure
+RestartSec=5s
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

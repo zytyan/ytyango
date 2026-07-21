@@ -1,0 +1,16 @@
+bot-token: ""
+god: 123456789
+my-chats: []
+ai-chats: []
+content-moderator:
+  endpoint: "https://example.cognitiveservices.azure.com"
+  api-key: ""
+tg-api-url: "http://localhost:8081"
+drop-pending-updates: false
+log-level: 0
+database-path: "./run/ytyanbot.db"
+ai-media-path: "./run/ai-media"
+gemini-key: ""
+gemini-explicit-cache: true
+deepseek-key: ""
+deepseek-base-url: "https://api.deepseek.com"
