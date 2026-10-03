@@ -19,6 +19,7 @@ import { type NsfwPhoto, NsfwService } from "./nsfw/service.ts";
 import { DenoProcessRunner } from "./shared/process.ts";
 import { StatsService } from "./stats/service.ts";
 import { GrammyTelegramGateway } from "./telegram/gateway.ts";
+import { registerRoll } from "./features/roll.ts";
 
 const SYSTEM_PROMPT_HELP =
   `没有找到任何System prompt，请使用 /sysprompt 提示词或使用该命令回复其他消息设置提示词。
@@ -250,6 +251,9 @@ export async function createApplication(
     }
     await next();
   });
+
+  // Register specific commands/callbacks before the general message/callback handlers.
+  registerRoll(bot);
 
   bot.command("sysprompt", async (ctx) => {
     const message = ctx.msg!;

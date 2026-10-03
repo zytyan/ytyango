@@ -3,3 +3,16 @@ dist/
 run/
 *.db-shm
 *.db-wal
+node_modules/
+.env
+.env.*
+!.env.example
+build/
+media/
+backups/
+*.db
+*.db-*
+*.sqlite*
+*.log
+*.pem
+*.key
