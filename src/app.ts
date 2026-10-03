@@ -8,8 +8,8 @@ import {
   type IncomingAiMessage,
   type IncomingMedia,
 } from "./ai/service.ts";
-import { DeepSeekProvider, GeminiProvider } from "./ai/providers.ts";
-import { type AiProvider, MODEL_OPTIONS, providerForModel } from "./ai/types.ts";
+import { createAiGenerator } from "./ai/providers.ts";
+import { type AiProviderName, MODEL_OPTIONS, parseModelCallback } from "./ai/types.ts";
 import { ContentAddressedMediaStore } from "./ai/media_store.ts";
 import type { ConfigStore } from "./config.ts";
 import type { MainDatabase } from "./db/database.ts";
@@ -149,11 +149,17 @@ function configKeyboard(stats: StatsService, chatId: number): InlineKeyboardMark
   };
 }
 
-function modelKeyboard(current: string, sessionId = 0): InlineKeyboardMarkup {
+function modelKeyboard(
+  current: string,
+  provider: AiProviderName,
+  sessionId = 0,
+): InlineKeyboardMarkup {
   return {
-    inline_keyboard: MODEL_OPTIONS.map((option) => [{
-      text: `${option.model === current ? "✅ " : ""}${option.label}`,
-      callback_data: `aimodel:${sessionId}:${option.model}`,
+    inline_keyboard: MODEL_OPTIONS.map((option, index) => [{
+      text: `${
+        option.model === current && option.provider === provider ? "✅ " : ""
+      }${option.label}`,
+      callback_data: `aimodel2:${sessionId}:${index}`,
     }]),
   };
 }
@@ -211,10 +217,7 @@ export async function createApplication(
   const stats = new StatsService(db);
   const ai = new AiService(
     repository,
-    new Map<string, AiProvider>([
-      ["gemini", new GeminiProvider(() => configs.value)],
-      ["deepseek", new DeepSeekProvider(() => configs.value)],
-    ]),
+    createAiGenerator(() => configs.value),
     telegram,
     new ContentAddressedMediaStore(initial.aiMediaPath),
     () => configs.value,
@@ -303,6 +306,7 @@ export async function createApplication(
     }
     let sessionId = 0;
     let current = repository.getSelection(ctx.chat.id).model;
+    let provider = repository.getSelection(ctx.chat.id).provider;
     if (ctx.message.reply_to_message) {
       const session = ai.sessionForMessage(ctx.chat.id, ctx.message.reply_to_message.message_id);
       if (!session) {
@@ -311,13 +315,14 @@ export async function createApplication(
       }
       sessionId = session.id;
       current = session.model;
+      provider = session.provider;
     }
     const prompt = sessionId
       ? `请选择历史会话 #${sessionId} 使用的 AI 模型：`
       : "请选择当前聊天使用的 AI 模型：";
     await ctx.reply(prompt, {
       ...replyOptions(ctx.message),
-      reply_markup: modelKeyboard(current, sessionId),
+      reply_markup: modelKeyboard(current, provider, sessionId),
     });
   };
   bot.command("change_model", showModels);
@@ -513,20 +518,30 @@ export async function createApplication(
       return;
     }
     if (data.startsWith("aimodel:")) {
+      return await ctx.answerCallbackQuery({
+        text: "模型菜单已更新，请重新使用 /model",
+        show_alert: true,
+      });
+    }
+    if (data.startsWith("aimodel2:")) {
       if (!await canAdminister(ctx, configs.value.god)) {
         return await ctx.answerCallbackQuery({
           text: "只有群主或管理员可以切换模型",
           show_alert: true,
         });
       }
-      const payload = data.slice(8);
-      const colon = payload.indexOf(":");
-      const sessionId = colon >= 0 ? Number(payload.slice(0, colon)) : 0;
-      const model = colon >= 0 ? payload.slice(colon + 1) : payload;
-      const option = MODEL_OPTIONS.find((item) => item.model === model);
-      if (!option) return await ctx.answerCallbackQuery({ text: "无效模型", show_alert: true });
+      const selection = parseModelCallback(data);
+      if (!selection) return await ctx.answerCallbackQuery({ text: "无效模型", show_alert: true });
+      const { sessionId, option } = selection;
+      const { model, provider } = option;
       if (option.provider === "deepseek" && !configs.value.deepSeekKey) {
         return await ctx.answerCallbackQuery({ text: "DeepSeek API Key 未配置", show_alert: true });
+      }
+      if (provider === "sub2api" && !configs.value.sub2apiKey) {
+        return await ctx.answerCallbackQuery({ text: "Sub2API API Key 未配置", show_alert: true });
+      }
+      if (provider === "gemini" && !configs.value.geminiKey) {
+        return await ctx.answerCallbackQuery({ text: "Gemini API Key 未配置", show_alert: true });
       }
       if (sessionId) {
         const session = repository.getSession(sessionId);
@@ -536,18 +551,18 @@ export async function createApplication(
             show_alert: true,
           });
         }
-        repository.setSessionModel(sessionId, providerForModel(model), model, now());
+        repository.setSessionModel(sessionId, provider, model, now());
         await ctx.editMessageText(
           `历史会话 #${sessionId} 已切换到 ${option.label}；下次继续该会话时将从本地文本历史重建，不重放旧远端链。`,
           {
-            reply_markup: modelKeyboard(model, sessionId),
+            reply_markup: modelKeyboard(model, provider, sessionId),
           },
         );
       } else {
-        repository.setChatModel(message.chat.id, providerForModel(model), model, now());
+        repository.setChatModel(message.chat.id, provider, model, now());
         ai.resetCurrent(message.chat.id, message.message_thread_id ?? 0);
         await ctx.editMessageText(`当前聊天已切换到 ${option.label}；下一条消息将开始新会话。`, {
-          reply_markup: modelKeyboard(model),
+          reply_markup: modelKeyboard(model, provider),
         });
       }
       await ctx.answerCallbackQuery({ text: `已切换到 ${option.label}` });

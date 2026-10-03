@@ -3,7 +3,8 @@ import { KeyedMutex } from "../shared/concurrency.ts";
 import type { Clock, MediaStore, TelegramPort } from "../shared/types.ts";
 import { systemClock } from "../shared/types.ts";
 import type { AiRepository, PendingAiMessage, RunRow, StoredAiMessage } from "./repository.ts";
-import type { AiMessage, AiProvider, AiResult, AiSession } from "./types.ts";
+import type { AiMessage, AiRequest, AiResult, AiSession } from "./types.ts";
+import { supportsImages } from "./types.ts";
 
 export const DEFAULT_SYSTEM_PROMPT = `这里是一个Telegram聊天 type:%CHAT_TYPE%,name:%CHAT_NAME%
 你是一个Telegram机器人，name: %BOT_NAME% username: %BOT_USERNAME%
@@ -95,7 +96,7 @@ export class AiService {
 
   constructor(
     readonly repository: AiRepository,
-    readonly providers: ReadonlyMap<string, AiProvider>,
+    readonly generate: (request: AiRequest) => Promise<AiResult>,
     readonly telegram: TelegramPort,
     readonly mediaStore: MediaStore,
     readonly config: () => AppConfig,
@@ -165,9 +166,9 @@ export class AiService {
       incoming.reply &&
       !this.repository.findSessionByMessage(incoming.chatId, incoming.reply.messageId)
     ) {
-      pending.push(await this.#prepareMessage(incoming.reply, true, session.provider));
+      pending.push(await this.#prepareMessage(incoming.reply, true, session));
     }
-    pending.push(await this.#prepareMessage(incoming, false, session.provider));
+    pending.push(await this.#prepareMessage(incoming, false, session));
     const now = Math.floor(this.clock.now().getTime() / 1000);
     const existing = this.repository.getRunByRequest(
       session.id,
@@ -186,12 +187,10 @@ export class AiService {
       try {
         const loaded = await this.#loadMessages(session.id);
         const window = loaded.length > 200 ? loaded.slice(50) : loaded;
-        const provider = this.providers.get(session.provider);
-        if (!provider) throw new Error(`unsupported AI provider: ${session.provider}`);
         const promptTemplate =
           this.repository.getSystemPrompt(incoming.chatId, incoming.topicId ?? 0) ??
             DEFAULT_SYSTEM_PROMPT;
-        result = await provider.generate({
+        result = await this.generate({
           sessionId: session.id,
           provider: session.provider,
           model: session.model,
@@ -272,13 +271,14 @@ export class AiService {
   async #prepareMessage(
     input: IncomingAiMessage,
     contextOnly: boolean,
-    provider: string,
+    session: AiSession,
   ): Promise<PendingAiMessage> {
     const mediaObjects: Array<Awaited<ReturnType<MediaStore["put"]>> & { kind: string }> = [];
     for (const media of input.media) {
       if (
-        provider === "deepseek" &&
-        (media.kind === "video" || media.kind === "animation" || media.kind === "sticker")
+        session.provider === "deepseek" &&
+        (media.kind === "video" || media.kind === "animation" ||
+          !supportsImages(session.provider, session.model))
       ) continue;
       if ((media.byteSize ?? 0) > 15 * 1024 * 1024 || (media.duration ?? 0) > 240) continue;
       const file = await this.telegram.getFile(media.fileId);

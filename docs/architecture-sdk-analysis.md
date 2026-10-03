@@ -13,8 +13,8 @@
 
 ## 结论
 
-统一多家模型的候选是 **Vercel AI SDK**，不是旧的 Google Vertex AI SDK。
-两者名称不同，用户所指名称尚待明确；本报告同时覆盖，不据此自动切换云平台或运行时依赖。
+统一多家模型的候选是 **Vercel AI SDK**，不是旧的 Google Vertex AI SDK。 用户已确认采用 Vercel AI
+SDK；运行时切片已完成，详见下方实施记录。没有切换到 Vertex 云平台。
 
 旧 `@google-cloud/vertexai` 生成式 AI 接口已进入官方退役迁移范围，官方方向是 `@google/genai`。
 Google Gen AI SDK 可访问 Gemini Developer API/Vertex AI，但不是现有独立 DeepSeek、Sub2API
@@ -26,7 +26,7 @@ Vercel AI SDK 的统一生成调用有 Google/DeepSeek provider，适合消除�
 业务状态仍由本项目保存。无需引入 Agent、UI hooks、Next.js、服务容器或多层 provider 注册框架。
 依据：[providers](https://ai-sdk.dev/docs/foundations/providers-and-models)。
 
-## 当前具体的抽象问题
+## 评估时的具体抽象问题
 
 - `src/shared/types.ts` 把 Telegram、media、process、clock 的行为端口集中在一起，92 行；
   单实现端口可改为具体对象或少量可替换函数，数据结构类型不是删除目标。
@@ -74,7 +74,8 @@ DeepSeek provider 有自己的 provider options；模型名称能序列化不代
 
 ## 最新正式版本的离线验证
 
-仅 /tmp 验证，没有修改 deno.json/deno.lock 或调用真实 provider。 npm registry 发布记录：
+以下是实施前的 /tmp 探针记录；随后已锁定前三项到 deno.json/deno.lock 并固化仓库测试。 npm registry
+发布记录：
 
 - ai 7.0.127
 - @ai-sdk/google 4.0.87
@@ -101,15 +102,40 @@ DeepSeek provider 有自己的 provider options；模型名称能序列化不代
 Interactions 的本地旧 steps payload 到 SDK
 新消息格式仍须做导入/重放测试；不能只依据文档宣布完全兼容。
 
-## 下一切片建议
+## 实施记录
 
-确认 SDK 名称后，先做 SDK 适配的最小切片：
+本次实施前重新核对：TS HEAD/远程 `28afaa3a21488fc1daa3cd2dba5ce065b4e17060`， Go
+HEAD/远程开发分支仍为 `9b52b20188c592f736987eca97d9ece65aa43a41`。 这只是检查记录，下一切片继续刷新
+HEAD。
 
-- 独立模型实例，直接 generateText；不创建新的 provider hierarchy。
-- 将 /tmp mock 固化为无真实凭证的仓库测试，覆盖 raw payload、签名、usage 和 Sub2API 路由。
-- 追加 Interactions、当前 DeepSeek 图片跟进/工具结果、缓存策略与重试用例。
-- 指定有限重试与总 deadline，避免 SDK 默认重试再叠加当前 provider 的三次循环。
-- 保留应用级 pending/generated/delivered 与一次计量事务；SDK 不负责 Telegram 交付。
+- 已移除 AiProvider 接口、GeminiProvider/DeepSeekProvider 类与注册 Map。 一个 createAiGenerator
+  配置闭包直接创建 SDK 模型并调用 generateText，不加代理框架。
+- 三通道及 provider/model 联合选择已接通；回调 aimodel2 使用稳定选项索引避免 Telegram 64-byte
+  限制，旧模型菜单明确提示重新打开。Sub2API 映射 tiered，只走原生路径。
+- 新 assistant 保存 vercel-ai-messages-v1：provider、mode、SDK response.messages 与 native payload；
+  raw_payload 保存克隆 HTTP 响应原字节。旧原生 content/steps/DeepSeek message 在相同协议下精确重放；
+  明确的供应商/模型切换依旧使用可移植历史重建。无需新建 transport/legacy provider 类。
+- 新官方 Gemini 会话开启缓存时使用原生生成；已存在 Interactions 历史继续原协议。 Interactions opaque
+  steps 不被压成显示文字创建缓存。生成与缓存只在 AI 执行入口调用，
+  不增加后台摘要/缓存请求；整个传统事实触发编排仍待后续切片。
+- 缓存保留 4096-token、稳定五分钟、900 秒 TTL 策略；新增 model/prompt/tools/content
+  指纹，修正整个未缓存尾部发送与失效有限回退。生命周期端点保留两个小型 HTTP 调用，未额外引入 Google
+  Gen AI SDK；generateText 无对应的缓存管理接口。
+- DeepSeek 按模型选择图片能力，对齐最新 Go 的连续图片/文字合并与最近图片放入 active user 行为。 SDK
+  输入验收不等于相册、完整回复链与上下文引用加载都已验收，这些仍在新持久化/编排切片中。
+- maxRetries=0，总期限 180 秒；401/403/429/5xx/网络错误不叠加重试。
+  只有缓存失效、远端链失效或接口兼容错误有显式有限回退。reasoning 不重复计入 outputTokens。
+- 保留原 Run 状态/计量/交付事务，没有修改业务 SQL 或 schema。SDK 到临时数据库的集成测试覆盖 pending
+  先落库、生成保存、交付失败重发不二次生成/计量、RichMessage 与消息身份。
+- 格式/lint/类型检查、62 项测试通过；hostname 最小权限的独立 Linux 二进制 CLI 和临时 V9
+  db-init/db-check smoke 通过。没有真实供应商调用、生产数据库操作或服务重启。
+
+## 后续切片
+
+SDK 切片之后：
+
+- 真实测试账号验证 Gemini/Interactions/Sub2API/DeepSeek/显式缓存；实验模型不依据名称假定可用。
+- 扩展真实旧数据副本的导入/重放验收；旧原始 payload 保留，不自动覆盖或删除。
 - 再按新 schema/导入计划重组持久化与 aiContext；不要在一次提交里同时改 SDK、数据库和全 bot 架构。
 
 SDK 净收益主要是手写协议减少和模型消息统一；不预先承诺整个仓库缩减比例。

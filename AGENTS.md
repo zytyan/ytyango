@@ -6,8 +6,9 @@
 - Prefer functional modules and direct mature SDK/library APIs. Do not add controller/service/port/
   adapter stacks, generic repositories, provider frameworks or DI containers without concrete need.
   Keep transaction, media integrity, cancellation and concurrency guarantees; data types are not
-  unnecessary abstractions. SDK evaluation is in docs/architecture-sdk-analysis.md, not a completed
-  runtime SDK migration.
+  unnecessary abstractions. Runtime generation uses Vercel AI SDK through createAiGenerator; do not
+  restore AiProvider classes/registries or wrap the SDK in another provider hierarchy. SDK decisions
+  and acceptance are in docs/architecture-sdk-analysis.md.
 - Only CoC/role-playing is approved for feature removal; independent /roll stays. Other missing
   capabilities are migration backlog.
 - Breaking database and interaction changes are explicitly allowed. Preserve capability goals, not
@@ -39,7 +40,16 @@
 - Persist AI requests before provider calls; transition pending to generated and aggregate usage
   exactly once. Retain generated payloads on delivery failure; atomically commit delivery and
   provider-state promotion. Persist provider and model separately. Keep Sub2API independent of
-  official Gemini cache/Interactions state.
+  official Gemini cache/Interactions state. Save vercel-ai-messages-v1 with its provider/protocol
+  tag, SDK response messages including providerOptions, native assistant payload, and original HTTP
+  response bytes. SDK outputTokens already includes reasoning; do not add it again. Keep legacy
+  native history replay until offline imports have a verified replacement. Provider switching
+  deliberately rebuilds portable history. Cache-enabled new official Gemini sessions use native
+  generation; existing Interactions chains stay on Interactions. Never cache an opaque interaction
+  by replacing it with display text. Cache reuse verifies model/prompt/tools/content fingerprint and
+  sends the complete uncached tail. Generation has a 180-second total deadline and maxRetries=0;
+  compatibility/state/cache recovery is explicit and bounded. Never retry Telegram side effects
+  through the model SDK.
 - Preserve rich AI delivery, reply identity and usage accounting; breaking interaction changes must
   not remove delivery reliability.
 - Work on codex/retain-features. Separate accepted features into commits, run deno task check and
@@ -50,3 +60,6 @@
   use temporary databases and intercepted APIs.
 - Never stop, restart or replace the live service without explicit approval. Compilation or
   migration tests do not authorize deployment.
+- Unit tests have only --allow-sys=hostname for the SDK's indirect OIDC module import, no network or
+  environment access. Integration tests also have temporary-file/environment permissions. Compile
+  smoke must use a fresh /tmp directory and the documented restricted runtime permissions.

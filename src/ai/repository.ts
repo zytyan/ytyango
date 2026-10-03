@@ -1,7 +1,7 @@
 import type { MainDatabase } from "../db/database.ts";
 import type { MediaObject } from "../shared/types.ts";
 import type { AiMessage, AiProviderName, AiResult, AiSession, ProviderState } from "./types.ts";
-import { MODEL_GEMINI_FLASH, providerForModel } from "./types.ts";
+import { MODEL_GEMINI_FLASH } from "./types.ts";
 
 interface SessionRow {
   id: number;
@@ -84,7 +84,7 @@ export class AiRepository {
         showUsage: row.show_usage === 1,
       }
       : {
-        provider: providerForModel(MODEL_GEMINI_FLASH),
+        provider: "gemini",
         model: MODEL_GEMINI_FLASH,
         showUsage: false,
       };

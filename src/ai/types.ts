@@ -1,8 +1,9 @@
 export const MODEL_GEMINI_FLASH = "gemini-3-flash-preview";
+export const MODEL_GEMINI_37_FLASH = "gemini-3.7-flash";
 export const MODEL_GEMINI_FLASH_LITE = "gemini-3.1-flash-lite";
 export const MODEL_DEEPSEEK_FLASH = "deepseek-v4-flash";
 
-export type AiProviderName = "gemini" | "deepseek";
+export type AiProviderName = "gemini" | "sub2api" | "deepseek";
 export type AiRole = "user" | "model" | "system";
 
 export interface AiMedia {
@@ -74,11 +75,6 @@ export interface AiResult {
   readonly inputLastMessageId?: number;
 }
 
-export interface AiProvider {
-  readonly name: AiProviderName;
-  generate(request: AiRequest): Promise<AiResult>;
-}
-
 export interface AiSession {
   readonly id: number;
   readonly chatId: number;
@@ -88,12 +84,38 @@ export interface AiSession {
   readonly historyRebuildLossy: boolean;
 }
 
-export function providerForModel(model: string): AiProviderName {
-  return model === MODEL_DEEPSEEK_FLASH ? "deepseek" : "gemini";
-}
-
+// aimodel2 callbacks use this stable index; append new options, never reorder this version.
 export const MODEL_OPTIONS = Object.freeze([
+  { model: MODEL_GEMINI_37_FLASH, label: "Gemini 3.7 Flash", provider: "gemini" as const },
+  {
+    model: MODEL_GEMINI_37_FLASH,
+    label: "Gemini 3.7 Flash（Sub2API）",
+    provider: "sub2api" as const,
+  },
   { model: MODEL_GEMINI_FLASH, label: "Gemini 3 Flash Preview", provider: "gemini" as const },
   { model: MODEL_GEMINI_FLASH_LITE, label: "Gemini 3.1 Flash-Lite", provider: "gemini" as const },
   { model: MODEL_DEEPSEEK_FLASH, label: "DeepSeek V4 Flash", provider: "deepseek" as const },
+  {
+    model: "deepseek-v4-flash-vision-exp",
+    label: "DeepSeek V4 Flash Vision（图片）",
+    provider: "deepseek" as const,
+  },
+  {
+    model: "deepseek-v4.1-flash-expires-on-0910",
+    label: "DeepSeek V4.1 Flash（多模态内测）",
+    provider: "deepseek" as const,
+  },
 ]);
+
+export function supportsImages(provider: AiProviderName, model: string): boolean {
+  return provider !== "deepseek" || model === "deepseek-v4-flash-vision-exp" ||
+    model === "deepseek-v4.1-flash-expires-on-0910";
+}
+
+export function parseModelCallback(data: string) {
+  const match = /^aimodel2:(\d+):(\d+)$/.exec(data);
+  if (!match) return undefined;
+  const sessionId = Number(match[1]);
+  const option = MODEL_OPTIONS[Number(match[2])];
+  return Number.isSafeInteger(sessionId) && option ? { sessionId, option } : undefined;
+}

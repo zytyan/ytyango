@@ -18,4 +18,17 @@ content-moderator:
   assertEquals(config.contentModerator.endpoint, "https://azure.example");
   assertEquals(config.telegramApiUrl, "https://api.telegram.org");
   assertEquals(config.deepSeekBaseUrl, "https://api.deepseek.com");
+  assertEquals(config.sub2apiKey, "");
+  assertEquals(config.sub2apiBaseUrl, "http://127.0.0.1:18080/antigravity/v1beta");
+});
+
+Deno.test("Sub2API native base URL and credential are independently configured", () => {
+  const config = parseConfig(`database-path: /tmp/test.db
+gemini-key: official-key
+sub2api-key: proxy-key
+sub2api-base-url: https://proxy.example/antigravity/v1beta/
+`);
+  assertEquals(config.geminiKey, "official-key");
+  assertEquals(config.sub2apiKey, "proxy-key");
+  assertEquals(config.sub2apiBaseUrl, "https://proxy.example/antigravity/v1beta");
 });

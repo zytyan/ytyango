@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "exports": "./src/main.ts",
   "imports": {
+    "ai": "npm:ai@7.0.127",
+    "@ai-sdk/google": "npm:@ai-sdk/google@4.0.87",
+    "@ai-sdk/deepseek": "npm:@ai-sdk/deepseek@3.0.58",
     "grammy": "npm:grammy@1.45.1/web",
     "@grammyjs/runner": "https://deno.land/x/grammy_runner@v2.0.3/mod.ts",
     "https://lib.deno.dev/x/grammy@v1/mod.ts": "npm:grammy@1.45.1/web",
@@ -28,9 +31,9 @@
   },
   "tasks": {
     "check": "deno fmt --check && deno lint && deno check src/main.ts",
-    "test:unit": "deno test tests/unit",
-    "test:integration": "deno test --allow-read --allow-write --allow-env tests/integration",
+    "test:unit": "deno test --allow-sys=hostname tests/unit",
+    "test:integration": "deno test --allow-sys=hostname --allow-read --allow-write --allow-env tests/integration",
     "test": "deno task test:unit && deno task test:integration",
-    "compile": "deno compile --target x86_64-unknown-linux-gnu --output dist/ytyanbot-linux-x86_64 --allow-env=YTYAN_CONFIG_FILE,YTYAN_BOT_TOKEN,GEMINI_API_KEY,DEEPSEEK_API_KEY,TZ --allow-net --allow-read=/opt/tgbots/ytyanbot/build,/opt/tgbots/ytyanbot-ts/run,/tmp --allow-write=/opt/tgbots/ytyanbot-ts/run,/tmp --allow-run=/usr/local/bin/yt-dlp,/usr/local/bin/dotnet-tools/BBDown,/usr/bin/ffprobe src/main.ts"
+    "compile": "deno compile --target x86_64-unknown-linux-gnu --output dist/ytyanbot-linux-x86_64 --allow-sys=hostname --allow-env=YTYAN_CONFIG_FILE,YTYAN_BOT_TOKEN,GEMINI_API_KEY,SUB2API_API_KEY,DEEPSEEK_API_KEY,TZ --allow-net --allow-read=/opt/tgbots/ytyanbot/build,/opt/tgbots/ytyanbot-ts/run,/tmp --allow-write=/opt/tgbots/ytyanbot-ts/run,/tmp --allow-run=/usr/local/bin/yt-dlp,/usr/local/bin/dotnet-tools/BBDown,/usr/bin/ffprobe src/main.ts"
   }
 }
