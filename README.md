@@ -1,7 +1,7 @@
 # ytyanbot-ts
 
-`ytyanbot-ts` 是冻结 Go 版本 `b6376aec837a45854944ed68a5561f5349fc442a` 的 TypeScript/Deno
-核心迁移。当前实现 AI、视频/音频下载与 Bilibili 转换、NSFW 检测和图库评分、
+`ytyanbot-ts` 是独立的 TypeScript/Deno 重构，功能分析和迁移以当前最新 Go/TS 提交为准，
+不再以历史冻结 commit 定义目标。当前实现 AI、视频/音频下载与 Bilibili 转换、NSFW 检测和图库评分、
 群消息统计/日报，以及已上线功能的群配置。
 
 后续迁移沿用本仓库：**只裁剪 CoC，保留其他能力，但允许数据库与交互 breaking change**。 新 TS
@@ -9,7 +9,9 @@
 上下文仍按回复链，传统功能先执行并通过 `aiContext(...)` 显式注入事实，随后才检查是否触发 AI；
 不采集普通群聊历史，不在未触发时调用模型。 功能清单见
 [features](docs/features.md)，架构、阶段计划及剩余问题见
-[AI-first 计划](docs/ai-first-plan.md)。普通 `/roll` 已补齐，包含旧 `delme` 删除按钮兼容和离线测试。
+[AI-first 计划](docs/ai-first-plan.md)，简化层级与 SDK 评估见
+[架构分析](docs/architecture-sdk-analysis.md)。普通 `/roll` 已补齐，包含旧 `delme`
+删除按钮兼容和离线测试。
 
 **当前运行时代码尚未按新计划改造**：数据库仍直接使用 Go 的 canonical SQLite V9，只接受 V9，
 不能替换当前 Go V11 线上库。程序不会迁移或修复旧库，也不会修改 schema。 AI 媒体继续使用
@@ -43,11 +45,11 @@ src/
   stats/       统计缓存、V9 聚合和日报
   db/          canonical V9 schema、初始化和严格检查
   telegram/    grammY typed API 与 sendRichMessage 窄适配
-  shared/      五个公共端口及有界并发原语
+  shared/      当前共享类型与有界并发原语（单实现端口计划收拢）
 ```
 
-业务层只通过 `TelegramPort`、`AiProvider`、`MediaStore`、`ProcessRunner` 和 `Clock` 接触外部
-能力。SQLite 事务内不进行网络请求或异步操作。
+当前实现使用 Telegram、provider、media、process、clock 端口。后续优先直接使用成熟库，
+收拢无实际替换需求的单实现端口，不把这套结构作为目标架构。SQLite 事务内不进行网络请求或异步操作。
 
 ## 配置和运行
 

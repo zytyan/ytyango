@@ -1,6 +1,13 @@
 # Repository agent guide
 
 - Continue the existing Deno/TypeScript rewrite, not the separate Node prototype.
+- Evaluate against the latest relevant Go and TS branch commits, not a historical frozen baseline.
+  Record inspected SHAs for traceability, but refresh branch heads for every implementation slice.
+- Prefer functional modules and direct mature SDK/library APIs. Do not add controller/service/port/
+  adapter stacks, generic repositories, provider frameworks or DI containers without concrete need.
+  Keep transaction, media integrity, cancellation and concurrency guarantees; data types are not
+  unnecessary abstractions. SDK evaluation is in docs/architecture-sdk-analysis.md, not a completed
+  runtime SDK migration.
 - Only CoC/role-playing is approved for feature removal; independent /roll stays. Other missing
   capabilities are migration backlog.
 - Breaking database and interaction changes are explicitly allowed. Preserve capability goals, not

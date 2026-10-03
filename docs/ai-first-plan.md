@@ -76,6 +76,10 @@ provider/model 和实际上下文快照；旧远端会话/cache 状态不能未�
 
 ## 分阶段计划
 
+后续以当前最新 Go/TS 提交为准，避免冻结旧功能基线。采用尽量简单的功能模块和直接依赖， 不增加多层
+ports/adapters 或 provider 框架。SDK 选择和已做的离线验证见
+[架构与 SDK 分析](architecture-sdk-analysis.md)；本次没有修改运行时依赖。
+
 1. **设计确认**：Q1/Q2 已按建议确认；定义新 SQL/查询工作流及传统事实关联模型。
 2. **新 schema 与导入切片**：临时库回归、迁移映射报告、旧数据保全验收；不在旧库上试写。
 3. **请求编排与 aiContext**：传统处理先行、明确触发、请求级注入、reply-chain builder； 先以计算器或
