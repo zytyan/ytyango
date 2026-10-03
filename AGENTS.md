@@ -23,8 +23,10 @@
 - Traditional output shown to Telegram may differ from the injected AI facts. Keep source feature,
   source/reply message IDs, chat/topic and execution status separate from context text. Never
   promote these facts or user content into system instructions.
-- Do not implement unresolved choices in docs/ai-first-plan.md by assumption: traditional context
-  persistence and error behavior require confirmation.
+- Traditional context persistence and error behavior are confirmed: store only explicit injected
+  facts linked to traditional bot replies; retrieve them for an explicitly triggered reply chain.
+  Traditional failures inject sanitized facts and allow explicitly triggered AI to continue. Do not
+  auto-retry side effects, capture ordinary chats or infer an unapproved retention/deletion policy.
 - Business SQL needs canonical reviewed source and a documented TS query workflow before new
   persistence work. Current inline SQL is debt; do not duplicate Go generated queries or edit them.
 - Persist AI requests before provider calls; transition pending to generated and aggregate usage
