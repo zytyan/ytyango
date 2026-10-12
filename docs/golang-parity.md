@@ -65,3 +65,14 @@ Go `d395a28545701a5640d91b1ff7057bee236a3f1e`；TS 前置 `5631f01`。 Fraction.
 WebP→PNG、鱼图自动拼接；传统结果可显式注入 AI 回复链。恢复五项非 CoC 群开关，管理员校验。
 统计文字长度仅统计 text，与 Go 相同。验收：73 项测试通过，包含数学边界与模拟外部 API、 同消息
 /calc + mention 的执行顺序及事实注入。
+
+## 内部接口与运维
+
+Go `d395a28545701a5640d91b1ff7057bee236a3f1e`；TS 前置 `ba28b9e`。 恢复 loopback:4019 /
+BOT_INNER_HTTP=OFF、全路由 token、非 loopback 强制鉴权、受限 JSON body、 Mars/Dio 统计、动态 runtime
+日志等级、运行内存指标与 V8 CPU profile（替代 Go pprof 格式）。 `/backupdb` 使用 SQLite backup API
+的独立一致性快照，校验完整媒体目录映射、大小和 SHA256， 快照对应的 DB/媒体副本/清单打包为
+tar.gz；media=0 明确标记不完整 AI 数据集。 格式允许 breaking change，下载文件扩展名与 Content-Type
+同步。超时、取消、临时文件清理与单次打包并发限制。 `media-gc` 默认 dry-run，grace-hours
+必填；--apply 须在运行停止时执行，仅移除目录中未登记的旧对象，
+不删除数据库历史或有登记的媒体。没有自动执行生产清理。76 项回归与本机真实 tar smoke 通过。

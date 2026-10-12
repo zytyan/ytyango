@@ -3,6 +3,7 @@ import { createApplication } from "./app.ts";
 import { configPath, ConfigStore, loadConfig } from "./config.ts";
 import { MainDatabase } from "./db/database.ts";
 import { importDatabase } from "./db/import.ts";
+import { SQL } from "./db/queries.ts";
 
 export const VERSION = "0.1.0";
 
@@ -125,6 +126,39 @@ async function main(): Promise<void> {
       );
     }
     console.log(JSON.stringify(await importDatabase({ source, output, media: option("--media") })));
+    return;
+  }
+  if (command === "media-gc") {
+    const path = option("--database"), media = option("--media");
+    const grace = Number(option("--grace-hours"));
+    if (!path || !media || !Number.isFinite(grace) || grace <= 0) {
+      throw new Error(
+        "media-gc requires --database, --media and positive --grace-hours; stop the runtime before --apply",
+      );
+    }
+    const db = new MainDatabase(path, { readOnly: true });
+    try {
+      db.validate();
+      const retained = new Set(
+        db.all<{ sha256: string }>(SQL.BackupMedia).map((row) => row.sha256),
+      );
+      const dryRun = !Deno.args.includes("--apply");
+      const objects = await new ContentAddressedMediaStore(media).collectGarbage(
+        retained,
+        grace * 3600_000,
+        dryRun,
+      );
+      console.log(
+        JSON.stringify({
+          dryRun,
+          count: objects.length,
+          bytes: objects.reduce((sum, object) => sum + object.byteSize, 0),
+          objects,
+        }),
+      );
+    } finally {
+      db.close();
+    }
     return;
   }
   if (command !== "serve") throw new Error(`unknown command: ${command}`);

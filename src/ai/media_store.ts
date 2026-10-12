@@ -65,6 +65,42 @@ export class ContentAddressedMediaStore implements MediaStore {
     }
   }
 
+  // Invoke while the runtime is stopped. Catalogued objects are retained even
+  // when no current message references them; this does not define history retention.
+  async collectGarbage(
+    retained: ReadonlySet<string>,
+    graceMs: number,
+    dryRun = true,
+    now = Date.now(),
+  ): Promise<Array<{ sha256: string; byteSize: number }>> {
+    if (!Number.isFinite(graceMs) || graceMs <= 0) {
+      throw new Error("positive media GC grace required");
+    }
+    const removed: Array<{ sha256: string; byteSize: number }> = [];
+    let directories: Deno.DirEntry[];
+    try {
+      directories = await Array.fromAsync(Deno.readDir(`${this.root}/sha256`));
+    } catch (error) {
+      if (error instanceof Deno.errors.NotFound) return removed;
+      throw error;
+    }
+    for (const directory of directories) {
+      if (!directory.isDirectory || !/^[0-9a-f]{2}$/.test(directory.name)) continue;
+      for await (const entry of Deno.readDir(`${this.root}/sha256/${directory.name}`)) {
+        if (
+          !entry.isFile || !/^[0-9a-f]{64}$/.test(entry.name) ||
+          !entry.name.startsWith(directory.name) || retained.has(entry.name)
+        ) continue;
+        const path = `${this.root}/sha256/${directory.name}/${entry.name}`;
+        const stat = await Deno.lstat(path);
+        if (!stat.isFile || !stat.mtime || now - stat.mtime.getTime() < graceMs) continue;
+        removed.push({ sha256: entry.name, byteSize: stat.size });
+        if (!dryRun) await Deno.remove(path);
+      }
+    }
+    return removed;
+  }
+
   #validateHash(hash: string): void {
     if (!/^[0-9a-f]{64}$/.test(hash)) throw new Error("invalid media hash");
   }

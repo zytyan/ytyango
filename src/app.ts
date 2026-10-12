@@ -23,6 +23,7 @@ import { GrammyTelegramGateway } from "./telegram/gateway.ts";
 import { registerRoll } from "./features/roll.ts";
 import { type Interaction, interaction, isAiTrigger, type TraditionalFact } from "./interaction.ts";
 import { SQL } from "./db/queries.ts";
+import { installLogging, startInnerHttp } from "./inner_http.ts";
 
 const SYSTEM_PROMPT_HELP =
   `没有找到任何System prompt，请使用 /sysprompt 提示词或使用该命令回复其他消息设置提示词。
@@ -769,51 +770,64 @@ export async function createApplication(
     flush: () => stats.flush(),
     async serve(signal: AbortSignal): Promise<void> {
       signal.addEventListener("abort", () => shutdown.abort(signal.reason), { once: true });
-      await downloads.checkExecutables();
-      if (configs.value.dropPendingUpdates) {
-        await bot.api.getUpdates({ offset: -1, limit: 1, timeout: 0 });
-      }
-      const flushTimer = setInterval(() => {
-        try {
-          stats.flush();
-          downloads.cleanupInline(now());
-        } catch (error) {
-          console.error("periodic flush failed", error);
+      const logging = installLogging(configs.value.logLevel);
+      let http: Deno.HttpServer | undefined;
+      let flushTimer: ReturnType<typeof setInterval> | undefined;
+      let dailyTimer: ReturnType<typeof setInterval> | undefined;
+      try {
+        http = startInnerHttp(db, stats, configs.value.aiMediaPath, signal, logging);
+        await downloads.checkExecutables();
+        if (configs.value.dropPendingUpdates) {
+          await bot.api.getUpdates({ offset: -1, limit: 1, timeout: 0 });
         }
-      }, 60_000);
-      let sentDay = "";
-      const dailyTimer = setInterval(async () => {
-        const current = new Date();
-        const day = current.toISOString().slice(0, 10);
-        if (current.getHours() !== 8 || sentDay === day) return;
-        sentDay = day;
-        for (const chatId of configs.value.myChats) {
+        flushTimer = setInterval(() => {
           try {
             stats.flush();
-            await telegram.sendMessage(chatId, stats.dailyMessage(chatId, now() - 86_400), {
-              parse_mode: "HTML",
-            });
+            downloads.cleanupInline(now());
           } catch (error) {
-            console.error("daily statistics failed", chatId, error);
+            console.error("periodic flush failed", error);
           }
-        }
-      }, 30_000);
-      // Both sides implement the Web AbortSignal API. Their declaration files
-      // refer to different copies of the same compatibility type.
-      const runnerBot = bot as unknown as Parameters<typeof run>[0];
-      runner = run(runnerBot, {
-        runner: { fetch: { timeout: 120 } },
-        sink: { concurrency: 16 },
-      });
-      console.log(`bot started @${identity.username}`);
-      await new Promise<void>((resolve) =>
-        signal.addEventListener("abort", () => resolve(), { once: true })
-      );
-      clearInterval(flushTimer);
-      clearInterval(dailyTimer);
-      await runner.stop();
-      await runner.task();
-      stats.flush();
+        }, 60_000);
+        let sentDay = "";
+        dailyTimer = setInterval(async () => {
+          const current = new Date();
+          const day = current.toISOString().slice(0, 10);
+          if (current.getHours() !== 8 || sentDay === day) return;
+          sentDay = day;
+          for (const chatId of configs.value.myChats) {
+            try {
+              stats.flush();
+              await telegram.sendMessage(chatId, stats.dailyMessage(chatId, now() - 86_400), {
+                parse_mode: "HTML",
+              });
+            } catch (error) {
+              console.error("daily statistics failed", chatId, error);
+            }
+          }
+        }, 30_000);
+        // Both sides implement the Web AbortSignal API. Their declaration files
+        // refer to different copies of the same compatibility type.
+        const runnerBot = bot as unknown as Parameters<typeof run>[0];
+        runner = run(runnerBot, {
+          runner: { fetch: { timeout: 120 } },
+          sink: { concurrency: 16 },
+        });
+        console.log(`bot started @${identity.username}`);
+        await new Promise<void>((resolve) => {
+          if (signal.aborted) resolve();
+          else signal.addEventListener("abort", () => resolve(), { once: true });
+        });
+      } finally {
+        clearInterval(flushTimer);
+        clearInterval(dailyTimer);
+        shutdown.abort();
+        await runner?.stop();
+        await runner?.task();
+        await http?.shutdown();
+        await http?.finished;
+        logging.restore();
+        stats.flush();
+      }
     },
   };
 }

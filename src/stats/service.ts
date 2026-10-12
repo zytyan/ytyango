@@ -189,6 +189,16 @@ last_name=excluded.last_name,username=excluded.username`,
     stat.dirty = true;
   }
 
+  external(chatId: number, kind: "mars" | "dio_add" | "dio_ban", amount = 1): void {
+    const stat = this.#snapshot(chatId, Math.floor(Date.now() / 1000));
+    if (kind === "mars") {
+      stat.marsCount++;
+      stat.maxMarsCount = Math.max(stat.maxMarsCount, amount);
+    } else if (kind === "dio_add") stat.dioAddUserCount++;
+    else stat.dioBanUserCount++;
+    stat.dirty = true;
+  }
+
   flush(): void {
     let firstError: unknown;
     for (const [key, stat] of [...this.#cache, ...this.#pending]) {

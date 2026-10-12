@@ -23,4 +23,6 @@ export const SQL = {
     "INSERT INTO chat_cfg(id,auto_cvt_bili,auto_calculate,auto_exchange,auto_check_adult,enable_coc,resp_nsfw_msg,timezone)\nVALUES(?,0,0,0,0,0,0,?) ON CONFLICT(id) DO NOTHING;",
   "SetChatConfig":
     "UPDATE chat_cfg SET auto_cvt_bili=?,auto_calculate=?,auto_exchange=?,auto_check_adult=?,resp_nsfw_msg=? WHERE id=?;",
+  "BackupMedia":
+    "SELECT sha256,relative_path,byte_size,mime_type FROM media_objects ORDER BY sha256;",
 } as const;

@@ -43,3 +43,6 @@ VALUES(?,0,0,0,0,0,0,?) ON CONFLICT(id) DO NOTHING;
 
 -- name: SetChatConfig
 UPDATE chat_cfg SET auto_cvt_bili=?,auto_calculate=?,auto_exchange=?,auto_check_adult=?,resp_nsfw_msg=? WHERE id=?;
+
+-- name: BackupMedia
+SELECT sha256,relative_path,byte_size,mime_type FROM media_objects ORDER BY sha256;
