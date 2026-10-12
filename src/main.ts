@@ -2,6 +2,7 @@ import { ContentAddressedMediaStore } from "./ai/media_store.ts";
 import { createApplication } from "./app.ts";
 import { configPath, ConfigStore, loadConfig } from "./config.ts";
 import { MainDatabase } from "./db/database.ts";
+import { importDatabase } from "./db/import.ts";
 
 export const VERSION = "0.1.0";
 
@@ -107,6 +108,17 @@ async function main(): Promise<void> {
     const path = option("--database");
     if (!path) throw new Error("db-check requires --database <path>");
     await checkDatabase(path, option("--media"));
+    return;
+  }
+  if (command === "db-import") {
+    const source = option("--source");
+    const output = option("--output");
+    if (!source || !output) {
+      throw new Error(
+        "db-import requires --source <readonly.db> --output <new-directory> [--media <source-media>]",
+      );
+    }
+    console.log(JSON.stringify(await importDatabase({ source, output, media: option("--media") })));
     return;
   }
   if (command !== "serve") throw new Error(`unknown command: ${command}`);

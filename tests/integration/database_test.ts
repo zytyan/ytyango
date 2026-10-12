@@ -3,13 +3,13 @@ import { MainDatabase } from "../../src/db/database.ts";
 import { MIGRATIONS, REQUIRED_TABLES } from "../../src/db/schema.ts";
 import { temporaryDatabase } from "./helpers.ts";
 
-Deno.test("canonical V9 database contains exact migrations and required objects", async () => {
+Deno.test("TS-owned V1 database contains exact migrations and required objects", async () => {
   const temporary = await temporaryDatabase();
   try {
-    assertEquals(temporary.db.validate().version, 9);
+    assertEquals(temporary.db.validate().version, 1);
     assertEquals(
       temporary.db.all<{ version: number; checksum: string }>(
-        "SELECT version,checksum FROM schema_migrations ORDER BY version",
+        "SELECT version,checksum FROM ts_schema_versions ORDER BY version",
       ),
       MIGRATIONS.map(({ version, checksum }) => ({ version, checksum })),
     );
@@ -30,7 +30,7 @@ Deno.test("canonical V9 database contains exact migrations and required objects"
 Deno.test("db validation refuses checksum drift", async () => {
   const temporary = await temporaryDatabase();
   const path = temporary.path;
-  temporary.db.run("UPDATE schema_migrations SET checksum='bad' WHERE version=9");
+  temporary.db.run("UPDATE ts_schema_versions SET checksum='bad' WHERE version=1");
   temporary.db.close();
   const reopened = new MainDatabase(path);
   try {

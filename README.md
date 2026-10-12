@@ -13,10 +13,10 @@
 [架构分析](docs/architecture-sdk-analysis.md)。普通 `/roll` 已补齐，包含旧 `delme`
 删除按钮兼容和离线测试。
 
-**AI SDK 切片已实现，但新数据库/aiContext 编排仍待改造**：数据库仍直接使用 Go 的 canonical SQLite
-V9，只接受 V9， 不能替换当前 Go V11 线上库。程序不会迁移或修复旧库，也不会修改 schema。 AI
-媒体继续使用 `ai-media/sha256/<prefix>/<sha256>`。生产切换前必须停止 Go Bot；两个进程
-不得同时轮询同一 token 或写同一数据库。
+**TS 独立 V1 数据库与一次性离线导入器已实现**：运行时只接受 TS 库，Go canonical V9–V11 通过
+`db-import` 只读导入新目标目录，校验行数据、Token、payload、媒体与外键，并输出报告。
+导入失败不发布目标、不修改源库。AI-first 编排仍待改造。AI 媒体继续使用
+`ai-media/sha256/<prefix>/<sha256>`；实际服务切换需要另行授权。
 
 ## 固定工具链
 
@@ -44,7 +44,7 @@ src/
   download/    URL/Bilibili 处理、进程执行、缓存和 singleflight
   nsfw/        Azure Content Safety、图库和用户评分
   stats/       统计缓存、V9 聚合和日报
-  db/          canonical V9 schema、初始化和严格检查
+  db/          TS V1 schema、初始化和严格检查
   telegram/    grammY typed API 与 sendRichMessage 窄适配
   shared/      当前共享类型与有界并发原语（单实现端口计划收拢）
 ```
@@ -92,11 +92,12 @@ deno task compile
 
 ./dist/ytyanbot-linux-x86_64 --version
 ./dist/ytyanbot-linux-x86_64 db-init --database /opt/tgbots/ytyanbot-ts/run/new.db
-./dist/ytyanbot-linux-x86_64 db-check --database /path/to/v9.db --media /path/to/ai-media
+./dist/ytyanbot-linux-x86_64 db-check --database /path/to/ts.db --media /path/to/ai-media
+./dist/ytyanbot-linux-x86_64 db-import --source /path/to/go.db --media /path/to/go-ai-media --output /tmp/new-import
 ./dist/ytyanbot-linux-x86_64 serve
 ```
 
-`db-init` 拒绝覆盖已有文件。`db-check` 以 SQLite read-only 模式校验九条 migration、checksum、
+`db-init` 拒绝覆盖已有文件。`db-check` 以 SQLite read-only 模式校验 TS migration、checksum、
 必需表/索引/触发器、退役对象、`integrity_check`、外键和可选媒体引用。
 
 编译产物只允许读取 Go build 目录、仓库 `run` 和 `/tmp`，只允许写仓库 `run` 和 `/tmp`，
@@ -136,9 +137,9 @@ integration）通过，含三供应商拦截、签名/工具结果/历史重放�
 OCR、计算器、汇率、prpr、鱼图、webp2png、备份接口、内部 HTTP、等价诊断、媒体 GC，
 以及相册、反应偏好等能力仍待迁移。Sub2API SDK 路由及联合模型选择已接通并离线验收。
 回复链/传统事实编排、上下文引用加载与媒体选择仍按 AI-first 计划重组，不能把 SDK 输入序列化验收
-等同于整个回复链/多模态产品验收。新库与导入器按新模型设计，不要求复刻 Go V10/V11 表结构。
-历史数据和配置通过映射迁移，不会因 breaking change 隐式删除；尚未迁移的群配置按钮仍返回
-“本版本暂未上线”。
+等同于整个回复链/多模态产品验收。新库与导入器已独立设计，工作流见
+[数据库文档](docs/database.md)，不复刻 Go migration 历史。 历史数据和配置通过映射迁移，不会因
+breaking change 隐式删除；尚未迁移的群配置按钮仍返回 “本版本暂未上线”。
 
 CoC 人物属性、检定和战斗模块明确不迁移，历史属性数据默认保留。独立 `/roll` 不属于这一裁剪范围。
 已经退役的旧消息搜索和 AI memory 不重新引入。

@@ -65,7 +65,7 @@ export class MainDatabase {
     this.transaction(() => {
       for (const schema of CANONICAL_SCHEMA) this.raw.exec(schema);
       const insert = this.raw.prepare(
-        "INSERT INTO schema_migrations(version,name,checksum,applied_at) VALUES(?,?,?,unixepoch())",
+        "INSERT INTO ts_schema_versions(version,name,checksum,applied_at) VALUES(?,?,?,unixepoch())",
       );
       for (const migration of MIGRATIONS) {
         insert.run(migration.version, migration.name, migration.checksum);
@@ -76,7 +76,7 @@ export class MainDatabase {
   validate(): DatabaseCheck {
     for (const migration of MIGRATIONS) {
       const row = this.get<{ name: string; checksum: string }>(
-        "SELECT name,checksum FROM schema_migrations WHERE version=?",
+        "SELECT name,checksum FROM ts_schema_versions WHERE version=?",
         migration.version,
       );
       if (!row) throw new Error(`database migration ${migration.version} is missing`);
@@ -85,9 +85,9 @@ export class MainDatabase {
       }
     }
     const versions = this.get<{ count: number; maximum: number }>(
-      "SELECT COUNT(*) AS count,MAX(version) AS maximum FROM schema_migrations",
+      "SELECT COUNT(*) AS count,MAX(version) AS maximum FROM ts_schema_versions",
     );
-    if (versions?.count !== MIGRATIONS.length || versions.maximum !== 9) {
+    if (versions?.count !== MIGRATIONS.length || versions.maximum !== MIGRATIONS.at(-1)!.version) {
       throw new Error("database contains an unknown or incomplete migration set");
     }
     for (const name of REQUIRED_TABLES) this.#requireObject("table", name);
@@ -127,7 +127,7 @@ export class MainDatabase {
     }
     const mediaReferences =
       this.get<{ count: number }>("SELECT COUNT(*) AS count FROM media_objects")?.count ?? 0;
-    return { version: 9, integrity, foreignKeyIssues, mediaReferences };
+    return { version: MIGRATIONS.at(-1)!.version, integrity, foreignKeyIssues, mediaReferences };
   }
 
   #requireObject(type: string, name: string): void {
