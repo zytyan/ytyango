@@ -1,4 +1,5 @@
 import { resolve } from "node:path";
+import { createHash } from "node:crypto";
 import { MainDatabase } from "./database.ts";
 import { ContentAddressedMediaStore } from "../ai/media_store.ts";
 
@@ -17,16 +18,51 @@ const encode = (value: unknown): string =>
         ? Object.fromEntries(Object.entries(item).sort(([a], [b]) => a.localeCompare(b)))
         : item,
   );
-const hash = async (bytes: Uint8Array): Promise<string> =>
-  Array.from(
-    new Uint8Array(await crypto.subtle.digest("SHA-256", Uint8Array.from(bytes))),
-    (b) => b.toString(16).padStart(2, "0"),
-  ).join("");
-const digest = (rows: Row[]) => hash(new TextEncoder().encode(rows.map(encode).sort().join("\n")));
-function rows64(db: MainDatabase, sql: string): Row[] {
-  const statement = db.raw.prepare(sql);
+function rows64(db: MainDatabase, table: string): Iterable<Row> {
+  const columns = db.all<{ name: string; pk: number }>(`PRAGMA table_xinfo(${quote(table)})`);
+  const keys = columns.filter((column) => column.pk > 0).sort((a, b) => a.pk - b.pk).map((column) =>
+    column.name
+  );
+  const order = keys.length ? keys : columns.map((column) => column.name);
+  const statement = db.raw.prepare(
+    `SELECT * FROM ${quote(table)} ORDER BY ${order.map(quote).join(",")}`,
+  );
   statement.setReadBigInts(true);
-  return statement.all() as Row[];
+  return statement.iterate() as Iterable<Row>;
+}
+function digest(rows: Iterable<Row>): { sha256: string; count: number } {
+  const digest = createHash("sha256");
+  let count = 0;
+  for (const row of rows) {
+    count++;
+    for (const key of Object.keys(row).sort()) {
+      const value = row[key];
+      const bytes = value instanceof Uint8Array ? value : new TextEncoder().encode(encode(value));
+      digest.update(
+        `${key}:${value instanceof Uint8Array ? "blob" : "value"}:${bytes.byteLength}:`,
+      );
+      digest.update(bytes);
+    }
+    digest.update("\n");
+  }
+  return { sha256: digest.digest("hex"), count };
+}
+function archivedRows(db: MainDatabase, table: string): Iterable<Row> {
+  const statement = db.raw.prepare(
+    "SELECT payload FROM import_archives WHERE source_table=? ORDER BY CAST(row_key AS INTEGER)",
+  );
+  return Array.from(
+    statement.iterate(table),
+    (row) =>
+      JSON.parse(String(row.payload), (_key, value) => {
+        if (value && typeof value === "object" && "integer" in value) return BigInt(value.integer);
+        if (value && typeof value === "object" && "blobHex" in value) {
+          return Uint8Array.from(value.blobHex.match(/.{2}/g) ?? [], (hex: string) =>
+            parseInt(hex, 16));
+        }
+        return value;
+      }) as Row,
+  );
 }
 
 export interface ImportOptions {
@@ -100,18 +136,19 @@ export async function importDatabase(options: ImportOptions): Promise<Record<str
       for (const trigger of triggers) target!.raw.exec(`DROP TRIGGER ${quote(trigger.name)}`);
       for (const name of tables) {
         if (name === "schema_migrations") continue;
-        const rows = rows64(source, `SELECT * FROM ${quote(name)}`);
+        const rows = rows64(source, name);
         const destination = name === "character_attrs" ? "legacy_coc_attrs" : name;
         if (!targetTables.has(destination) || name === "ai_session_provider_state") {
           // Source-only data, including albums, is explicitly archived rather than silently discarded.
           const insert = target!.raw.prepare(
             "INSERT INTO import_archives(source_table,row_key,payload) VALUES(?,?,?)",
           );
-          rows.forEach((row, index) => insert.run(name, String(index), encode(row)));
+          let count = 0;
+          for (const row of rows) insert.run(name, String(count++), encode(row));
           report.push({
             source: name,
             destination: "import_archives",
-            count: rows.length,
+            count,
             action: "archive",
           });
           continue;
@@ -120,7 +157,9 @@ export async function importDatabase(options: ImportOptions): Promise<Record<str
           `PRAGMA table_xinfo(${quote(destination)})`,
         );
         const columns = info.filter((column) => column.hidden === 0).map((column) => column.name);
-        if (rows.some((row) => columns.some((column) => !(column in row)))) {
+        const sourceColumns = source.all<{ name: string }>(`PRAGMA table_xinfo(${quote(name)})`)
+          .map((column) => column.name);
+        if (columns.some((column) => !sourceColumns.includes(column))) {
           throw new Error(`missing columns in ${name}`);
         }
         const insert = target!.raw.prepare(
@@ -128,11 +167,15 @@ export async function importDatabase(options: ImportOptions): Promise<Record<str
             columns.map(() => "?").join(",")
           })`,
         );
-        for (const row of rows) insert.run(...columns.map((column) => row[column]!));
+        let count = 0;
+        for (const row of rows) {
+          insert.run(...columns.map((column) => row[column]!));
+          count++;
+        }
         report.push({
           source: name,
           destination,
-          count: rows.length,
+          count,
           action: name === "character_attrs" ? "archive" : "identity",
         });
       }
@@ -140,20 +183,16 @@ export async function importDatabase(options: ImportOptions): Promise<Record<str
     });
     for (const mapping of report) {
       const name = String(mapping.source);
-      const rows = rows64(source, `SELECT * FROM ${quote(name)}`);
+      const rows = rows64(source, name);
       const copied = mapping.destination === "import_archives"
-        ? target.all<{ payload: string }>(
-          "SELECT payload FROM import_archives WHERE source_table=? ORDER BY CAST(row_key AS INTEGER)",
-          name,
-        ).map((row) => JSON.parse(row.payload))
-        : rows64(target, `SELECT * FROM ${quote(String(mapping.destination))}`);
-      // Archived BLOBs use the same canonical encoding as the source.
-      const sourceHash = await digest(rows);
-      const targetHash = await digest(copied);
-      if (sourceHash !== targetHash || copied.length !== rows.length) {
+        ? archivedRows(target, name)
+        : rows64(target, String(mapping.destination));
+      const original = digest(rows);
+      const replacement = digest(copied);
+      if (original.sha256 !== replacement.sha256 || original.count !== replacement.count) {
         throw new Error(`row/payload validation failed for ${name}`);
       }
-      mapping.sha256 = sourceHash;
+      mapping.sha256 = original.sha256;
     }
     const tokens = source.get<Row>(
       "SELECT COALESCE(SUM(total_input_tokens),0) AS input,COALESCE(SUM(total_output_tokens),0) AS output,COALESCE(SUM(total_cached_input_tokens),0) AS cached FROM ai_sessions",
