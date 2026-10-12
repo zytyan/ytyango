@@ -92,7 +92,7 @@ Deno.test("traditional commands precede explicit AI, saved facts are user contex
           return Promise.resolve({ ok: true, result } as Awaited<ReturnType<typeof _previous>>);
         }),
     );
-    const update = (id: number, text: string, reply?: Message): Update => ({
+    const update = (id: number, text: string, reply?: Message, extra: object = {}): Update => ({
       update_id: id,
       message: {
         message_id: nextId++,
@@ -101,9 +101,12 @@ Deno.test("traditional commands precede explicit AI, saved facts are user contex
         from: user,
         text,
         reply_to_message: reply as never,
+        // Ordinary supergroup replies can carry a thread ID without being forum topics.
+        message_thread_id: reply?.message_id,
         entities: text.startsWith("/")
           ? [{ type: "bot_command", offset: 0, length: text.split(" ")[0]!.length }]
           : undefined,
+        ...extra,
       },
     });
     await app.bot.handleUpdate(update(1, "ordinary chat"));
@@ -122,6 +125,7 @@ Deno.test("traditional commands precede explicit AI, saved facts are user contex
     assertStringIncludes(JSON.stringify(lastBody.contents), "掷出了3");
     await app.bot.handleUpdate(update(6, "continue", sent.at(-1)!));
     assertEquals(modelCalls, 3);
+    assertStringIncludes(JSON.stringify(lastBody.contents), "掷出了3");
     await app.bot.handleUpdate(update(7, "/calc 1/3+1/6 @test_bot"));
     assertEquals(modelCalls, 4);
     assertStringIncludes(JSON.stringify(lastBody.contents), "1/3+1/6 = 0.5");
@@ -152,6 +156,21 @@ Deno.test("traditional commands precede explicit AI, saved facts are user contex
     );
     assertEquals(modelCalls, 6);
     assertEquals(fileDownloads, 6);
+    const ordinaryAnswer = sent.at(-1)!;
+    const forum = { is_topic_message: true, message_thread_id: 55 };
+    await app.bot.handleUpdate(update(904, "cross topic", ordinaryAnswer, forum));
+    assertEquals(modelCalls, 6);
+    await app.bot.handleUpdate(update(905, "@test_bot forum conversation", undefined, forum));
+    assertEquals(modelCalls, 7);
+    const forumAnswer = { ...sent.at(-1)!, ...forum };
+    await app.bot.handleUpdate(update(906, "continue forum", forumAnswer, forum));
+    assertEquals(modelCalls, 8);
+    assertStringIncludes(JSON.stringify(lastBody.contents), "forum conversation");
+    await app.bot.handleUpdate(
+      update(907, "wrong topic", forumAnswer, { ...forum, message_thread_id: 56 }),
+    );
+    await app.bot.handleUpdate(update(908, "outside topic", forumAnswer));
+    assertEquals(modelCalls, 8);
     app.flush();
   } finally {
     globalThis.fetch = originalFetch;

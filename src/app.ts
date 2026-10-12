@@ -20,6 +20,7 @@ import { DenoProcessRunner } from "./shared/process.ts";
 import { toolHandlers } from "./features/tool_handlers.ts";
 import { type ConfigField, StatsService } from "./stats/service.ts";
 import { GrammyTelegramGateway } from "./telegram/gateway.ts";
+import { topicId } from "./telegram/topic.ts";
 import { registerRoll } from "./features/roll.ts";
 import { type Interaction, interaction, isAiTrigger, type TraditionalFact } from "./interaction.ts";
 import { albumIndex } from "./ai/albums.ts";
@@ -47,10 +48,6 @@ function commandArgument(message?: Message): string {
 
 function escapeHtml(value: string): string {
   return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
-}
-
-function topicId(message?: Message): number {
-  return message?.message_thread_id ?? 0;
 }
 
 function largestPhoto(message?: Message): PhotoSize | undefined {
@@ -698,7 +695,7 @@ export async function createApplication(
         );
       } else {
         repository.setChatModel(message.chat.id, provider, model, now());
-        ai.resetCurrent(message.chat.id, message.message_thread_id ?? 0);
+        ai.resetCurrent(message.chat.id, topicId(message));
         await ctx.editMessageText(`当前聊天已切换到 ${option.label}；下一条消息将开始新会话。`, {
           reply_markup: modelKeyboard(model, provider),
         });

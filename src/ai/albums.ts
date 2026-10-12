@@ -2,24 +2,25 @@ import type { Message } from "grammy/types";
 import type { MainDatabase } from "../db/database.ts";
 import { SQL } from "../db/queries.ts";
 import type { IncomingMedia } from "./service.ts";
+import { topicId } from "../telegram/topic.ts";
 
 const ttlSeconds = 7 * 86400;
 export function albumIndex(db: MainDatabase, idleMs = 1000, maxWaitMs = 5000) {
   const activity = new Map<string, { seen: number; claimedAt?: number }>();
   const key = (message: Message, group: string) =>
-    `${message.chat.id}:${message.message_thread_id ?? 0}:${group}`;
+    `${message.chat.id}:${topicId(message)}:${group}`;
   const groupFor = (message: Message) =>
     message.media_group_id ?? db.get<{ group_id: string }>(
       SQL.AlbumForMessage,
       message.chat.id,
-      message.message_thread_id ?? 0,
+      topicId(message),
       message.message_id,
     )?.group_id;
   return {
     capture(message: Message) {
       const group = message.media_group_id;
       if (!group) return;
-      const photo = message.photo?.at(-1), topic = message.message_thread_id ?? 0;
+      const photo = message.photo?.at(-1), topic = topicId(message);
       db.transaction(() => {
         db.run(
           SQL.IndexAlbum,
@@ -83,7 +84,7 @@ export function albumIndex(db: MainDatabase, idleMs = 1000, maxWaitMs = 5000) {
       const metadata = db.get<{ topic_id: number; expires_at: number; photo_only: number }>(
         SQL.GetAlbum,
         message.chat.id,
-        message.message_thread_id ?? 0,
+        topicId(message),
         group,
       );
       if (!metadata || metadata.expires_at <= Math.floor(Date.now() / 1000)) {

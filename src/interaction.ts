@@ -1,6 +1,7 @@
 import type { Context } from "grammy";
 import type { MainDatabase } from "./db/database.ts";
 import { SQL } from "./db/queries.ts";
+import { topicId } from "./telegram/topic.ts";
 
 export interface TraditionalFact {
   feature: string;
@@ -13,7 +14,7 @@ export interface TraditionalFact {
 
 export function interaction(db: MainDatabase, ctx: Context) {
   const message = ctx.message!;
-  const topic = message.message_thread_id ?? 0;
+  const topic = topicId(message);
   const facts: TraditionalFact[] = [];
   let replyId: number | null = null;
   return {

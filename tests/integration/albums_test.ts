@@ -33,7 +33,10 @@ Deno.test("album indexes only files, assembles in message order, isolates topics
       ["file-1", "file-2"],
     );
     assertEquals(
-      (await index.media(message(2, { media_group_id: undefined }), new AbortController().signal))!
+      (await index.media(
+        message(2, { media_group_id: undefined, message_thread_id: 999 }),
+        new AbortController().signal,
+      ))!
         .length,
       2,
     );
@@ -41,7 +44,10 @@ Deno.test("album indexes only files, assembles in message order, isolates topics
     assertEquals(JSON.stringify(rows).includes("caption"), false);
     assertEquals(temporary.db.all("SELECT * FROM ai_messages"), []);
     await assertRejects(() =>
-      index.media(message(1, { message_thread_id: 5 }), new AbortController().signal)
+      index.media(
+        message(1, { message_thread_id: 5, is_topic_message: true }),
+        new AbortController().signal,
+      )
     );
     index.capture(message(3, { photo: undefined, video: { file_id: "video" } }));
     const mixed = await assertRejects(
