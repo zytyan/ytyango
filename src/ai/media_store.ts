@@ -31,7 +31,12 @@ export class ContentAddressedMediaStore implements MediaStore {
       try {
         const file = await Deno.open(temp, { write: true, truncate: true });
         try {
-          await file.write(bytes);
+          let offset = 0;
+          while (offset < bytes.length) {
+            const written = await file.write(bytes.subarray(offset));
+            if (!written) throw new Error("media write made no progress");
+            offset += written;
+          }
           await file.sync();
         } finally {
           file.close();

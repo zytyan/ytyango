@@ -151,3 +151,24 @@ Deno.test("media GC keeps catalogue objects and young files and defaults to dry 
     await Deno.remove(root, { recursive: true });
   }
 });
+
+Deno.test("media publication handles partial filesystem writes before rename", async () => {
+  const root = await Deno.makeTempDir();
+  const originalOpen = Deno.open;
+  try {
+    Deno.open = async (path, options) => {
+      const file = await originalOpen(path, options);
+      if (options?.write) {
+        const write = file.write.bind(file);
+        file.write = (bytes) => write(bytes.subarray(0, 2));
+      }
+      return file;
+    };
+    const store = new ContentAddressedMediaStore(root), bytes = new Uint8Array([1, 2, 3, 4, 5]);
+    const object = await store.put(bytes, "image/jpeg");
+    assertEquals(await store.open(object.sha256), bytes);
+  } finally {
+    Deno.open = originalOpen;
+    await Deno.remove(root, { recursive: true });
+  }
+});
