@@ -6,6 +6,44 @@ import { ContentAddressedMediaStore } from "../../src/ai/media_store.ts";
 import { parseConfig } from "../../src/config.ts";
 import { FakeTelegram, temporaryDatabase } from "./helpers.ts";
 
+Deno.test("media preparation failure never calls a provider or creates a partial request", async () => {
+  const temporary = await temporaryDatabase();
+  try {
+    let calls = 0;
+    const telegram = new FakeTelegram();
+    telegram.downloadFile = () => Promise.reject(new Error("file unavailable"));
+    const service = new AiService(
+      new AiRepository(temporary.db),
+      () => {
+        calls++;
+        throw new Error("unexpected model call");
+      },
+      telegram,
+      new ContentAddressedMediaStore(`${temporary.path}.media`),
+      () => parseConfig(`database-path: ${temporary.path}\nai-chats: [-100]\n`),
+      { id: 99, firstName: "bot", username: "bot" },
+    );
+    await assertRejects(() =>
+      service.handle({
+        chatId: -100,
+        chatName: "test",
+        chatType: "supergroup",
+        messageId: 12,
+        sentAt: 1,
+        userId: 7,
+        username: "user",
+        text: "@bot",
+        media: [{ fileId: "photo", kind: "image", mimeType: "image/jpeg" }],
+      })
+    );
+    assertEquals(calls, 0);
+    assertEquals(temporary.db.all("SELECT * FROM ai_runs"), []);
+    assertEquals(telegram.calls.some((call) => call.method === "message"), true);
+  } finally {
+    await temporary.close();
+  }
+});
+
 Deno.test("SDK result survives Telegram failure; redelivery neither calls model nor counts tokens twice", async () => {
   const temporary = await temporaryDatabase();
   try {

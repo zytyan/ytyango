@@ -106,7 +106,7 @@ export function parseConfig(text: string): AppConfig {
     geminiKey: env("GEMINI_API_KEY") ?? raw["gemini-key"],
     geminiExplicitCache: raw["gemini-explicit-cache"],
     sub2apiKey: env("SUB2API_API_KEY") ?? raw["sub2api-key"],
-    sub2apiBaseUrl: raw["sub2api-base-url"].replace(/\/$/, ""),
+    sub2apiBaseUrl: (env("SUB2API_BASE_URL") ?? raw["sub2api-base-url"]).replace(/\/$/, ""),
     deepSeekKey: env("DEEPSEEK_API_KEY") ?? raw["deepseek-key"],
     deepSeekBaseUrl: raw["deepseek-base-url"].replace(/\/$/, ""),
   });

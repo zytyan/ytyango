@@ -179,13 +179,24 @@ export class AiService {
     );
     if (existing?.status === "delivered") return;
     const pending: PendingAiMessage[] = [];
-    if (
-      !existing && incoming.reply &&
-      !this.repository.findSessionByMessage(incoming.chatId, incoming.reply.messageId)
-    ) {
-      pending.push(await this.#prepareMessage(incoming.reply, true, session));
+    try {
+      if (
+        !existing && incoming.reply &&
+        !this.repository.findSessionByMessage(incoming.chatId, incoming.reply.messageId)
+      ) {
+        pending.push(await this.#prepareMessage(incoming.reply, true, session));
+      }
+      if (!existing) pending.push(await this.#prepareMessage(incoming, false, session));
+    } catch (error) {
+      await this.telegram.sendMessage(
+        incoming.chatId,
+        "无法完整读取请求中的媒体，本次未调用模型。",
+        {
+          reply_parameters: { message_id: incoming.messageId, allow_sending_without_reply: true },
+        },
+      );
+      throw error;
     }
-    if (!existing) pending.push(await this.#prepareMessage(incoming, false, session));
     const now = Math.floor(this.clock.now().getTime() / 1000);
     const run = existing ?? this.repository.beginRun(session.id, pending, now);
     if (run.status === "delivered") return;
@@ -305,20 +316,30 @@ export class AiService {
     session: AiSession,
   ): Promise<PendingAiMessage> {
     const mediaObjects: Array<Awaited<ReturnType<MediaStore["put"]>> & { kind: string }> = [];
+    const notes: string[] = [];
     for (const media of input.media) {
       if (
         session.provider === "deepseek" &&
         (media.kind === "video" || media.kind === "animation" ||
           !supportsImages(session.provider, session.model))
-      ) continue;
-      if ((media.byteSize ?? 0) > 15 * 1024 * 1024 || (media.duration ?? 0) > 240) continue;
+      ) {
+        notes.push("[当前模型不支持此媒体，未上传]");
+        continue;
+      }
+      if ((media.byteSize ?? 0) > 15 * 1024 * 1024 || (media.duration ?? 0) > 240) {
+        notes.push("[媒体超过 15 MiB 或 240 秒，未上传]");
+        continue;
+      }
       const file = await this.telegram.getFile(media.fileId);
       const timeout = AbortSignal.timeout(10_000);
       const bytes = await this.telegram.downloadFile(
         file,
         input.signal ? AbortSignal.any([input.signal, timeout]) : timeout,
       );
-      if (bytes.byteLength > 15 * 1024 * 1024) continue;
+      if (bytes.byteLength > 15 * 1024 * 1024) {
+        notes.push("[媒体超过 15 MiB，未上传]");
+        continue;
+      }
       mediaObjects.push({ ...await this.mediaStore.put(bytes, media.mimeType), kind: media.kind });
     }
     const message: AiMessage = {
@@ -330,7 +351,10 @@ export class AiService {
       atableUsername: input.atableUsername,
       role: "user",
       messageType: input.media[0]?.kind ?? "text",
-      text: `${input.text ?? ""}${factText(input.facts ?? [])}` || undefined,
+      text:
+        `${input.text ?? ""}${notes.length ? "\n" + notes.join("\n") : ""}${
+          factText(input.facts ?? [])
+        }` || undefined,
       replyToMessageId: input.reply?.messageId,
       media: [],
     };

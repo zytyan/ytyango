@@ -77,6 +77,7 @@ function incomingMedia(message: Message): IncomingMedia[] {
     }];
   }
   if (message.sticker) {
+    if (message.sticker.is_animated) return [];
     return [{
       fileId: message.sticker.file_id,
       uniqueId: message.sticker.file_unique_id,
@@ -124,7 +125,8 @@ function toIncoming(message: Message, withReply = true): IncomingAiMessage {
       ? [from.first_name, from.last_name].filter(Boolean).join(" ")
       : message.sender_chat?.title ?? "未知用户",
     atableUsername: from?.username,
-    text: messageText(message) || undefined,
+    text: messageText(message) || message.sticker?.emoji ||
+      (message.sticker ? "[贴纸]" : undefined),
     reply: withReply && message.reply_to_message
       ? toIncoming(message.reply_to_message, false)
       : undefined,
@@ -464,11 +466,18 @@ export async function createApplication(
   });
   bot.command(
     "getrank",
-    async (ctx) => await ctx.reply(stats.rank(ctx.chat.id), replyOptions(ctx.message)),
+    async (ctx) => {
+      const output = stats.rank(ctx.chat.id);
+      await currentInteraction(ctx).reply(output);
+      currentInteraction(ctx).aiContext("rank", `今日发言排行：\n${output}`);
+    },
   );
   bot.command("diag_sendstat", async (ctx) => {
     stats.flush();
-    await ctx.reply(stats.dailyMessage(ctx.chat.id, now() - 86_400), { parse_mode: "HTML" });
+    await currentInteraction(ctx).reply(stats.dailyMessage(ctx.chat.id, now() - 86_400), {
+      parse_mode: "HTML",
+    });
+    currentInteraction(ctx).aiContext("statistics", "已发送昨日群统计日报。");
   });
   bot.command("chat_config", async (ctx) => {
     await ctx.reply("当前群组的信息如下", { reply_markup: configKeyboard(stats, ctx.chat.id) });
