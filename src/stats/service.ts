@@ -1,13 +1,23 @@
+import { SQL } from "../db/queries.ts";
 import type { MainDatabase } from "../db/database.ts";
 
 export interface ChatConfig {
   readonly id: number;
   readonly autoCvtBili: boolean;
+  readonly autoCalculate: boolean;
+  readonly autoExchange: boolean;
   readonly autoCheckAdult: boolean;
   readonly respNsfwMsg: boolean;
   readonly timezone: number;
   readonly inDatabase: boolean;
 }
+
+export type ConfigField =
+  | "auto_cvt_bili"
+  | "auto_calculate"
+  | "auto_exchange"
+  | "auto_check_adult"
+  | "resp_nsfw_msg";
 
 interface UserStat {
   messageCount: number;
@@ -86,17 +96,21 @@ export class StatsService {
     const row = this.db.get<{
       id: number;
       auto_cvt_bili: number;
+      auto_calculate: number;
+      auto_exchange: number;
       auto_check_adult: number;
       resp_nsfw_msg: number;
       timezone: number;
     }>(
-      "SELECT id,auto_cvt_bili,auto_check_adult,resp_nsfw_msg,timezone FROM chat_cfg WHERE id=?",
+      "SELECT id,auto_cvt_bili,auto_calculate,auto_exchange,auto_check_adult,resp_nsfw_msg,timezone FROM chat_cfg WHERE id=?",
       chatId,
     );
     return row
       ? {
         id: row.id,
         autoCvtBili: row.auto_cvt_bili === 1,
+        autoCalculate: row.auto_calculate === 1,
+        autoExchange: row.auto_exchange === 1,
         autoCheckAdult: row.auto_check_adult === 1,
         respNsfwMsg: row.resp_nsfw_msg === 1,
         timezone: row.timezone,
@@ -105,6 +119,8 @@ export class StatsService {
       : {
         id: chatId,
         autoCvtBili: false,
+        autoCalculate: false,
+        autoExchange: false,
         autoCheckAdult: false,
         respNsfwMsg: false,
         timezone: 8 * 3600,
@@ -114,19 +130,22 @@ export class StatsService {
 
   setConfigField(
     chatId: number,
-    field: "auto_cvt_bili" | "resp_nsfw_msg",
+    field: ConfigField,
     value: boolean,
   ): ChatConfig {
     const current = this.config(chatId);
-    if (!current.inDatabase) {
-      this.db.run(
-        `INSERT INTO chat_cfg(id,auto_cvt_bili,auto_calculate,auto_exchange,auto_check_adult,enable_coc,resp_nsfw_msg,timezone)
-VALUES(?,0,0,0,0,0,0,?)`,
-        chatId,
-        current.timezone,
-      );
-    }
-    this.db.run(`UPDATE chat_cfg SET ${field}=? WHERE id=?`, value ? 1 : 0, chatId);
+    const values: Record<ConfigField, boolean> = {
+      auto_cvt_bili: current.autoCvtBili,
+      auto_calculate: current.autoCalculate,
+      auto_exchange: current.autoExchange,
+      auto_check_adult: current.autoCheckAdult,
+      resp_nsfw_msg: current.respNsfwMsg,
+    };
+    values[field] = value;
+    this.db.transaction(() => {
+      this.db.run(SQL.EnsureChatConfig, chatId, current.timezone);
+      this.db.run(SQL.SetChatConfig, ...Object.values(values).map((v) => v ? 1 : 0), chatId);
+    });
     return this.config(chatId);
   }
 

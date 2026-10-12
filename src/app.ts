@@ -17,7 +17,8 @@ import { convertBilibiliLinks, hasBilibiliVideo } from "./download/bilibili.ts";
 import { DownloadService, parseDownloadKey } from "./download/service.ts";
 import { type NsfwPhoto, NsfwService } from "./nsfw/service.ts";
 import { DenoProcessRunner } from "./shared/process.ts";
-import { StatsService } from "./stats/service.ts";
+import { toolHandlers } from "./features/tool_handlers.ts";
+import { type ConfigField, StatsService } from "./stats/service.ts";
 import { GrammyTelegramGateway } from "./telegram/gateway.ts";
 import { registerRoll } from "./features/roll.ts";
 import { type Interaction, interaction, isAiTrigger, type TraditionalFact } from "./interaction.ts";
@@ -136,18 +137,18 @@ function replyOptions(message?: Message): Record<string, unknown> {
 
 function configKeyboard(stats: StatsService, chatId: number): InlineKeyboardMarkup {
   const cfg = stats.config(chatId);
+  const options: [ConfigField, string, boolean][] = [
+    ["auto_cvt_bili", "自动转换Bilibili链接", cfg.autoCvtBili],
+    ["auto_calculate", "自动计算", cfg.autoCalculate],
+    ["auto_exchange", "自动换算汇率", cfg.autoExchange],
+    ["auto_check_adult", "自动图片审核", cfg.autoCheckAdult],
+    ["resp_nsfw_msg", "响应来张色图", cfg.respNsfwMsg],
+  ];
   return {
-    inline_keyboard: [[
-      {
-        text: `${cfg.autoCvtBili ? "✅" : "❌"} 自动转换Bilibili链接`,
-        callback_data: `gcfg:auto_cvt_bili:${cfg.autoCvtBili ? "T" : "F"}`,
-      },
-    ], [
-      {
-        text: `${cfg.respNsfwMsg ? "✅" : "❌"} 响应来张色图`,
-        callback_data: `gcfg:resp_nsfw_msg:${cfg.respNsfwMsg ? "T" : "F"}`,
-      },
-    ]],
+    inline_keyboard: options.map(([field, label, enabled]) => [{
+      text: `${enabled ? "✅" : "❌"} ${label}`,
+      callback_data: `gcfg:${field}:${enabled ? "T" : "F"}`,
+    }]),
   };
 }
 
@@ -292,7 +293,7 @@ export async function createApplication(
           lastName: message.from.last_name,
           username: message.from.username,
         },
-        text: messageText(message),
+        text: message.text ?? "",
         photo: Boolean(message.photo),
         video: Boolean(message.video),
         sticker: Boolean(message.sticker),
@@ -308,6 +309,8 @@ export async function createApplication(
     (ctx, text, status, replyId) =>
       currentInteraction(ctx).aiContext("roll", text, status, replyId),
   );
+
+  const automaticTools = toolHandlers(bot, db, telegram, configs, currentInteraction);
 
   bot.command("ai_reaction", async (ctx) => {
     const value = commandArgument(ctx.message).toLowerCase();
@@ -513,6 +516,7 @@ export async function createApplication(
     const message = ctx.message;
     const text = messageText(message);
     const config = stats.config(message.chat.id);
+    if (await automaticTools(ctx, config.autoCalculate, config.autoExchange)) return;
 
     if (message.via_bot?.id === identity.id && message.reply_markup) {
       for (const row of message.reply_markup.inline_keyboard) {
@@ -722,8 +726,20 @@ export async function createApplication(
       return;
     }
     if (data.startsWith("gcfg:")) {
+      if (!await canAdminister(ctx, configs.value.god)) {
+        return await ctx.answerCallbackQuery({
+          text: "只有群主或管理员可以修改设置",
+          show_alert: true,
+        });
+      }
       const [, rawField, old] = data.split(":");
-      const aliases: Record<string, "auto_cvt_bili" | "resp_nsfw_msg"> = {
+      const aliases: Record<string, ConfigField> = {
+        auto_calculate: "auto_calculate",
+        AutoCalculate: "auto_calculate",
+        auto_exchange: "auto_exchange",
+        AutoExchange: "auto_exchange",
+        auto_check_adult: "auto_check_adult",
+        AutoCheckAdult: "auto_check_adult",
         auto_cvt_bili: "auto_cvt_bili",
         AutoCvtBili: "auto_cvt_bili",
         resp_nsfw_msg: "resp_nsfw_msg",

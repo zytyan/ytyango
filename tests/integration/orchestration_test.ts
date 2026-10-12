@@ -114,6 +114,9 @@ Deno.test("traditional commands precede explicit AI, saved facts are user contex
     assertStringIncludes(JSON.stringify(lastBody.contents), "掷出了3");
     await app.bot.handleUpdate(update(6, "continue", sent.at(-1)!));
     assertEquals(modelCalls, 3);
+    await app.bot.handleUpdate(update(7, "/calc 1/3+1/6 @test_bot"));
+    assertEquals(modelCalls, 4);
+    assertStringIncludes(JSON.stringify(lastBody.contents), "1/3+1/6 = 0.5");
     app.flush();
   } finally {
     globalThis.fetch = originalFetch;

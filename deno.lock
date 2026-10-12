@@ -7,6 +7,7 @@
     "npm:@ai-sdk/deepseek@3.0.58": "3.0.58_zod@4.4.3",
     "npm:@ai-sdk/google@4.0.87": "4.0.87_zod@4.4.3",
     "npm:ai@7.0.127": "7.0.127_zod@4.4.3",
+    "npm:fraction.js@5.3.4": "5.3.4",
     "npm:grammy@1.45.1": "1.45.1",
     "npm:zod@4.4.3": "4.4.3"
   },
@@ -106,6 +107,9 @@
     "eventsource-parser@3.1.1": {
       "integrity": "sha512-EKN1vKAMcZ8MlYMpaNuxN6R9yakzH6uajHcHVTqWJzvu5pWw9DyhbP35HH8MVBQ+dZjAfDxk+A8NiR9KWaXiyQ=="
     },
+    "fraction.js@5.3.4": {
+      "integrity": "sha512-1X1NTtiJphryn/uLQz3whtY6jK3fTqoE3ohKs0tT+Ujr1W59oopxmoEh7Lu5p6vBaPbgoM0bzveAW4Qi5RyWDQ=="
+    },
     "grammy@1.45.1": {
       "integrity": "sha512-Y4VL/hqJMZZxwlUr5ZgM68CFu2iIeEkNLR1cY3+Ww68CIvWARDsoXFix7+31rmyC0+7L85ZI+Pq3E5JSG5+nLQ==",
       "dependencies": [
@@ -166,6 +170,7 @@
       "npm:@ai-sdk/deepseek@3.0.58",
       "npm:@ai-sdk/google@4.0.87",
       "npm:ai@7.0.127",
+      "npm:fraction.js@5.3.4",
       "npm:grammy@1.45.1",
       "npm:zod@4.4.3"
     ]
