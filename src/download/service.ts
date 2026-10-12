@@ -2,6 +2,7 @@ import type { MainDatabase } from "../db/database.ts";
 import { Semaphore } from "../shared/concurrency.ts";
 import type { ProcessRunner, SentMessage, TelegramPort } from "../shared/types.ts";
 import { convertBilibiliLinks } from "./bilibili.ts";
+import { isAbsolute, resolve } from "node:path";
 
 const DOWNLOAD_URL =
   /(?:(?:bilibili\.com|www\.bilibili\.com|b23\.tv|youtu\.be|youtube\.com)\/[a-zA-Z\d_%.~:/?#[\]@!$&'()*+,;=\-]+)/i;
@@ -71,6 +72,52 @@ async function firstMediaFile(root: string, audioOnly: boolean): Promise<string>
   throw new Error(`${root} 目录中没有文件`);
 }
 
+export async function findBilibiliCookies(): Promise<string> {
+  for (
+    const path of [
+      "bili_cookies.json",
+      "build/bili_cookies.json",
+      "../ytyanbot/build/bili_cookies.json",
+      "/opt/tgbots/ytyanbot/build/bili_cookies.json",
+    ]
+  ) {
+    try {
+      if ((await Deno.stat(path)).isFile) return resolve(path);
+    } catch (error) {
+      if (!(error instanceof Deno.errors.NotFound)) throw error;
+    }
+  }
+  throw new Error("找不到 Bilibili 账户文件 bili_cookies.json");
+}
+
+export function bbdownArgs(
+  cookieFile: string,
+  workDir: string,
+  audioOnly: boolean,
+  url: string,
+): string[] {
+  return [
+    "--cookie-file",
+    cookieFile,
+    "-work-dir",
+    workDir,
+    "-encoding-priority",
+    "HEVC",
+    ...(audioOnly ? ["--audio-only"] : []),
+    url,
+  ];
+}
+
+export function bbdownOutput(output: Uint8Array, workDir: string, audioOnly: boolean): string {
+  const body = JSON.parse(decoder.decode(output)) as Record<string, unknown>;
+  const key = audioOnly ? "audio_path" : "video_path";
+  if (typeof body[key] !== "string" || !body[key]) throw new Error(`bbdown-go 未返回 ${key}`);
+  const path = isAbsolute(body[key]) ? body[key] : resolve(workDir, body[key]);
+  const root = resolve(workDir);
+  if (!path.startsWith(`${root}/`)) throw new Error("bbdown-go 返回的文件不在下载目录内");
+  return path;
+}
+
 export async function parseDownloadKey(text: string, audioOnly: boolean): Promise<DownloadKey> {
   const found = text.match(DOWNLOAD_URL)?.[0];
   if (!found) throw new Error(`没有在聊天 ${text} 中找到任何可下载的链接`);
@@ -97,6 +144,7 @@ export class DownloadService {
     readonly telegram: TelegramPort,
     readonly process: ProcessRunner,
     readonly fetcher: typeof fetch = fetch,
+    readonly cookieFile: () => Promise<string> = findBilibiliCookies,
   ) {}
 
   async deliver(input: DeliveryRequest): Promise<void> {
@@ -168,7 +216,7 @@ file_id=excluded.file_id,title=excluded.title,description=excluded.description,u
   async checkExecutables(): Promise<void> {
     const results = await Promise.all([
       this.process.run("/usr/local/bin/yt-dlp", ["--version"], { timeoutMs: 10_000 }),
-      this.process.run("/usr/local/bin/dotnet-tools/BBDown", ["--help"], { timeoutMs: 10_000 }),
+      this.process.run("/usr/bin/bbdown-go", ["--help"], { timeoutMs: 10_000 }),
       this.process.run("/usr/bin/ffprobe", ["-version"], { timeoutMs: 10_000 }),
     ]);
     if (results.some((result) => result.code !== 0)) {
@@ -227,22 +275,23 @@ file_id=excluded.file_id,title=excluded.title,description=excluded.description,u
     const temporary = await Deno.makeTempDir({ prefix: "ytdlp-" });
     try {
       if (key.url.includes("bilibili.com") || key.url.includes("b23.tv")) {
-        const metadata = this.#bilibiliInfo(key.url, signal);
-        const result = await this.process.run("/usr/local/bin/dotnet-tools/BBDown", [
-          key.url,
-          "-app",
-          "-e",
-          "hevc,av1,avc",
-          "-q",
-          "720P 高清",
-          "-F",
-          `${temporary}/<bvid>`,
-        ], { cwd: temporary, timeoutMs: 30 * 60_000, signal });
-        if (result.code !== 0) throw new Error(`BBDown failed: ${decoder.decode(result.stderr)}`);
-        const info = await metadata;
+        const cookies = await this.cookieFile();
+        const [result, metadata] = await Promise.allSettled([
+          this.process.run(
+            "/usr/bin/bbdown-go",
+            bbdownArgs(cookies, temporary, key.audioOnly, key.url),
+            { cwd: temporary, timeoutMs: 30 * 60_000, signal },
+          ),
+          this.#bilibiliInfo(key.url, signal),
+        ]);
+        if (result.status === "rejected") throw result.reason;
+        if (result.value.code !== 0) throw new Error(`bbdown-go 下载失败 (${result.value.code})`);
+        const info = metadata.status === "fulfilled"
+          ? metadata.value
+          : { title: "未知标题", uploader: "未知上传者", description: "" };
         return {
           key,
-          filePath: await firstMediaFile(temporary, key.audioOnly),
+          filePath: bbdownOutput(result.value.stdout, temporary, key.audioOnly),
           ...info,
           cleanup: () => Deno.remove(temporary, { recursive: true }),
         };
@@ -313,7 +362,10 @@ file_id=excluded.file_id,title=excluded.title,description=excluded.description,u
     const endpoint = /^av/i.test(token)
       ? `https://api.bilibili.com/x/web-interface/view?aid=${token.slice(2)}`
       : `https://api.bilibili.com/x/web-interface/view?bvid=${token}`;
-    const response = await this.fetcher(endpoint, { signal });
+    const deadline = AbortSignal.timeout(10_000);
+    const response = await this.fetcher(endpoint, {
+      signal: signal ? AbortSignal.any([signal, deadline]) : deadline,
+    });
     if (!response.ok) throw new Error(`Bilibili metadata HTTP ${response.status}`);
     const body = await response.json() as { code: number; data?: Record<string, unknown> };
     if (body.code !== 0 || !body.data) throw new Error(`Bilibili metadata code ${body.code}`);

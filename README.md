@@ -104,7 +104,7 @@ deno task compile
 
 ```text
 /usr/local/bin/yt-dlp
-/usr/local/bin/dotnet-tools/BBDown
+/usr/bin/bbdown-go
 /usr/bin/ffprobe
 ```
 
