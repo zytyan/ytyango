@@ -76,3 +76,11 @@ tar.gz；media=0 明确标记不完整 AI 数据集。 格式允许 breaking cha
 同步。超时、取消、临时文件清理与单次打包并发限制。 `media-gc` 默认 dry-run，grace-hours
 必填；--apply 须在运行停止时执行，仅移除目录中未登记的旧对象，
 不删除数据库历史或有登记的媒体。没有自动执行生产清理。76 项回归与本机真实 tar smoke 通过。
+
+## 本地 Telegram 文件
+
+Go `d395a28545701a5640d91b1ff7057bee236a3f1e`；TS 前置 `99296f8`。 实际 Go 配置 getMe/getFile
+探测发现本地 Bot API 返回绝对路径；TS 原 HTTP 拼接会导致图片能力不可用。 现在本地 API 仅读取当前 Bot
+的目录、检查 realpath 防止符号链接越界，并对本地/HTTP 输入进行 20 MiB
+流式上限和取消检查；错误不包含带凭据的文件路径。编译增加实际 Bot API 数据根读取权限。 77
+项回归通过，真实本地图片下载通过（未发送 Telegram 消息）。

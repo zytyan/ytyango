@@ -11,6 +11,7 @@ export class GrammyTelegramGateway implements TelegramPort {
     readonly bot: Bot,
     readonly token: string,
     readonly apiRoot: string,
+    readonly localFileRoot = "/opt/tgbots/telegram-bot-api",
   ) {}
 
   async sendMessage(
@@ -102,15 +103,72 @@ export class GrammyTelegramGateway implements TelegramPort {
 
   async downloadFile(file: TelegramFile, signal?: AbortSignal): Promise<Uint8Array> {
     if (!file.filePath) throw new Error("Telegram file has no path");
+    signal?.throwIfAborted();
+    if (file.filePath.startsWith("/")) {
+      const host = new URL(this.apiRoot).hostname;
+      if (!["localhost", "127.0.0.1", "[::1]"].includes(host)) {
+        throw new Error("absolute file path requires local Telegram API");
+      }
+      const root = `${this.localFileRoot}/${this.token}/`;
+      try {
+        const path = await Deno.realPath(file.filePath);
+        const canonicalRoot = `${await Deno.realPath(root)}/`;
+        if (!path.startsWith(canonicalRoot)) throw new Error("invalid local file path");
+        const stat = await Deno.stat(path);
+        if (!stat.isFile || stat.size > 20 * 1024 * 1024) {
+          throw new Error("invalid local file size");
+        }
+        const input = await Deno.open(path, { read: true });
+        return await fileBytes(input.readable, signal);
+      } catch {
+        // The local Bot API includes the token in filesystem paths.
+        throw new Error("local Telegram file unavailable or outside bot directory");
+      }
+    }
     const response = await fetch(`${this.apiRoot}/file/bot${this.token}/${file.filePath}`, {
       signal,
     });
     if (!response.ok) throw new Error(`Telegram file download failed: HTTP ${response.status}`);
-    return new Uint8Array(await response.arrayBuffer());
+    if (!response.body) throw new Error("empty Telegram file response");
+    return await fileBytes(response.body, signal);
   }
 
   #input(value: UploadSource): string | InputFile {
     if (typeof value === "string") return value;
     return new InputFile(value instanceof Uint8Array ? value : value.path);
+  }
+}
+
+async function fileBytes(
+  stream: ReadableStream<Uint8Array>,
+  signal?: AbortSignal,
+): Promise<Uint8Array> {
+  const reader = stream.getReader(), chunks: Uint8Array[] = [];
+  let size = 0;
+  const abort = () => {
+    reader.cancel().catch(() => {});
+  };
+  signal?.addEventListener("abort", abort, { once: true });
+  try {
+    while (true) {
+      signal?.throwIfAborted();
+      const { value, done } = await reader.read();
+      signal?.throwIfAborted();
+      if (done) break;
+      size += value.length;
+      if (size > 20 * 1024 * 1024) throw new Error("Telegram input media exceeds 20 MiB");
+      chunks.push(value);
+    }
+    const bytes = new Uint8Array(size);
+    let position = 0;
+    for (const chunk of chunks) {
+      bytes.set(chunk, position);
+      position += chunk.length;
+    }
+    return bytes;
+  } finally {
+    signal?.removeEventListener("abort", abort);
+    await reader.cancel();
+    reader.releaseLock();
   }
 }
