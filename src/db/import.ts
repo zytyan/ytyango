@@ -23,6 +23,11 @@ const hash = async (bytes: Uint8Array): Promise<string> =>
     (b) => b.toString(16).padStart(2, "0"),
   ).join("");
 const digest = (rows: Row[]) => hash(new TextEncoder().encode(rows.map(encode).sort().join("\n")));
+function rows64(db: MainDatabase, sql: string): Row[] {
+  const statement = db.raw.prepare(sql);
+  statement.setReadBigInts(true);
+  return statement.all() as Row[];
+}
 
 export interface ImportOptions {
   source: string;
@@ -95,7 +100,7 @@ export async function importDatabase(options: ImportOptions): Promise<Record<str
       for (const trigger of triggers) target!.raw.exec(`DROP TRIGGER ${quote(trigger.name)}`);
       for (const name of tables) {
         if (name === "schema_migrations") continue;
-        const rows = source.all<Row>(`SELECT * FROM ${quote(name)}`);
+        const rows = rows64(source, `SELECT * FROM ${quote(name)}`);
         const destination = name === "character_attrs" ? "legacy_coc_attrs" : name;
         if (!targetTables.has(destination) || name === "ai_session_provider_state") {
           // Source-only data, including albums, is explicitly archived rather than silently discarded.
@@ -135,13 +140,13 @@ export async function importDatabase(options: ImportOptions): Promise<Record<str
     });
     for (const mapping of report) {
       const name = String(mapping.source);
-      const rows = source.all<Row>(`SELECT * FROM ${quote(name)}`);
+      const rows = rows64(source, `SELECT * FROM ${quote(name)}`);
       const copied = mapping.destination === "import_archives"
         ? target.all<{ payload: string }>(
           "SELECT payload FROM import_archives WHERE source_table=? ORDER BY CAST(row_key AS INTEGER)",
           name,
         ).map((row) => JSON.parse(row.payload))
-        : target.all<Row>(`SELECT * FROM ${quote(String(mapping.destination))}`);
+        : rows64(target, `SELECT * FROM ${quote(String(mapping.destination))}`);
       // Archived BLOBs use the same canonical encoding as the source.
       const sourceHash = await digest(rows);
       const targetHash = await digest(copied);

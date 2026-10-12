@@ -26,7 +26,10 @@ async function fixture(root: string): Promise<string> {
     source.raw.exec(
       "CREATE TABLE character_attrs(user_id INTEGER,attr_name TEXT,attr_value TEXT); INSERT INTO character_attrs VALUES(7,'STR','80');",
     );
-    source.run("INSERT INTO saved_pics(file_uid,file_id,bot_rate,rand_key) VALUES('u','f',6,9)");
+    source.run(
+      "INSERT INTO saved_pics(file_uid,file_id,bot_rate,rand_key) VALUES('u','f',6,?)",
+      191315037158113842n,
+    );
     source.run("INSERT INTO saved_pics_rating VALUES('u',7,2)");
     source.run(
       "INSERT INTO ai_sessions(chat_id,chat_name,chat_type,provider,model,created_at,updated_at,total_input_tokens,total_output_tokens) VALUES(-100,'group','supergroup','gemini','model',1,1,11,5)",
@@ -74,6 +77,9 @@ Deno.test("Go V11 import preserves rows/tokens/payload/media/votes and leaves so
     const target = new MainDatabase(`${root}/target/dataset/main.db`, { readOnly: true });
     try {
       assertEquals(target.validate().version, 1);
+      const key = target.raw.prepare("SELECT rand_key FROM saved_pics");
+      key.setReadBigInts(true);
+      assertEquals(key.get()!.rand_key, 191315037158113842n);
       assertEquals(target.get("SELECT user_rating_sum,rate_user_count,user_rate FROM saved_pics"), {
         user_rating_sum: 2,
         rate_user_count: 1,
