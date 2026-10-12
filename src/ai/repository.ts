@@ -2,6 +2,7 @@ import type { MainDatabase } from "../db/database.ts";
 import type { MediaObject } from "../shared/types.ts";
 import type { AiMessage, AiProviderName, AiResult, AiSession, ProviderState } from "./types.ts";
 import { MODEL_GEMINI_FLASH } from "./types.ts";
+import { SQL } from "../db/queries.ts";
 
 interface SessionRow {
   id: number;
@@ -45,6 +46,7 @@ export interface PendingAiMessage {
 }
 
 export interface StoredAiMessage extends AiMessage {
+  readonly contextOnly: boolean;
   readonly mediaObjects: readonly { sha256: string; mimeType: string; kind: string }[];
 }
 
@@ -67,6 +69,23 @@ function session(row: SessionRow): AiSession {
 
 export class AiRepository {
   constructor(readonly db: MainDatabase) {}
+
+  reactionsEnabled(userId: number): boolean {
+    return this.db.get<{ reactions_enabled: number }>(SQL.GetReactions, userId)
+      ?.reactions_enabled !== 0;
+  }
+
+  setReactions(userId: number, enabled: boolean, now: number): void {
+    this.db.run(SQL.SetReactions, userId, enabled ? 1 : 0, now);
+  }
+
+  runForRequest(chatId: number, messageId: number): RunRow | undefined {
+    return this.db.get<RunRow>(SQL.RunForRequest, chatId, messageId);
+  }
+
+  freezeContext(runId: number, snapshot: string): void {
+    this.db.run(SQL.FreezeRunContext, runId, snapshot);
+  }
 
   getSelection(chatId: number): AiChatSelection {
     const row = this.db.get<{
@@ -189,15 +208,16 @@ ORDER BY s.updated_at DESC,sm.session_id DESC LIMIT 1`,
     }
   }
 
-  loadMessages(sessionId: number): StoredAiMessage[] {
+  loadMessages(sessionId: number, includeContext = false): StoredAiMessage[] {
     const rows = this.db.all<Record<string, unknown>>(
-      `SELECT sm.chat_id,sm.msg_id,sm.role,sm.quote_part,
+      `SELECT sm.chat_id,sm.msg_id,sm.role,sm.quote_part,sm.context_only,
 m.sent_at,m.user_id,m.username,m.atable_username,m.msg_type,m.text,m.reply_to_msg_id,
 r.assistant_payload,r.assistant_payload_format
 FROM ai_session_messages sm JOIN ai_messages m ON m.chat_id=sm.chat_id AND m.msg_id=sm.msg_id
 LEFT JOIN ai_runs r ON r.response_chat_id=m.chat_id AND r.response_msg_id=m.msg_id AND r.status='delivered'
-WHERE sm.session_id=? AND sm.context_only=0 ORDER BY sm.position`,
+WHERE sm.session_id=? AND (sm.context_only=0 OR ?=1) ORDER BY sm.position`,
       sessionId,
+      includeContext ? 1 : 0,
     );
     return rows.map((row) => {
       const chatId = Number(row.chat_id);
@@ -210,6 +230,7 @@ WHERE mm.chat_id=? AND mm.msg_id=? ORDER BY mm.ordinal`,
         messageId,
       );
       return {
+        contextOnly: Number(row.context_only) === 1,
         chatId,
         messageId,
         sentAt: Number(row.sent_at),

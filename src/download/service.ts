@@ -137,7 +137,10 @@ export interface DeliveryRequest {
 
 export class DownloadService {
   readonly #semaphore = new Semaphore(5);
-  readonly #inflight = new Map<string, Promise<DownloadRecord>>();
+  readonly #inflight = new Map<
+    string,
+    Promise<{ record: DownloadRecord; response: SentMessage }>
+  >();
 
   constructor(
     readonly db: MainDatabase,
@@ -147,37 +150,39 @@ export class DownloadService {
     readonly cookieFile: () => Promise<string> = findBilibiliCookies,
   ) {}
 
-  async deliver(input: DeliveryRequest): Promise<void> {
+  async deliver(input: DeliveryRequest): Promise<SentMessage> {
     const cached = this.#find(input.key);
     if (cached?.file_id) {
-      await this.#sendCached(cached, input);
+      const sent = await this.#sendCached(cached, input);
       this.db.run(
         "UPDATE yt_dl_results SET upload_count=upload_count+1 WHERE file_id=?",
         cached.file_id,
       );
-      return;
+      return sent;
     }
     const flightKey = this.#key(input.key);
     const running = this.#inflight.get(flightKey);
     if (running) {
-      const record = await running;
-      await this.#sendCached(record, input);
+      const { record } = await running;
+      const sent = await this.#sendCached(record, input);
       this.db.run(
         "UPDATE yt_dl_results SET upload_count=upload_count+1 WHERE file_id=?",
         record.file_id,
       );
-      return;
+      return sent;
     }
     const leader = this.#downloadAndUpload(input);
     this.#inflight.set(flightKey, leader);
     try {
-      await leader;
+      return (await leader).response;
     } finally {
       if (this.#inflight.get(flightKey) === leader) this.#inflight.delete(flightKey);
     }
   }
 
-  async #downloadAndUpload(input: DeliveryRequest): Promise<DownloadRecord> {
+  async #downloadAndUpload(
+    input: DeliveryRequest,
+  ): Promise<{ record: DownloadRecord; response: SentMessage }> {
     const downloaded = await this.#semaphore.use(() => this.#download(input.key, input.signal));
     try {
       const probe = input.key.audioOnly
@@ -199,14 +204,17 @@ file_id=excluded.file_id,title=excluded.title,description=excluded.description,u
         downloaded.uploader,
       );
       return {
-        url: input.key.url,
-        audio_only: input.key.audioOnly ? 1 : 0,
-        resolution: input.key.resolution,
-        file_id: id,
-        title: downloaded.title,
-        description: downloaded.description,
-        uploader: downloaded.uploader,
-        upload_count: 0,
+        response: sent,
+        record: {
+          url: input.key.url,
+          audio_only: input.key.audioOnly ? 1 : 0,
+          resolution: input.key.resolution,
+          file_id: id,
+          title: downloaded.title,
+          description: downloaded.description,
+          uploader: downloaded.uploader,
+          upload_count: 0,
+        },
       };
     } finally {
       await downloaded.cleanup();
@@ -421,14 +429,15 @@ file_id=excluded.file_id,title=excluded.title,description=excluded.description,u
       : header;
   }
 
-  async #sendCached(record: DownloadRecord, input: DeliveryRequest): Promise<void> {
+  #sendCached(record: DownloadRecord, input: DeliveryRequest): Promise<SentMessage> {
     const options = {
       caption: this.#caption(record, input),
       parse_mode: "HTML",
       reply_parameters: { message_id: input.messageId },
     };
-    if (input.key.audioOnly) await this.telegram.sendAudio(input.chatId, record.file_id, options);
-    else await this.telegram.sendVideo(input.chatId, record.file_id, options);
+    return input.key.audioOnly
+      ? this.telegram.sendAudio(input.chatId, record.file_id, options)
+      : this.telegram.sendVideo(input.chatId, record.file_id, options);
   }
 
   #sendFile(

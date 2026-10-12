@@ -87,6 +87,7 @@ Deno.test("SDK result survives Telegram failure; redelivery neither calls model 
     assertEquals(telegram.calls.filter((call) => call.method === "rich").length, 1);
     assertEquals(telegram.calls.find((call) => call.method === "rich")?.options?.reply_parameters, {
       message_id: 10,
+      allow_sending_without_reply: true,
     });
     assertEquals(repository.findSessionByMessage(-100, 100)?.provider, "sub2api");
   } finally {

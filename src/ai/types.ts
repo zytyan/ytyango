@@ -7,6 +7,7 @@ export type AiProviderName = "gemini" | "sub2api" | "deepseek";
 export type AiRole = "user" | "model" | "system";
 
 export interface AiMedia {
+  readonly sha256?: string;
   readonly kind: string;
   readonly mimeType: string;
   readonly bytes: Uint8Array;

@@ -4,7 +4,7 @@ export const SQL = {
   "SetReactions":
     "INSERT INTO ai_user_settings(user_id,reactions_enabled,updated_at) VALUES(?,?,?)\nON CONFLICT(user_id) DO UPDATE SET reactions_enabled=excluded.reactions_enabled,updated_at=excluded.updated_at;",
   "IsAiResponse":
-    "SELECT id FROM ai_runs WHERE status='delivered' AND response_chat_id=? AND response_msg_id=?;",
+    "SELECT r.id FROM ai_runs r JOIN ai_sessions s ON s.id=r.session_id\nWHERE r.status='delivered' AND r.response_chat_id=? AND r.response_msg_id=? AND COALESCE(s.topic_id,0)=?;",
   "SaveFact":
     "INSERT INTO traditional_facts(feature,chat_id,topic_id,request_msg_id,reply_msg_id,status,context_text,created_at,delivery_status)\nVALUES(?,?,?,?,?,?,?,?,?);",
   "ReplyFacts":
@@ -12,4 +12,8 @@ export const SQL = {
   "FreezeRunContext":
     "INSERT INTO ai_run_context(run_id,snapshot) VALUES(?,?) ON CONFLICT(run_id) DO NOTHING;",
   "GetRunContext": "SELECT snapshot FROM ai_run_context WHERE run_id=?;",
+  "RequestFacts":
+    "SELECT feature,request_msg_id,reply_msg_id,status,context_text,created_at FROM traditional_facts\nWHERE chat_id=? AND topic_id=? AND request_msg_id=? ORDER BY id;",
+  "RunForRequest":
+    "SELECT * FROM ai_runs WHERE request_chat_id=? AND request_msg_id=? ORDER BY id DESC LIMIT 1;",
 } as const;

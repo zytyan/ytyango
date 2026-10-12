@@ -1,5 +1,5 @@
 import { randomInt } from "node:crypto";
-import { type Bot, InlineKeyboard } from "grammy";
+import { type Bot, type Context, InlineKeyboard } from "grammy";
 
 export const DELETE_CALLBACK = "delme";
 const MAX_RANGE_WIDTH = 2 ** 48 - 1;
@@ -39,22 +39,27 @@ export function roll(
   return `在${start}-${end}的roll点中，你掷出了${start + offset}`;
 }
 
-export function registerRoll(bot: Bot): void {
+export function registerRoll(
+  bot: Bot,
+  record?: (ctx: Context, text: string, status: "success" | "failure", replyId: number) => void,
+): void {
   bot.command("roll", async (ctx) => {
     const args = ctx.match.trim() === "" ? [] : ctx.match.trim().split(/\s+/u);
     let text: string;
     try {
       text = roll(args);
     } catch {
-      await ctx.reply("随机数范围无效或过大", {
+      const response = await ctx.reply("随机数范围无效或过大", {
         reply_parameters: { message_id: ctx.msg.message_id },
       });
+      record?.(ctx, "随机数范围无效或过大", "failure", response.message_id);
       return;
     }
-    await ctx.reply(text, {
+    const response = await ctx.reply(text, {
       reply_parameters: { message_id: ctx.msg.message_id },
       reply_markup: new InlineKeyboard().text("删除该消息", DELETE_CALLBACK),
     });
+    record?.(ctx, text, "success", response.message_id);
   });
 
   bot.callbackQuery(DELETE_CALLBACK, async (ctx) => {

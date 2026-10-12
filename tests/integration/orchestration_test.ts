@@ -1,0 +1,122 @@
+import { assertEquals, assertStringIncludes } from "@std/assert";
+import { createApplication } from "../../src/app.ts";
+import { ConfigStore, parseConfig } from "../../src/config.ts";
+import { temporaryDatabase } from "./helpers.ts";
+import type { Message, Update } from "grammy/types";
+
+Deno.test("traditional commands precede explicit AI, saved facts are user context, traditional replies alone do not trigger", async () => {
+  const temporary = await temporaryDatabase();
+  const originalFetch = globalThis.fetch;
+  const chat = { id: -100, type: "supergroup", title: "test" } as const;
+  const botUser = { id: 99, is_bot: true, first_name: "bot", username: "test_bot" } as const;
+  const user = { id: 7, is_bot: false, first_name: "user" } as const;
+  let nextId = 100;
+  let modelCalls = 0;
+  const sent: Message[] = [];
+  let lastBody: Record<string, unknown> = {};
+  globalThis.fetch = (_input, options) => {
+    const url = String(_input);
+    if (url.endsWith("/sendRichMessage")) {
+      const payload = JSON.parse(String(options?.body));
+      const message = {
+        message_id: nextId++,
+        date: 1,
+        chat,
+        from: botUser,
+        text: payload.rich_message.markdown,
+      } as Message;
+      sent.push(message);
+      return Promise.resolve(Response.json({ ok: true, result: message }));
+    }
+    modelCalls++;
+    lastBody = JSON.parse(String(options?.body));
+    assertEquals(
+      temporary.db.get<{ count: number }>("SELECT COUNT(*) AS count FROM traditional_facts")!
+        .count > 0,
+      true,
+    );
+    assertEquals(
+      temporary.db.get<{ count: number }>("SELECT COUNT(*) AS count FROM ai_run_context")!.count >
+        0,
+      true,
+    );
+    return Promise.resolve(
+      Response.json({
+        candidates: [{
+          content: { role: "model", parts: [{ text: "answer" }] },
+          finishReason: "STOP",
+        }],
+        usageMetadata: { promptTokenCount: 3, candidatesTokenCount: 2 },
+      }),
+    );
+  };
+  try {
+    const cfg = parseConfig(
+      `database-path: ${temporary.path}\nbot-token: fake\nai-chats: [-100]\nsub2api-key: fake\n`,
+    );
+    temporary.db.run("INSERT INTO ai_chat_settings VALUES(-100,'sub2api','gemini-3.7-flash',0,1)");
+    const app = await createApplication(
+      temporary.db,
+      new ConfigStore(cfg, "unused"),
+      (bot) =>
+        bot.api.config.use((_previous, method, payload) => {
+          let result: unknown = true;
+          if (method === "getMe") {
+            result = {
+              ...botUser,
+              can_join_groups: true,
+              can_read_all_group_messages: true,
+              supports_inline_queries: true,
+            };
+          } else if (method === "sendMessage") {
+            const message = {
+              message_id: nextId++,
+              date: 1,
+              chat,
+              from: botUser,
+              text: (payload as { text: string }).text,
+            } as Message;
+            sent.push(message);
+            result = message;
+          } else if (!["setMessageReaction"].includes(method)) {
+            throw new Error(`unexpected API ${method}`);
+          }
+          return Promise.resolve({ ok: true, result } as Awaited<ReturnType<typeof _previous>>);
+        }),
+    );
+    const update = (id: number, text: string, reply?: Message): Update => ({
+      update_id: id,
+      message: {
+        message_id: nextId++,
+        date: 1,
+        chat,
+        from: user,
+        text,
+        reply_to_message: reply as never,
+        entities: text.startsWith("/")
+          ? [{ type: "bot_command", offset: 0, length: text.split(" ")[0]!.length }]
+          : undefined,
+      },
+    });
+    await app.bot.handleUpdate(update(1, "ordinary chat"));
+    assertEquals(temporary.db.all("SELECT * FROM ai_messages"), []);
+    await app.bot.handleUpdate(update(2, "/roll 2 2"));
+    assertEquals(modelCalls, 0);
+    const traditional = sent.at(-1)!;
+    await app.bot.handleUpdate(update(3, "hello", traditional));
+    assertEquals(modelCalls, 0);
+    await app.bot.handleUpdate(update(4, "@test_bot explain", traditional));
+    assertEquals(modelCalls, 1);
+    assertStringIncludes(JSON.stringify(lastBody.contents), "掷出了2");
+    assertEquals(JSON.stringify(lastBody.systemInstruction).includes("掷出了2"), false);
+    await app.bot.handleUpdate(update(5, "/roll 3 3 @test_bot"));
+    assertEquals(modelCalls, 2);
+    assertStringIncludes(JSON.stringify(lastBody.contents), "掷出了3");
+    await app.bot.handleUpdate(update(6, "continue", sent.at(-1)!));
+    assertEquals(modelCalls, 3);
+    app.flush();
+  } finally {
+    globalThis.fetch = originalFetch;
+    await temporary.close();
+  }
+});

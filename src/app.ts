@@ -20,6 +20,8 @@ import { DenoProcessRunner } from "./shared/process.ts";
 import { StatsService } from "./stats/service.ts";
 import { GrammyTelegramGateway } from "./telegram/gateway.ts";
 import { registerRoll } from "./features/roll.ts";
+import { type Interaction, interaction, isAiTrigger, type TraditionalFact } from "./interaction.ts";
+import { SQL } from "./db/queries.ts";
 
 const SYSTEM_PROMPT_HELP =
   `没有找到任何System prompt，请使用 /sysprompt 提示词或使用该命令回复其他消息设置提示词。
@@ -204,12 +206,14 @@ export interface Application {
 export async function createApplication(
   db: MainDatabase,
   configs: ConfigStore,
+  configureBot?: (bot: Bot) => void,
 ): Promise<Application> {
   const initial = configs.value;
   if (!initial.botToken) throw new Error("bot-token is empty");
   const bot = new Bot(initial.botToken, {
     client: { apiRoot: initial.telegramApiUrl, timeoutSeconds: 130 },
   });
+  configureBot?.(bot);
   await bot.init();
   const identity = bot.botInfo;
   const telegram = new GrammyTelegramGateway(bot, initial.botToken, initial.telegramApiUrl);
@@ -231,6 +235,49 @@ export async function createApplication(
     (chatId, kind) => stats.increment(chatId, kind),
   );
   const now = () => Math.floor(Date.now() / 1000);
+  const interactions = new WeakMap<Context, Interaction>();
+  const currentInteraction = (ctx: Context) => interactions.get(ctx)!;
+  const shutdown = new AbortController();
+
+  // Outer middleware resumes after commands and traditional message handlers finish.
+  bot.use(async (ctx, next) => {
+    if (!ctx.message) return await next();
+    const message = ctx.message;
+    const topic = topicId(message);
+    const current = interaction(db, ctx);
+    interactions.set(ctx, current);
+    const previous = db.all<TraditionalFact>(
+      SQL.RequestFacts,
+      message.chat.id,
+      topic,
+      message.message_id,
+    );
+    if (previous.length) current.facts.push(...previous);
+    else {
+      try {
+        await next();
+      } catch (error) {
+        console.warn("traditional handler failed", error);
+        try {
+          await current.reply("操作失败，请稍后重新发起请求。");
+        } catch { /* No automatic side-effect retry. */ }
+        current.aiContext("traditional", "传统功能执行或交付失败。", "failure");
+      }
+    }
+    const replied = message.reply_to_message;
+    const aiReply = Boolean(
+      replied && db.get(SQL.IsAiResponse, message.chat.id, replied.message_id, topic),
+    );
+    if (!isAiTrigger(messageText(message), identity.username, aiReply)) return;
+    const replyFacts = replied
+      ? db.all<TraditionalFact>(SQL.ReplyFacts, message.chat.id, topic, replied.message_id)
+      : [];
+    await ai.handle({
+      ...toIncoming(message),
+      facts: [...replyFacts, ...current.facts],
+      signal: shutdown.signal,
+    });
+  });
 
   bot.use(async (ctx, next) => {
     const message = ctx.message;
@@ -256,7 +303,20 @@ export async function createApplication(
   });
 
   // Register specific commands/callbacks before the general message/callback handlers.
-  registerRoll(bot);
+  registerRoll(
+    bot,
+    (ctx, text, status, replyId) =>
+      currentInteraction(ctx).aiContext("roll", text, status, replyId),
+  );
+
+  bot.command("ai_reaction", async (ctx) => {
+    const value = commandArgument(ctx.message).toLowerCase();
+    if (!ctx.from || !["on", "off"].includes(value)) {
+      return await ctx.reply("用法：/ai_reaction on|off", replyOptions(ctx.message));
+    }
+    repository.setReactions(ctx.from.id, value === "on", now());
+    await ctx.reply(`AI 表情回应已${value === "on" ? "开启" : "关闭"}`, replyOptions(ctx.message));
+  });
 
   bot.command("sysprompt", async (ctx) => {
     const message = ctx.msg!;
@@ -345,16 +405,25 @@ export async function createApplication(
       (ctx.message.reply_to_message ? messageText(ctx.message.reply_to_message) : "");
     try {
       const key = await parseDownloadKey(source, audioOnly);
-      await downloads.deliver({
+      const sent = await downloads.deliver({
         key,
         chatId: ctx.chat!.id,
         messageId: ctx.message.message_id,
         userId: ctx.from.id,
         userName: userLabel(ctx.message),
+        signal: shutdown.signal,
       });
+      currentInteraction(ctx).aiContext(
+        "download",
+        `${audioOnly ? "音频" : "视频"}下载成功。来源：${key.url}`,
+        "success",
+        sent.messageId,
+      );
       stats.increment(ctx.chat!.id, audioOnly ? "download_audio" : "download_video");
     } catch (error) {
-      await ctx.reply(`下载失败: ${String(error)}`, replyOptions(ctx.message));
+      console.warn("download failed", error);
+      await currentInteraction(ctx).reply("下载失败，请检查链接或稍后重新发起请求。");
+      currentInteraction(ctx).aiContext("download", "下载失败。", "failure");
     }
   };
   bot.command("downloadvideo", downloadCommand(false));
@@ -368,7 +437,7 @@ export async function createApplication(
       const severity = await nsfw.score(photoInput(photo));
       nsfw.savePicture(photo.file_unique_id, photo.file_id, severity);
       const saved = nsfw.getPicture(photo.file_unique_id);
-      await telegram.sendMessage(
+      const sent = await telegram.sendMessage(
         ctx.chat.id,
         `bot评分: ${severity}/6\n用户评分: ${saved?.userRate ?? severity}/6`,
         {
@@ -376,8 +445,15 @@ export async function createApplication(
           reply_markup: nsfw.ratingKeyboard(photo.file_unique_id, "score"),
         },
       );
+      currentInteraction(ctx).aiContext(
+        "score",
+        `图片审核评分：${severity}/6，图库用户评分：${saved?.userRate ?? severity}/6。`,
+        "success",
+        sent.messageId,
+      );
     } catch {
-      await ctx.reply("识别失败", replyOptions(ctx.message));
+      await currentInteraction(ctx).reply("识别失败");
+      currentInteraction(ctx).aiContext("score", "图片审核失败。", "failure");
     }
   });
   bot.command(
@@ -453,7 +529,7 @@ export async function createApplication(
       try {
         const converted = await convertBilibiliLinks(text);
         if (converted.needClean) {
-          await telegram.sendMessage(
+          const sent = await telegram.sendMessage(
             message.chat.id,
             `来自<a href="tg://user?id=${ctx.from?.id ?? 0}">${
               escapeHtml(userLabel(message))
@@ -464,6 +540,12 @@ export async function createApplication(
                 inline_keyboard: [[{ text: "下载视频", callback_data: "download:bilibili" }]],
               },
             },
+          );
+          currentInteraction(ctx).aiContext(
+            "bilibili",
+            `已转换 Bilibili 链接：${converted.bvText.slice(0, 1024)}`,
+            "success",
+            sent.messageId,
           );
           await telegram.deleteMessage(message.chat.id, message.message_id);
           return;
@@ -489,18 +571,19 @@ export async function createApplication(
     if (config.respNsfwMsg && text.includes("来张色图")) {
       const picture = nsfw.randomPicture();
       if (picture) {
-        await telegram.sendPhoto(message.chat.id, picture.fileId, {
+        const sent = await telegram.sendPhoto(message.chat.id, picture.fileId, {
           reply_parameters: { message_id: message.message_id },
           reply_markup: nsfw.ratingKeyboard(picture.fileUniqueId),
         });
+        currentInteraction(ctx).aiContext(
+          "gallery",
+          "已从图库发送一张图片。",
+          "success",
+          sent.messageId,
+        );
         return;
       }
     }
-    const aiTrigger = !text.startsWith("/") && (
-      text.includes("@new") || text.includes(`@${identity.username}`) ||
-      message.reply_to_message?.from?.id === identity.id
-    );
-    if (aiTrigger) await ai.handle(toIncoming(message));
   });
 
   bot.on("callback_query:data", async (ctx) => {
@@ -647,6 +730,7 @@ export async function createApplication(
     bot,
     flush: () => stats.flush(),
     async serve(signal: AbortSignal): Promise<void> {
+      signal.addEventListener("abort", () => shutdown.abort(signal.reason), { once: true });
       await downloads.checkExecutables();
       if (configs.value.dropPendingUpdates) {
         await bot.api.getUpdates({ offset: -1, limit: 1, timeout: 0 });

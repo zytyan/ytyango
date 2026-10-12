@@ -5,6 +5,7 @@ import { systemClock } from "../shared/types.ts";
 import type { AiRepository, PendingAiMessage, RunRow, StoredAiMessage } from "./repository.ts";
 import type { AiMessage, AiRequest, AiResult, AiSession } from "./types.ts";
 import { supportsImages } from "./types.ts";
+import { factText, type TraditionalFact } from "../interaction.ts";
 
 export const DEFAULT_SYSTEM_PROMPT = `这里是一个Telegram聊天 type:%CHAT_TYPE%,name:%CHAT_NAME%
 你是一个Telegram机器人，name: %BOT_NAME% username: %BOT_USERNAME%
@@ -35,6 +36,8 @@ export interface IncomingAiMessage {
   readonly text?: string;
   readonly reply?: IncomingAiMessage;
   readonly media: readonly IncomingMedia[];
+  readonly facts?: readonly TraditionalFact[];
+  readonly signal?: AbortSignal;
 }
 
 export interface BotIdentity {
@@ -119,7 +122,10 @@ export class AiService {
   async handle(message: IncomingAiMessage): Promise<void> {
     if (!this.config().aiChats.includes(message.chatId)) return;
     const routing = parseSessionRouting(message.text ?? "");
-    const target = this.#resolveSession(message, routing);
+    const previous = this.repository.runForRequest(message.chatId, message.messageId);
+    const target = previous
+      ? this.repository.getSession(previous.session_id)!
+      : this.#resolveSession(message, routing);
     await this.#locks.use(String(target.id), async () => {
       await this.#handleLocked(target, message);
     });
@@ -129,12 +135,15 @@ export class AiService {
     let target: AiSession | undefined;
     if (!routing.createNew && routing.explicitSessionId) {
       const explicit = this.repository.getSession(routing.explicitSessionId);
-      if (explicit?.chatId === message.chatId) target = explicit;
+      if (
+        explicit?.chatId === message.chatId && (explicit.topicId ?? 0) === (message.topicId ?? 0)
+      ) target = explicit;
     }
     if (!routing.createNew && !target && message.reply) {
-      target = this.repository.findSessionByMessage(message.chatId, message.reply.messageId);
+      const replied = this.repository.findSessionByMessage(message.chatId, message.reply.messageId);
+      if ((replied?.topicId ?? 0) === (message.topicId ?? 0)) target = replied;
     }
-    if (!routing.createNew && !target) {
+    if (!routing.createNew && !target && routing.ignoreCurrent) {
       const id = this.#current.get(topicKey(message));
       if (id) target = this.repository.getSession(id);
     }
@@ -157,24 +166,27 @@ export class AiService {
   async #handleLocked(initialSession: AiSession, incoming: IncomingAiMessage): Promise<void> {
     const session = this.repository.getSession(initialSession.id) ?? initialSession;
     try {
-      await this.telegram.setReaction(incoming.chatId, incoming.messageId, "👀");
+      if (this.repository.reactionsEnabled(incoming.userId)) {
+        await this.telegram.setReaction(incoming.chatId, incoming.messageId, "👀");
+      }
     } catch {
       // Reactions are best effort.
     }
-    const pending: PendingAiMessage[] = [];
-    if (
-      incoming.reply &&
-      !this.repository.findSessionByMessage(incoming.chatId, incoming.reply.messageId)
-    ) {
-      pending.push(await this.#prepareMessage(incoming.reply, true, session));
-    }
-    pending.push(await this.#prepareMessage(incoming, false, session));
-    const now = Math.floor(this.clock.now().getTime() / 1000);
     const existing = this.repository.getRunByRequest(
       session.id,
       incoming.chatId,
       incoming.messageId,
     );
+    if (existing?.status === "delivered") return;
+    const pending: PendingAiMessage[] = [];
+    if (
+      !existing && incoming.reply &&
+      !this.repository.findSessionByMessage(incoming.chatId, incoming.reply.messageId)
+    ) {
+      pending.push(await this.#prepareMessage(incoming.reply, true, session));
+    }
+    if (!existing) pending.push(await this.#prepareMessage(incoming, false, session));
+    const now = Math.floor(this.clock.now().getTime() / 1000);
     const run = existing ?? this.repository.beginRun(session.id, pending, now);
     if (run.status === "delivered") return;
     if (run.status === "model_failed" || run.status === "persistence_failed") {
@@ -185,11 +197,27 @@ export class AiService {
       result = storedResult(run);
     } else {
       try {
-        const loaded = await this.#loadMessages(session.id);
-        const window = loaded.length > 200 ? loaded.slice(50) : loaded;
+        const loaded = await this.#loadMessages(session.id, pending);
+        const drop = Math.max(0, Math.ceil((loaded.length - 200) / 50) * 50);
+        const window = loaded.slice(drop);
         const promptTemplate =
           this.repository.getSystemPrompt(incoming.chatId, incoming.topicId ?? 0) ??
             DEFAULT_SYSTEM_PROMPT;
+        this.repository.freezeContext(
+          run.id,
+          JSON.stringify({
+            provider: session.provider,
+            model: session.model,
+            systemPrompt: this.#renderPrompt(promptTemplate, incoming),
+            messages: window.map(({ media, ...message }) => ({
+              ...message,
+              media: media.map(({ bytes, ...reference }) => ({
+                ...reference,
+                byteSize: bytes.byteLength,
+              })),
+            })),
+          }, (_key, value) => value instanceof Uint8Array ? { bytes: Array.from(value) } : value),
+        );
         result = await this.generate({
           sessionId: session.id,
           provider: session.provider,
@@ -205,6 +233,7 @@ export class AiService {
           ),
           explicitCache: this.config().geminiExplicitCache,
           state: this.repository.loadProviderState(session.id),
+          signal: incoming.signal,
         });
         this.repository.completeRun(run.id, result, Math.floor(this.clock.now().getTime() / 1000));
       } catch (error) {
@@ -215,11 +244,13 @@ export class AiService {
           Math.floor(this.clock.now().getTime() / 1000),
         );
         try {
-          await this.telegram.setReaction(incoming.chatId, incoming.messageId, "😭");
+          if (this.repository.reactionsEnabled(incoming.userId)) {
+            await this.telegram.setReaction(incoming.chatId, incoming.messageId, "😭");
+          }
         } catch {
           // Best effort.
         }
-        await this.telegram.sendMessage(incoming.chatId, `error:${String(error)}`, {
+        await this.telegram.sendMessage(incoming.chatId, "AI 请求失败，请稍后重新发起请求。", {
           reply_parameters: { message_id: incoming.messageId },
         });
         throw error;
@@ -230,7 +261,7 @@ export class AiService {
       display = `模型没有返回任何信息${result.feedback ? `，原因: ${result.feedback}` : ""}`;
     }
     const options: Record<string, unknown> = {
-      reply_parameters: { message_id: incoming.messageId },
+      reply_parameters: { message_id: incoming.messageId, allow_sending_without_reply: true },
     };
     if (this.repository.getSelection(incoming.chatId).showUsage) {
       options.reply_markup = {
@@ -282,7 +313,11 @@ export class AiService {
       ) continue;
       if ((media.byteSize ?? 0) > 15 * 1024 * 1024 || (media.duration ?? 0) > 240) continue;
       const file = await this.telegram.getFile(media.fileId);
-      const bytes = await this.telegram.downloadFile(file);
+      const timeout = AbortSignal.timeout(10_000);
+      const bytes = await this.telegram.downloadFile(
+        file,
+        input.signal ? AbortSignal.any([input.signal, timeout]) : timeout,
+      );
       if (bytes.byteLength > 15 * 1024 * 1024) continue;
       mediaObjects.push({ ...await this.mediaStore.put(bytes, media.mimeType), kind: media.kind });
     }
@@ -295,18 +330,29 @@ export class AiService {
       atableUsername: input.atableUsername,
       role: "user",
       messageType: input.media[0]?.kind ?? "text",
-      text: input.text,
+      text: `${input.text ?? ""}${factText(input.facts ?? [])}` || undefined,
       replyToMessageId: input.reply?.messageId,
       media: [],
     };
     return { message, mediaObjects, contextOnly };
   }
 
-  async #loadMessages(sessionId: number): Promise<AiMessage[]> {
-    const stored = this.repository.loadMessages(sessionId);
+  async #loadMessages(
+    sessionId: number,
+    pending: readonly PendingAiMessage[],
+  ): Promise<AiMessage[]> {
+    const contextIds = new Set(
+      pending.filter((item) => item.contextOnly).map((item) => item.message.messageId),
+    );
+    const all = this.repository.loadMessages(sessionId, true).filter((item) =>
+      !item.contextOnly || contextIds.has(item.messageId)
+    );
+    const drop = Math.max(0, Math.ceil((all.length - 200) / 50) * 50);
+    const stored = all.slice(drop);
     return await Promise.all(stored.map(async (message: StoredAiMessage): Promise<AiMessage> => ({
       ...message,
       media: await Promise.all(message.mediaObjects.map(async (media) => ({
+        sha256: media.sha256,
         kind: media.kind,
         mimeType: media.mimeType,
         bytes: await this.mediaStore.open(media.sha256),
@@ -318,6 +364,7 @@ export class AiService {
     return template
       .replaceAll("%CHAT_TYPE%", message.chatType)
       .replaceAll("%CHAT_NAME%", message.chatName)
+      .replaceAll("%CHAT_ID%", String(message.chatId))
       .replaceAll("%BOT_NAME%", this.botIdentity.firstName)
       .replaceAll("%BOT_USERNAME%", this.botIdentity.username);
   }
