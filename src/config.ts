@@ -1,17 +1,29 @@
 import { parse as parseYaml } from "@std/yaml";
 import { z } from "zod";
-
-const azureSchema = z.object({
-  endpoint: z.string().default(""),
-  "api-key": z.string().default(""),
-}).default({ endpoint: "", "api-key": "" });
+import { dirname, resolve } from "node:path";
 
 const rawConfigSchema = z.object({
   "bot-token": z.string().default(""),
   god: z.number().int().default(0),
   "my-chats": z.array(z.number().int()).default([]),
   "ai-chats": z.array(z.number().int()).default([]),
-  "content-moderator": azureSchema,
+  "content-moderator": z.object({
+    "account-id": z.string().default(""),
+    "api-token": z.string().default(""),
+  }).default({ "account-id": "", "api-token": "" }),
+  ocr: z.object({
+    endpoint: z.string().default(""),
+    "api-key": z.string().default(""),
+    "api-ver": z.string().default("2023-10-01"),
+    language: z.string().default(""),
+    features: z.string().default("Read"),
+  }).default({
+    endpoint: "",
+    "api-key": "",
+    "api-ver": "2023-10-01",
+    language: "",
+    features: "Read",
+  }),
   "tg-api-url": z.string().url().default("https://api.telegram.org"),
   "drop-pending-updates": z.boolean().default(false),
   "log-level": z.number().int().min(-8).max(12).default(0),
@@ -30,7 +42,14 @@ export interface AppConfig {
   readonly god: number;
   readonly myChats: readonly number[];
   readonly aiChats: readonly number[];
-  readonly contentModerator: { readonly endpoint: string; readonly apiKey: string };
+  readonly contentModerator: { readonly accountId: string; readonly apiToken: string };
+  readonly ocr: {
+    readonly endpoint: string;
+    readonly apiKey: string;
+    readonly apiVersion: string;
+    readonly language: string;
+    readonly features: string;
+  };
   readonly telegramApiUrl: string;
   readonly dropPendingUpdates: boolean;
   readonly logLevel: number;
@@ -59,7 +78,7 @@ export function configPath(): string {
 
 export function parseConfig(text: string): AppConfig {
   const raw = rawConfigSchema.parse(parseYaml(text) ?? {});
-  const databasePath = raw["database-path"];
+  const databasePath = env("YTYAN_DATABASE_PATH") ?? raw["database-path"];
   const slash = Math.max(databasePath.lastIndexOf("/"), databasePath.lastIndexOf("\\"));
   const databaseDirectory = slash >= 0 ? databasePath.slice(0, slash) : ".";
   return Object.freeze({
@@ -68,14 +87,22 @@ export function parseConfig(text: string): AppConfig {
     myChats: Object.freeze([...raw["my-chats"]]),
     aiChats: Object.freeze([...raw["ai-chats"]]),
     contentModerator: Object.freeze({
-      endpoint: raw["content-moderator"].endpoint.replace(/\/$/, ""),
-      apiKey: raw["content-moderator"]["api-key"],
+      accountId: raw["content-moderator"]["account-id"],
+      apiToken: raw["content-moderator"]["api-token"],
+    }),
+    ocr: Object.freeze({
+      endpoint: raw.ocr.endpoint.replace(/\/$/, ""),
+      apiKey: raw.ocr["api-key"],
+      apiVersion: raw.ocr["api-ver"],
+      language: raw.ocr.language,
+      features: raw.ocr.features,
     }),
     telegramApiUrl: raw["tg-api-url"].replace(/\/$/, ""),
     dropPendingUpdates: raw["drop-pending-updates"],
     logLevel: raw["log-level"],
     databasePath,
-    aiMediaPath: raw["ai-media-path"] ?? `${databaseDirectory}/ai-media`,
+    aiMediaPath: env("YTYAN_AI_MEDIA_PATH") ?? raw["ai-media-path"] ??
+      `${databaseDirectory}/ai-media`,
     geminiKey: env("GEMINI_API_KEY") ?? raw["gemini-key"],
     geminiExplicitCache: raw["gemini-explicit-cache"],
     sub2apiKey: env("SUB2API_API_KEY") ?? raw["sub2api-key"],
@@ -86,7 +113,14 @@ export function parseConfig(text: string): AppConfig {
 }
 
 export async function loadConfig(path = configPath()): Promise<AppConfig> {
-  return parseConfig(await Deno.readTextFile(path));
+  const parsed = parseConfig(await Deno.readTextFile(path));
+  return Object.freeze({
+    ...parsed,
+    databasePath: parsed.databasePath === ":memory:"
+      ? parsed.databasePath
+      : resolve(dirname(path), parsed.databasePath),
+    aiMediaPath: resolve(dirname(path), parsed.aiMediaPath),
+  });
 }
 
 export class ConfigStore {

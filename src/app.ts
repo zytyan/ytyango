@@ -434,15 +434,17 @@ export async function createApplication(
     const photo = target ? largestPhoto(target) : undefined;
     if (!target || !photo) return await ctx.reply("没有图片", replyOptions(ctx.message));
     try {
-      const severity = await nsfw.score(photoInput(photo));
-      nsfw.savePicture(photo.file_unique_id, photo.file_id, severity);
-      const saved = nsfw.getPicture(photo.file_unique_id);
+      const result = await nsfw.moderate(photoInput(photo));
+      const severity = result.severity;
+      const saved = nsfw.collect(photoInput(photo), result);
       const sent = await telegram.sendMessage(
         ctx.chat.id,
-        `bot评分: ${severity}/6\n用户评分: ${saved?.userRate ?? severity}/6`,
+        `bot评分: ${severity}/6\n已入库: ${saved ? "是" : "否"}\n用户评分: ${
+          saved?.userRate ?? severity
+        }/6`,
         {
           reply_parameters: { message_id: target.message_id },
-          reply_markup: nsfw.ratingKeyboard(photo.file_unique_id, "score"),
+          ...(saved ? { reply_markup: nsfw.ratingKeyboard(photo.file_unique_id, "score") } : {}),
         },
       );
       currentInteraction(ctx).aiContext(
@@ -557,19 +559,33 @@ export async function createApplication(
     const photo = largestPhoto(message);
     if (photo && config.autoCheckAdult) {
       try {
-        await nsfw.detectAndReply({
-          chatId: message.chat.id,
-          messageId: message.message_id,
-          mediaGroupId: message.media_group_id,
-          hasMediaSpoiler: message.has_media_spoiler ?? false,
-          photo: photoInput(photo),
-        });
+        await nsfw.detectAndReply(
+          {
+            chatId: message.chat.id,
+            messageId: message.message_id,
+            mediaGroupId: message.media_group_id,
+            hasMediaSpoiler: message.has_media_spoiler ?? false,
+            photo: photoInput(photo),
+          },
+          (sent, result) =>
+            currentInteraction(ctx).aiContext(
+              "moderation",
+              `图片审核评分 ${result.severity}/6，已入图库。`,
+              "success",
+              sent.messageId,
+            ),
+        );
       } catch (error) {
         console.warn("NSFW detection failed", error);
       }
     }
-    if (config.respNsfwMsg && text.includes("来张色图")) {
-      const picture = nsfw.randomPicture();
+    if (
+      config.respNsfwMsg &&
+      /来[张点个]([涩色瑟]|se)图|再来一张|來[張點個]([澀色瑟]|se)圖/.test(text)
+    ) {
+      const match = text.match(/(\d)(?:.*\b(\d))?/);
+      const start = Number(match?.[1] ?? 2), end = Number(match?.[2] ?? match?.[1] ?? 6);
+      const picture = nsfw.randomPicture(start, end);
       if (picture) {
         const sent = await telegram.sendPhoto(message.chat.id, picture.fileId, {
           reply_parameters: { message_id: message.message_id },
@@ -583,6 +599,12 @@ export async function createApplication(
         );
         return;
       }
+      await currentInteraction(ctx).reply("没有涩图~");
+      currentInteraction(ctx).aiContext(
+        "gallery",
+        `图库评分区间 ${start}–${end} 内没有图片。`,
+        "failure",
+      );
     }
   });
 

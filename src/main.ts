@@ -66,6 +66,12 @@ async function serve(): Promise<void> {
   const path = configPath();
   const initial = await loadConfig(path);
   const configs = new ConfigStore(initial, path);
+  const checked = new MainDatabase(initial.databasePath, { readOnly: true });
+  try {
+    checked.validate();
+  } finally {
+    checked.close();
+  }
   const db = new MainDatabase(initial.databasePath);
   const abort = new AbortController();
   const stop = () => abort.abort(new DOMException("shutdown", "AbortError"));

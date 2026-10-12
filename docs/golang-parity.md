@@ -41,3 +41,18 @@ request-only 上下文进入本次请求；窗口按 50 条裁剪且始终不超
 
 验收：非触发普通消息不进 AI 表，传统回复不触发，同消息 /roll + mention 先执行传统功能，
 后续明确回复取回事实，事实不升为系统指令；SDK 交付失败重投和一次计量回归通过。
+
+## Go 配置、图片审核与处理
+
+Go `d395a28545701a5640d91b1ff7057bee236a3f1e`；TS 前置 `d9046bf`。 Cloudflare Clef-flash 直接
+HTTP、0/2/4/6 与 anime 两项 choice 校验、JPEG 768px/128KiB 规范化；
+失败不保存分数。安全二次元自动入库，每张相册图片分类且最多回复一次； `/score`
+显示真实入库状态，只对入库图片提供投票。随机图库恢复评分区间与多种表达。 Go Cloudflare/OCR YAML
+字段直接解析，支持独立 TS database/media 环境覆盖； 相对路径按配置目录解析。serve 在任何 writable
+打开前只读确认 TS schema，拒绝误写 Go 库。 图片 codec 使用现有 `/usr/bin/ffmpeg`、`ffprobe`，模板是
+Go 源码中的静态功能资源， 不是用户媒体；编译嵌入资源并仅增加必要执行/读取路径权限。
+
+验收：70 项回归、真实本机 FFmpeg 鱼图/prpr/WebP→PNG/审核 JPEG smoke 通过。 实际 Go V11
+只读导入演练：98,732 AI messages、46,595 Runs、1,023,120 统计桶， 9,412 个媒体、2,066,541,946
+字节；完整行/payload 摘要、Token、媒体 hash/size、外键、integrity 通过。 实际演练报告保存在
+/tmp，不提交数据库、媒体或运行文件。

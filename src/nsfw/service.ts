@@ -1,7 +1,8 @@
 import type { AppConfig } from "../config.ts";
 import type { MainDatabase } from "../db/database.ts";
 import { BoundedCache, KeyedMutex } from "../shared/concurrency.ts";
-import type { TelegramPort } from "../shared/types.ts";
+import type { SentMessage, TelegramPort } from "../shared/types.ts";
+import { normalizeModerationImage } from "../features/images.ts";
 
 export interface NsfwPhoto {
   readonly fileId: string;
@@ -20,7 +21,19 @@ export interface NsfwMessage {
 
 interface Detection {
   readonly severity: number;
+  readonly animeIllustration: boolean;
 }
+
+const severityCriteria = {
+  "0":
+    "Safe: benign family or romantic imagery, everyday clothing and objects, nonsexual poses or activities, nonsexual nudity, animal reproduction, and sexual health contexts; ordinary hugs and nonsexual affectionate contact.",
+  "2":
+    "Low: suggestive behavior or presentation, fashion poses, body decoration, artistic nudity, and mildly provocative displays.",
+  "4":
+    "Medium: erotic commercial or amateur material; nude or partly clothed subjects intended to arouse, without visibly photographed penetration; erotic posing, less explicit artistic nudity, adult businesses, partially hidden sexual activity, backstage productions and pole performances.",
+  "6":
+    "High: clearly detailed sexual anatomy or sexual acts; pornography, sexual solicitation, voyeurism, sexual acts in art, nonconsensual sexual activity, exploitation or grooming of children, incest, sexual activity involving animals or deceased persons.",
+};
 
 export interface RatingResult {
   readonly existed: boolean;
@@ -41,76 +54,133 @@ export class NsfwService {
     readonly config: () => AppConfig,
     readonly incrementStat: (chatId: number, kind: "racy" | "adult") => void,
     readonly fetcher: typeof fetch = fetch,
+    readonly normalize: (bytes: Uint8Array) => Promise<Uint8Array> = normalizeModerationImage,
   ) {}
 
-  async detectAndReply(message: NsfwMessage): Promise<number> {
+  async detectAndReply(
+    message: NsfwMessage,
+    onReply?: (sent: SentMessage, result: Detection) => void,
+  ): Promise<number> {
     const key = message.mediaGroupId
       ? `${message.chatId}:${message.mediaGroupId}`
       : `${message.chatId}:${message.messageId}`;
     return await this.#groups.use(key, async () => {
       this.#expireGroups();
-      const severity = await this.score(message.photo);
+      const result = await this.moderate(message.photo);
+      const severity = result.severity;
+      this.collect(message.photo, result);
       if (severity < 2 || severity > 7) return severity;
-      this.savePicture(message.photo.fileUniqueId, message.photo.fileId, severity);
       this.incrementStat(message.chatId, severity >= 6 ? "adult" : "racy");
       if (message.mediaGroupId && this.#groupReplied.has(key)) return severity;
-      if (message.mediaGroupId) this.#groupReplied.set(key, Date.now() + 10_000);
       const replies = message.hasMediaSpoiler
         ? ["给bot也看看~", "悄悄看一眼~", "不敢看~"]
         : ["涩涩的~", "好色哦~", "口夷~"];
-      await this.telegram.sendMessage(message.chatId, replies[Math.floor(severity / 2) - 1]!, {
-        reply_parameters: { message_id: message.messageId },
-        reply_markup: this.ratingKeyboard(message.photo.fileUniqueId),
-      });
+      const sent = await this.telegram.sendMessage(
+        message.chatId,
+        replies[Math.floor(severity / 2) - 1]!,
+        {
+          reply_parameters: { message_id: message.messageId },
+          reply_markup: this.ratingKeyboard(message.photo.fileUniqueId),
+        },
+      );
+      if (message.mediaGroupId) this.#groupReplied.set(key, Date.now() + 10_000);
+      onReply?.(sent, result);
       return severity;
     });
   }
 
   async score(photo: NsfwPhoto): Promise<number> {
-    if (photo.width < 128 || photo.height < 128) throw new Error("image too small");
-    const cached = this.#cache.get(photo.fileId);
-    if (cached) return cached.severity;
-    return await this.#rateLimit.use("azure", () => this.#scoreUncached(photo));
+    return (await this.moderate(photo)).severity;
   }
 
-  async #scoreUncached(photo: NsfwPhoto): Promise<number> {
+  collect(photo: NsfwPhoto, result: Detection) {
+    if (result.severity >= 2 || result.animeIllustration) {
+      this.savePicture(photo.fileUniqueId, photo.fileId, result.severity);
+    }
+    return this.getPicture(photo.fileUniqueId);
+  }
+
+  async moderate(photo: NsfwPhoto): Promise<Detection> {
+    if (photo.width < 128 || photo.height < 128) throw new Error("image too small");
     const cached = this.#cache.get(photo.fileId);
-    if (cached) return cached.severity;
+    if (cached) return cached;
+    return await this.#rateLimit.use("cloudflare", () => this.#scoreUncached(photo));
+  }
+
+  async #scoreUncached(photo: NsfwPhoto): Promise<Detection> {
+    const cached = this.#cache.get(photo.fileId);
+    if (cached) return cached;
     const wait = Math.max(0, this.#nextRequestAt - Date.now());
     if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
     this.#nextRequestAt = Date.now() + 200;
     const config = this.config().contentModerator;
-    if (!config.endpoint || !config.apiKey) throw new Error("Azure Content Safety 未配置");
+    if (!config.accountId || !config.apiToken) throw new Error("Cloudflare Workers AI 未配置");
     const file = await this.telegram.getFile(photo.fileId);
-    const bytes = await this.telegram.downloadFile(file, AbortSignal.timeout(10_000));
+    const bytes = await this.normalize(
+      await this.telegram.downloadFile(file, AbortSignal.timeout(10_000)),
+    );
     let binary = "";
     for (let offset = 0; offset < bytes.length; offset += 0x8000) {
       binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
     }
     const response = await this.fetcher(
-      `${config.endpoint}/contentsafety/image:analyze?api-version=2024-09-01`,
+      `https://api.cloudflare.com/client/v4/accounts/${
+        encodeURIComponent(config.accountId)
+      }/ai/run/@cf/cloudflare/clef-flash`,
       {
         method: "POST",
-        headers: { "content-type": "application/json", "Ocp-Apim-Subscription-Key": config.apiKey },
+        headers: {
+          "content-type": "application/json",
+          "Authorization": `Bearer ${config.apiToken}`,
+        },
         body: JSON.stringify({
-          image: { content: btoa(binary) },
-          categories: ["Sexual"],
-          outputType: "FourSeverityLevels",
+          model: "clef-flash",
+          state: "Evaluate the single attached image for content moderation.",
+          images: [{ content_type: "image/jpeg", base64: btoa(binary) }],
+          questions: {
+            microsoft_severity: {
+              type: "choice",
+              instructions:
+                "Assess the attached image using Microsoft Sexual IMAGE severity definitions; select exactly one severity: 0 Safe, 2 Low, 4 Medium, or 6 High, based on visible evidence and context, not source or filename.",
+              criteria: severityCriteria,
+            },
+            anime_illustration: {
+              type: "choice",
+              instructions:
+                "Is this a Japanese anime/manga-style (2D or 二次元) illustration? Classify visual style independently of sexual content. Ordinary photos, text/interface screenshots and other illustration styles do not qualify.",
+              criteria: {
+                yes:
+                  "A drawn or digital illustration in Japanese anime or manga style, whether safe or sexual.",
+                no: "Not anime/manga style or insufficient visual evidence.",
+              },
+            },
+          },
         }),
         signal: AbortSignal.timeout(10_000),
       },
     );
     if (!response.ok) {
-      throw new Error(`Azure Content Safety HTTP ${response.status}: ${await response.text()}`);
+      throw new Error(`Cloudflare moderation HTTP ${response.status}`);
     }
-    const body = await response.json() as {
-      categoriesAnalysis?: Array<{ category: string; severity: number }>;
+    const text = await response.text();
+    if (text.length > 1024 * 1024) throw new Error("moderation response too large");
+    const body = JSON.parse(text) as {
+      success: boolean;
+      result?: { answers?: Record<string, { type: string; choice: string }> };
     };
-    const severity =
-      body.categoriesAnalysis?.find((item) => item.category === "Sexual")?.severity ?? -1;
-    if (severity < 0 || severity > 7) throw new Error(`severity ${severity} is invalid`);
-    this.#cache.set(photo.fileId, { severity });
-    return severity;
+    const severityAnswer = body.result?.answers?.microsoft_severity;
+    const anime = body.result?.answers?.anime_illustration;
+    if (
+      !body.success || severityAnswer?.type !== "choice" ||
+      !["0", "2", "4", "6"].includes(severityAnswer.choice) || anime?.type !== "choice" ||
+      !["yes", "no"].includes(anime.choice)
+    ) throw new Error("invalid Cloudflare moderation choices");
+    const result = {
+      severity: Number(severityAnswer.choice),
+      animeIllustration: anime.choice === "yes",
+    };
+    this.#cache.set(photo.fileId, result);
+    return result;
   }
 
   savePicture(fileUniqueId: string, fileId: string, severity: number): void {

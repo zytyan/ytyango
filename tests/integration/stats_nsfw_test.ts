@@ -1,11 +1,11 @@
-import { assertEquals } from "@std/assert";
+import { assertEquals, assertRejects } from "@std/assert";
 import type { AppConfig } from "../../src/config.ts";
 import { NsfwService } from "../../src/nsfw/service.ts";
 import { StatsService } from "../../src/stats/service.ts";
 import { FakeTelegram, temporaryDatabase } from "./helpers.ts";
 
 const config = {
-  contentModerator: { endpoint: "https://azure.example", apiKey: "key" },
+  contentModerator: { accountId: "account", apiToken: "key" },
 } as AppConfig;
 
 Deno.test("statistics count graphemes and timezone buckets transactionally", async () => {
@@ -38,20 +38,95 @@ Deno.test("statistics count graphemes and timezone buckets transactionally", asy
   }
 });
 
-Deno.test("NSFW severity, gallery and V9 rating triggers stay compatible", async () => {
+Deno.test("Cloudflare collects safe anime, ignores safe photos, classifies every album item and rejects invalid choices", async () => {
+  const temporary = await temporaryDatabase();
+  const telegram = new FakeTelegram();
+  const choices = [["0", "yes"], ["0", "no"], ["6", "no"], ["4", "yes"], ["oops", "no"]];
+  let calls = 0;
+  const fetcher: typeof fetch = (url, options) => {
+    assertEquals(
+      String(url),
+      "https://api.cloudflare.com/client/v4/accounts/account/ai/run/@cf/cloudflare/clef-flash",
+    );
+    assertEquals(new Headers(options?.headers).get("authorization"), "Bearer key");
+    const body = JSON.parse(String(options?.body));
+    assertEquals(body.images[0].content_type, "image/jpeg");
+    assertEquals(Object.keys(body.questions.microsoft_severity.criteria), ["0", "2", "4", "6"]);
+    const [severity, anime] = choices[calls++]!;
+    return Promise.resolve(
+      Response.json({
+        success: true,
+        result: {
+          answers: {
+            microsoft_severity: { type: "choice", choice: severity },
+            anime_illustration: { type: "choice", choice: anime },
+          },
+        },
+      }),
+    );
+  };
+  try {
+    const service = new NsfwService(
+      temporary.db,
+      telegram,
+      () => config,
+      () => {},
+      fetcher,
+      (bytes) => Promise.resolve(bytes),
+    );
+    for (let index = 0; index < 4; index++) {
+      await service.detectAndReply({
+        chatId: -100,
+        messageId: index,
+        mediaGroupId: "album",
+        hasMediaSpoiler: false,
+        photo: { fileId: `file${index}`, fileUniqueId: `uid${index}`, width: 640, height: 480 },
+      });
+    }
+    assertEquals(calls, 4);
+    assertEquals(Boolean(service.getPicture("uid0")), true);
+    assertEquals(Boolean(service.getPicture("uid1")), false);
+    assertEquals(Boolean(service.getPicture("uid2")), true);
+    assertEquals(Boolean(service.getPicture("uid3")), true);
+    assertEquals(telegram.calls.filter((call) => call.method === "message").length, 1);
+    await assertRejects(
+      () => service.score({ fileId: "bad", fileUniqueId: "bad", width: 640, height: 480 }),
+      Error,
+      "invalid",
+    );
+    assertEquals(service.getPicture("bad"), undefined);
+  } finally {
+    await temporary.close();
+  }
+});
+
+Deno.test("Cloudflare severity, gallery and rating triggers stay compatible", async () => {
   const temporary = await temporaryDatabase();
   const telegram = new FakeTelegram();
   const fetcher: typeof fetch = () =>
     Promise.resolve(
       new Response(
         JSON.stringify({
-          categoriesAnalysis: [{ category: "Sexual", severity: 6 }],
+          success: true,
+          result: {
+            answers: {
+              microsoft_severity: { type: "choice", choice: "6" },
+              anime_illustration: { type: "choice", choice: "no" },
+            },
+          },
         }),
         { status: 200, headers: { "content-type": "application/json" } },
       ),
     );
   try {
-    const nsfw = new NsfwService(temporary.db, telegram, () => config, () => {}, fetcher);
+    const nsfw = new NsfwService(
+      temporary.db,
+      telegram,
+      () => config,
+      () => {},
+      fetcher,
+      (bytes) => Promise.resolve(bytes),
+    );
     const severity = await nsfw.detectAndReply({
       chatId: -100,
       messageId: 9,

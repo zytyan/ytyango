@@ -3,8 +3,14 @@ god: 123456789
 my-chats: []
 ai-chats: []
 content-moderator:
-  endpoint: "https://example.cognitiveservices.azure.com"
+  account-id: ""
+  api-token: ""
+ocr:
+  endpoint: "https://example-ocr.cognitiveservices.azure.com"
   api-key: ""
+  api-ver: "2023-10-01"
+  features: Read
+  language: ""
 tg-api-url: "http://localhost:8081"
 drop-pending-updates: false
 log-level: 0

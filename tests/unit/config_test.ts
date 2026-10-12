@@ -8,14 +8,17 @@ bot-token: token
 god: 42
 ai-chats: [-1001]
 content-moderator:
+  account-id: cloudflare-account
+  api-token: secret
+ocr:
   endpoint: https://azure.example/
-  api-key: secret
+  api-key: ocr-secret
 `);
   assertEquals(config.databasePath, "/srv/ytyan/main.db");
   assertEquals(config.aiMediaPath, "/srv/ytyan/ai-media");
   assertEquals(config.god, 42);
   assertEquals(config.aiChats, [-1001]);
-  assertEquals(config.contentModerator.endpoint, "https://azure.example");
+  assertEquals(config.contentModerator.accountId, "cloudflare-account");
   assertEquals(config.telegramApiUrl, "https://api.telegram.org");
   assertEquals(config.deepSeekBaseUrl, "https://api.deepseek.com");
   assertEquals(config.sub2apiKey, "");
