@@ -13,10 +13,10 @@
 [架构分析](docs/architecture-sdk-analysis.md)。普通 `/roll` 已补齐，包含旧 `delme`
 删除按钮兼容和离线测试。
 
-**TS 独立 V1 数据库与一次性离线导入器已实现**：运行时只接受 TS 库，Go canonical V9–V11 通过
+**TS 独立 V1/V2 数据库与一次性离线导入器已实现**：运行时只接受 TS 库，Go canonical V9–V11 通过
 `db-import` 只读导入新目标目录，校验行数据、Token、payload、媒体与外键，并输出报告。
-导入失败不发布目标、不修改源库。AI-first 编排仍待改造。AI 媒体继续使用
-`ai-media/sha256/<prefix>/<sha256>`；实际服务切换需要另行授权。
+导入失败不发布目标、不修改源库。AI-first 编排和传统事实注入已实现。AI 媒体继续使用
+`ai-media/sha256/<prefix>/<sha256>`；实际切换按本次会话的明确授权执行。
 
 ## 固定工具链
 
@@ -42,9 +42,9 @@
 src/
   ai/          provider、会话/Run repository、媒体存储和业务服务
   download/    URL/Bilibili 处理、进程执行、缓存和 singleflight
-  nsfw/        Azure Content Safety、图库和用户评分
-  stats/       统计缓存、V9 聚合和日报
-  db/          TS V1 schema、初始化和严格检查
+  nsfw/        Cloudflare Clef-flash、图库和用户评分
+  stats/       统计缓存、聚合和日报
+  db/          TS V1/V2 schema、只读导入、初始化和严格检查
   telegram/    grammY typed API 与 sendRichMessage 窄适配
   shared/      当前共享类型与有界并发原语（单实现端口计划收拢）
 ```
@@ -63,9 +63,10 @@ cp config.example.yaml run/test-config.yaml
 export YTYAN_CONFIG_FILE=/opt/tgbots/ytyanbot-ts/run/test-config.yaml
 ```
 
-支持 Go 版 YAML 字段，以及 `YTYAN_BOT_TOKEN`、`GEMINI_API_KEY`、`SUB2API_API_KEY`、
-`DEEPSEEK_API_KEY` 覆盖。Bot token、Telegram API URL、数据库和媒体路径改变后必须重启；
-白名单、provider key、NSFW 和日志配置可热重载，无效配置保留旧快照。
+支持 Go 版 YAML 字段，以及 `YTYAN_DATABASE_PATH`、`YTYAN_AI_MEDIA_PATH`、
+`YTYAN_BOT_TOKEN`、`GEMINI_API_KEY`、`SUB2API_API_KEY`、`SUB2API_BASE_URL`、 `DEEPSEEK_API_KEY`
+覆盖。Bot token、Telegram API URL、数据库和媒体路径改变后必须重启； 白名单、provider key、NSFW
+和日志配置可热重载，无效配置保留旧快照。
 
 模型选择同时保存 provider/model；相同 `gemini-3.7-flash` 可选官方或 Sub2API。 Sub2API 使用独立
 `sub2api-key`/`sub2api-base-url`，仅走原生 antigravity generateContent，映射到
@@ -100,18 +101,20 @@ deno task compile
 `db-init` 拒绝覆盖已有文件。`db-check` 以 SQLite read-only 模式校验 TS migration、checksum、
 必需表/索引/触发器、退役对象、`integrity_check`、外键和可选媒体引用。
 
-编译产物只允许读取 Go build 目录、仓库 `run` 和 `/tmp`，只允许写仓库 `run` 和 `/tmp`，
-只允许执行以下程序：
+编译产物只允许读取 Go build、本地 Bot API 数据根、嵌入图片资源、仓库 `run` 和 `/tmp`，只允许写仓库
+`run` 和 `/tmp`， 只允许执行以下程序：
 
 ```text
 /usr/local/bin/yt-dlp
 /usr/bin/bbdown-go
 /usr/bin/ffprobe
+/usr/bin/ffmpeg
+/usr/bin/tar
 ```
 
-它没有 shell 或 FFI 权限。SDK 根入口的间接 OIDC 模块需要 hostname 权限，因此编译和测试仅补充
-`--allow-sys=hostname`，不开放全部系统信息或环境变量。 `deploy/ytyanbot-ts-test.service`
-仅用于独立测试 Bot，不会替换生产单元。
+它没有 shell 或 FFI 权限。SDK 根入口的间接 OIDC 模块需要 hostname 权限，因此测试仅补充
+`--allow-sys=hostname`；编译额外允许 `inspector` 供 CPU/heap 诊断，不开放全部系统信息或环境变量。
+`deploy/ytyanbot-ts-test.service` 仅用于独立测试 Bot，不会替换生产单元。
 
 ## 已验证
 
@@ -124,22 +127,27 @@ deno task compile
 - 在无 Deno/npm 的 PATH 中连接本地假 Telegram API，runner 预热后空闲 RSS 约 62 MiB
 - SIGINT 可停止 runner、关闭配置 watcher 并 flush 后以状态 0 退出
 
-真实 Gemini、DeepSeek、Bilibili 和独立测试 Bot 验收需要显式提供测试凭证，默认测试不会访问这些服务。
+真实 Go 配置已用于 Telegram 身份/本地文件、官方 Gemini 原生/Interactions 与 DeepSeek 小请求验证。
+Sub2API 模型列表可用，但当前 tiered 生成返回 404；用户已确认保留配置并继续切换。
+默认测试全部拦截外部 API，不使用生产配置。
 
-本次 SDK 切片全仓合计 62 项（55 项 unit、7 项
-integration）通过，含三供应商拦截、签名/工具结果/历史重放、 Vision
-图片跟进、缓存指纹/尾部/失效、取消，以及生成后交付失败重发不重复调用/计量。
-格式、lint、类型检查、独立编译及临时数据库 `db-init`/`db-check` smoke 均通过；未启动线上 polling，
-未调用真实 provider，也未修改生产数据库；离线通过不等同于真实供应商或生产切换验收。
+## 相册与运维
 
-## 迁移待办，不是裁剪
+相册七天只保存文件索引，不采集普通 caption。明确触发后聚合整组并延迟下载；
+混合媒体、过期/缺失索引、任一图片失败或超限都拒绝发送残缺相册。 当前请求及选中的回复 caption
+才成为请求数据。历史 Go caption 完整归档。
 
-OCR、计算器、汇率、prpr、鱼图、webp2png、备份接口、内部 HTTP、等价诊断、媒体 GC，
-以及相册、反应偏好等能力仍待迁移。Sub2API SDK 路由及联合模型选择已接通并离线验收。
-回复链/传统事实编排、上下文引用加载与媒体选择仍按 AI-first 计划重组，不能把 SDK 输入序列化验收
-等同于整个回复链/多模态产品验收。新库与导入器已独立设计，工作流见
-[数据库文档](docs/database.md)，不复刻 Go migration 历史。 历史数据和配置通过映射迁移，不会因
-breaking change 隐式删除；尚未迁移的群配置按钮仍返回 “本版本暂未上线”。
+内部 HTTP 缺省 `127.0.0.1:4019`，`BOT_INNER_HTTP=OFF` 关闭； `GOYTYAN_BACKUP_TOKEN`
+可保护全部接口，非 loopback 必须设置。 `/mars-counter`、`/dio-ban` 保留外部统计接入；`/loggers` 与
+`PUT /loggers/runtime/<level>`
+控制运行日志；`/debug/runtime`、`/debug/profile?seconds=1..60`、`/debug/heap` 提供 Deno
+指标、Chrome/V8 CPU profile 和 heap snapshot，取代 Go pprof 格式。 `/backupdb?db=main|all&media=0|1`
+下载一致性快照的 tar.gz，media=1 校验并附带全部登记媒体和清单， media=0 明确标记非完整 AI
+数据集。`GOYTYAN_BACKUP_MAX_DURATION` 支持 ms/s/m/h（缺省 30m）。
 
-CoC 人物属性、检定和战斗模块明确不迁移，历史属性数据默认保留。独立 `/roll` 不属于这一裁剪范围。
-已经退役的旧消息搜索和 AI memory 不重新引入。
+`media-gc --database <TS.db> --media <root> --grace-hours <positive>` 默认仅预览； `--apply`
+只能在程序停止时使用，仅删除未登记且超过明确宽限期的文件，不删除数据库历史。
+
+数据库规范 SQL 和一次性只读迁移见 [数据库文档](docs/database.md)， 实现 SHA、逐切片验证和实际验收见
+[基线同步记录](docs/golang-parity.md)。 CoC 人物属性、检定和战斗不进入运行时；历史数据另行归档。独立
+`/roll` 保留。 旧消息搜索与 AI memory 不重新引入。

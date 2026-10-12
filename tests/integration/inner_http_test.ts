@@ -53,6 +53,7 @@ Deno.test("inner HTTP authenticates every route and validates counters and log c
     assertEquals(level, 4);
     assertEquals((await handler(request("/backupdb?db=msg"))).status, 410);
     assertEquals((await handler(request("/backupdb?media=bad"))).status, 400);
+    assertEquals((await handler(request("/debug/profile?seconds=0"))).status, 400);
     stats.flush();
     assertEquals(
       temporary.db.get(

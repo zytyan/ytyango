@@ -18,8 +18,9 @@ export function innerAddress(value = "", token = "") {
   return { hostname: host, port: Number(url.port) };
 }
 
-export function installLogging(initial: number) {
-  let level = initial;
+export function installLogging(initial: number | (() => number)) {
+  let override: number | undefined;
+  const level = () => override ?? (typeof initial === "function" ? initial() : initial);
   const original = {
     debug: console.debug,
     log: console.log,
@@ -34,13 +35,13 @@ export function installLogging(initial: number) {
     ]] as const
   ) {
     console[name] = (...args: unknown[]) => {
-      if (severity >= level) original[name](...args);
+      if (severity >= level()) original[name](...args);
     };
   }
   return {
-    get: () => level,
+    get: level,
     set: (value: number) => {
-      level = value;
+      override = value;
     },
     restore: () => Object.assign(console, original),
   };
@@ -175,6 +176,41 @@ export function innerHandler(options: {
           }
         });
       }
+      if (method === "GET" && url.pathname === "/debug/heap") {
+        return await profileSlot.use(async () => {
+          signal.throwIfAborted();
+          const root = await Deno.makeTempDir({ prefix: "ytyan-heap-" });
+          const path = `${root}/runtime.heapsnapshot`;
+          const cleanup = () => Deno.remove(root, { recursive: true });
+          const session = new Session();
+          try {
+            const file = await Deno.open(path, { createNew: true, write: true, mode: 0o600 });
+            try {
+              session.connect();
+              session.on("HeapProfiler.addHeapSnapshotChunk", (message) => {
+                const bytes = new TextEncoder().encode(message.params.chunk);
+                let offset = 0;
+                while (offset < bytes.length) offset += file.writeSync(bytes.subarray(offset));
+              });
+              await session.post("HeapProfiler.takeHeapSnapshot", { reportProgress: false });
+              signal.throwIfAborted();
+            } finally {
+              file.close();
+              session.disconnect();
+            }
+            return await downloadFile(
+              path,
+              cleanup,
+              signal,
+              "application/json",
+              "runtime.heapsnapshot",
+            );
+          } catch (error) {
+            await cleanup();
+            throw error;
+          }
+        });
+      }
       if (method === "GET" && url.pathname === "/backupdb") {
         const selection = (url.searchParams.get("db") ?? "main").toLowerCase();
         if (selection === "msg") {
@@ -193,46 +229,18 @@ export function innerHandler(options: {
           deadline.throwIfAborted();
           options.stats.flush();
           const result = await createBackup(options.db, options.mediaRoot, includeMedia, deadline);
-          const file = await Deno.open(result.path, { read: true });
-          const reader = file.readable.getReader();
-          let cleaned = false;
-          const cleanup = async () => {
-            if (!cleaned) {
-              cleaned = true;
-              try {
-                await reader.cancel();
-              } finally {
-                await result.cleanup();
-              }
-            }
-          };
-          const stream = new ReadableStream<Uint8Array>({
-            async pull(controller) {
-              try {
-                deadline.throwIfAborted();
-                const { done, value } = await reader.read();
-                if (done) {
-                  await cleanup();
-                  controller.close();
-                } else controller.enqueue(value);
-              } catch (error) {
-                await cleanup();
-                controller.error(error);
-              }
-            },
-            cancel: cleanup,
-          });
-          return new Response(stream, {
-            headers: {
-              "content-type": "application/gzip",
-              "content-disposition": "attachment; filename=ytyan-backup.tar.gz",
-            },
-          });
+          return await downloadFile(
+            result.path,
+            result.cleanup,
+            deadline,
+            "application/gzip",
+            "ytyan-backup.tar.gz",
+          );
         });
       }
       if (method === "GET" && url.pathname === "/") {
         return new Response(
-          "POST /mars-counter\nPOST /dio-ban\nGET /backupdb?db=main|all&media=0|1\nGET /loggers\nPUT /loggers/runtime/<level>\nGET /debug/runtime\nGET /debug/profile?seconds=1..60\n",
+          "POST /mars-counter\nPOST /dio-ban\nGET /backupdb?db=main|all&media=0|1\nGET /loggers\nPUT /loggers/runtime/<level>\nGET /debug/runtime\nGET /debug/profile?seconds=1..60\nGET /debug/heap\n",
         );
       }
       return new Response("not found", { status: 404 });
@@ -241,6 +249,64 @@ export function innerHandler(options: {
       return new Response("request failed", { status: 500 });
     }
   };
+}
+
+async function downloadFile(
+  path: string,
+  cleanupFiles: () => Promise<void>,
+  signal: AbortSignal,
+  type: string,
+  filename: string,
+) {
+  let file: Deno.FsFile;
+  try {
+    signal.throwIfAborted();
+    file = await Deno.open(path, { read: true });
+  } catch (error) {
+    await cleanupFiles();
+    throw error;
+  }
+  const reader = file.readable.getReader();
+  let cleaned = false;
+  const cleanup = async () => {
+    if (cleaned) return;
+    cleaned = true;
+    signal.removeEventListener("abort", abort);
+    try {
+      await reader.cancel();
+    } finally {
+      await cleanupFiles();
+    }
+  };
+  let output: ReadableStreamDefaultController<Uint8Array>;
+  const abort = () => {
+    cleanup().then(() => output.error(signal.reason)).catch(() => {});
+  };
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      output = controller;
+      signal.addEventListener("abort", abort, { once: true });
+      if (signal.aborted) abort();
+    },
+    async pull(controller) {
+      try {
+        signal.throwIfAborted();
+        const { done, value } = await reader.read();
+        if (cleaned) return;
+        if (done) {
+          await cleanup();
+          controller.close();
+        } else controller.enqueue(value);
+      } catch (error) {
+        await cleanup();
+        controller.error(error);
+      }
+    },
+    cancel: cleanup,
+  });
+  return new Response(stream, {
+    headers: { "content-type": type, "content-disposition": `attachment; filename=${filename}` },
+  });
 }
 
 export function startInnerHttp(

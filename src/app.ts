@@ -798,12 +798,12 @@ export async function createApplication(
     flush: () => stats.flush(),
     async serve(signal: AbortSignal): Promise<void> {
       signal.addEventListener("abort", () => shutdown.abort(signal.reason), { once: true });
-      const logging = installLogging(configs.value.logLevel);
+      const logging = installLogging(() => configs.value.logLevel);
       let http: Deno.HttpServer | undefined;
       let flushTimer: ReturnType<typeof setInterval> | undefined;
       let dailyTimer: ReturnType<typeof setInterval> | undefined;
       try {
-        http = startInnerHttp(db, stats, configs.value.aiMediaPath, signal, logging);
+        http = startInnerHttp(db, stats, configs.value.aiMediaPath, shutdown.signal, logging);
         albums.cleanup();
         await downloads.checkExecutables();
         if (configs.value.dropPendingUpdates) {

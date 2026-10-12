@@ -105,3 +105,14 @@ caption 或被选中回复 caption 才成为请求数据。 Go 原索引与历�
 topic=-1（未知）和缺失值保留，不伪造信息。未知 topic 只由 Telegram chat/group/message 身份选取。
 新索引包含明确 topic；同 chat 不同 topic 隔离。79 项测试通过，包括真实 App 并发相册、 无 caption
 采集、后续回复整组、部分读取失败和导入映射全行摘要。
+
+## 最终运行验收
+
+Go `d395a28545701a5640d91b1ff7057bee236a3f1e`；TS 前置 `a80ed3c`。 补齐 V8 heap
+snapshot、配置热重载日志等级与临时下载清理/取消；编译明确授予 inspector， 默认 unit/integration
+仍保持 hostname 与原文件/环境权限。当前 79 项回归全部通过。 全新 /tmp 独立编译 smoke：TS V2
+初始化/只读检查、假 Telegram polling、实际 FFmpeg 鱼图/prpr/WebP→PNG 交付、CPU/heap 诊断、完整
+tar.gz 备份、SIGINT 状态 0 退出均通过。 真实导入副本的 Gemini/Sub2API/DeepSeek
+历史经拦截重放通过；官方原生与 Interactions、DeepSeek 真实小请求均成功。Sub2API 404
+按用户确认保留。用户授权最终停止 Go、只读导入并直接替换当前服务，
+运行配置、数据库、媒体、二进制与实际部署记录不进入 Git。
