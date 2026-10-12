@@ -37,6 +37,7 @@ export interface IncomingAiMessage {
   readonly reply?: IncomingAiMessage;
   readonly media: readonly IncomingMedia[];
   readonly facts?: readonly TraditionalFact[];
+  readonly completeAlbum?: boolean;
   readonly signal?: AbortSignal;
 }
 
@@ -323,10 +324,12 @@ export class AiService {
         (media.kind === "video" || media.kind === "animation" ||
           !supportsImages(session.provider, session.model))
       ) {
+        if (input.completeAlbum) throw new Error("当前模型无法读取完整图片组");
         notes.push("[当前模型不支持此媒体，未上传]");
         continue;
       }
       if ((media.byteSize ?? 0) > 15 * 1024 * 1024 || (media.duration ?? 0) > 240) {
+        if (input.completeAlbum) throw new Error("图片组含超限媒体");
         notes.push("[媒体超过 15 MiB 或 240 秒，未上传]");
         continue;
       }
@@ -337,6 +340,7 @@ export class AiService {
         input.signal ? AbortSignal.any([input.signal, timeout]) : timeout,
       );
       if (bytes.byteLength > 15 * 1024 * 1024) {
+        if (input.completeAlbum) throw new Error("图片组含超限媒体");
         notes.push("[媒体超过 15 MiB，未上传]");
         continue;
       }

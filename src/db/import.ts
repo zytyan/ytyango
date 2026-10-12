@@ -1,5 +1,6 @@
 import { resolve } from "node:path";
 import { createHash } from "node:crypto";
+import { SQL } from "./queries.ts";
 import { MainDatabase } from "./database.ts";
 import { ContentAddressedMediaStore } from "../ai/media_store.ts";
 
@@ -197,6 +198,74 @@ export async function importDatabase(options: ImportOptions): Promise<Record<str
     const tokens = source.get<Row>(
       "SELECT COALESCE(SUM(total_input_tokens),0) AS input,COALESCE(SUM(total_output_tokens),0) AS output,COALESCE(SUM(total_cached_input_tokens),0) AS cached FROM ai_sessions",
     );
+    const albumMapping = {
+      groups: 0,
+      files: 0,
+      topic: "unknown legacy topic (-1); selected only by Telegram group/message identity",
+      captions: "preserved in import_archives only",
+    };
+    if (tables.includes("ai_media_groups") && tables.includes("ai_media_group_photos")) {
+      target.transaction(() => {
+        for (const row of rows64(source, "ai_media_groups")) {
+          target!.run(
+            SQL.IndexAlbum,
+            row.chat_id!,
+            -1,
+            row.media_group_id!,
+            row.expires_at!,
+            row.photo_only!,
+          );
+          albumMapping.groups++;
+        }
+        for (const row of rows64(source, "ai_media_group_photos")) {
+          target!.run(
+            SQL.IndexAlbumFile,
+            row.chat_id!,
+            -1,
+            row.media_group_id!,
+            row.msg_id!,
+            row.telegram_file_id!,
+            "",
+            null,
+          );
+          albumMapping.files++;
+        }
+      });
+      for (
+        const [table, sql] of [["ai_media_groups", SQL.ImportedAlbumGroups], [
+          "ai_media_group_photos",
+          SQL.ImportedAlbumFiles,
+        ]]
+      ) {
+        const mapped = function* (): Iterable<Row> {
+          for (const row of rows64(source, table!)) {
+            yield table === "ai_media_groups"
+              ? {
+                chat_id: row.chat_id!,
+                topic_id: -1n,
+                group_id: row.media_group_id!,
+                expires_at: row.expires_at!,
+                photo_only: row.photo_only!,
+              }
+              : {
+                chat_id: row.chat_id!,
+                topic_id: -1n,
+                group_id: row.media_group_id!,
+                msg_id: row.msg_id!,
+                file_id: row.telegram_file_id!,
+                file_unique_id: "",
+                byte_size: null,
+              };
+          }
+        };
+        const statement = target.raw.prepare(sql!);
+        statement.setReadBigInts(true);
+        const expected = digest(mapped()), actual = digest(statement.iterate() as Iterable<Row>);
+        if (expected.count !== actual.count || expected.sha256 !== actual.sha256) {
+          throw new Error("album index mapping validation failed");
+        }
+      }
+    }
     const media = target.all<
       { sha256: string; byte_size: number; relative_path: string; mime_type: string }
     >("SELECT sha256,byte_size,relative_path,mime_type FROM media_objects ORDER BY sha256");
@@ -226,6 +295,7 @@ export async function importDatabase(options: ImportOptions): Promise<Record<str
       destination: `${output}/dataset/main.db`,
       idMapping: "retained chat/message/session/run IDs",
       tables: report,
+      albumMapping,
       tokens,
       media: { count: media.length, bytes: media.reduce((sum, item) => sum + item.byte_size, 0) },
       validation: checked,

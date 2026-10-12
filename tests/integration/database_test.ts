@@ -3,10 +3,10 @@ import { MainDatabase } from "../../src/db/database.ts";
 import { MIGRATIONS, REQUIRED_TABLES } from "../../src/db/schema.ts";
 import { temporaryDatabase } from "./helpers.ts";
 
-Deno.test("TS-owned V1 database contains exact migrations and required objects", async () => {
+Deno.test("TS-owned database contains exact migrations and required objects", async () => {
   const temporary = await temporaryDatabase();
   try {
-    assertEquals(temporary.db.validate().version, 1);
+    assertEquals(temporary.db.validate().version, 2);
     assertEquals(
       temporary.db.all<{ version: number; checksum: string }>(
         "SELECT version,checksum FROM ts_schema_versions ORDER BY version",

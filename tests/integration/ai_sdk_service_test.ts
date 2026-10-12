@@ -11,7 +11,11 @@ Deno.test("media preparation failure never calls a provider or creates a partial
   try {
     let calls = 0;
     const telegram = new FakeTelegram();
-    telegram.downloadFile = () => Promise.reject(new Error("file unavailable"));
+    let files = 0;
+    telegram.downloadFile = () =>
+      ++files === 1
+        ? Promise.resolve(new Uint8Array([1, 2, 3]))
+        : Promise.reject(new Error("file unavailable"));
     const service = new AiService(
       new AiRepository(temporary.db),
       () => {
@@ -33,7 +37,12 @@ Deno.test("media preparation failure never calls a provider or creates a partial
         userId: 7,
         username: "user",
         text: "@bot",
-        media: [{ fileId: "photo", kind: "image", mimeType: "image/jpeg" }],
+        completeAlbum: true,
+        media: [{ fileId: "photo", kind: "image", mimeType: "image/jpeg" }, {
+          fileId: "missing",
+          kind: "image",
+          mimeType: "image/jpeg",
+        }],
       })
     );
     assertEquals(calls, 0);

@@ -22,6 +22,7 @@ import { type ConfigField, StatsService } from "./stats/service.ts";
 import { GrammyTelegramGateway } from "./telegram/gateway.ts";
 import { registerRoll } from "./features/roll.ts";
 import { type Interaction, interaction, isAiTrigger, type TraditionalFact } from "./interaction.ts";
+import { albumIndex } from "./ai/albums.ts";
 import { SQL } from "./db/queries.ts";
 import { installLogging, startInnerHttp } from "./inner_http.ts";
 
@@ -238,6 +239,7 @@ export async function createApplication(
     () => configs.value,
     (chatId, kind) => stats.increment(chatId, kind),
   );
+  const albums = albumIndex(db);
   const now = () => Math.floor(Date.now() / 1000);
   const interactions = new WeakMap<Context, Interaction>();
   const currentInteraction = (ctx: Context) => interactions.get(ctx)!;
@@ -247,6 +249,7 @@ export async function createApplication(
   bot.use(async (ctx, next) => {
     if (!ctx.message) return await next();
     const message = ctx.message;
+    if (configs.value.aiChats.includes(message.chat.id)) albums.capture(message);
     const topic = topicId(message);
     const current = interaction(db, ctx);
     interactions.set(ctx, current);
@@ -273,11 +276,27 @@ export async function createApplication(
       replied && db.get(SQL.IsAiResponse, message.chat.id, replied.message_id, topic),
     );
     if (!isAiTrigger(messageText(message), identity.username, aiReply)) return;
+    if (!configs.value.aiChats.includes(message.chat.id)) return;
     const replyFacts = replied
       ? db.all<TraditionalFact>(SQL.ReplyFacts, message.chat.id, topic, replied.message_id)
       : [];
+    const incoming = toIncoming(message);
+    if (!repository.runForRequest(message.chat.id, message.message_id)) {
+      if (!albums.claim(message)) return;
+      try {
+        const media = await albums.media(message, shutdown.signal);
+        if (media) Object.assign(incoming, { media, completeAlbum: true });
+        if (replied && incoming.reply) {
+          const replyMedia = await albums.media(replied, shutdown.signal);
+          if (replyMedia) Object.assign(incoming.reply, { media: replyMedia, completeAlbum: true });
+        }
+      } catch (error) {
+        await current.reply(error instanceof Error ? error.message : "无法读取完整图片组。");
+        return;
+      }
+    }
     await ai.handle({
-      ...toIncoming(message),
+      ...incoming,
       facts: [...replyFacts, ...current.facts],
       signal: shutdown.signal,
     });
@@ -785,6 +804,7 @@ export async function createApplication(
       let dailyTimer: ReturnType<typeof setInterval> | undefined;
       try {
         http = startInnerHttp(db, stats, configs.value.aiMediaPath, signal, logging);
+        albums.cleanup();
         await downloads.checkExecutables();
         if (configs.value.dropPendingUpdates) {
           await bot.api.getUpdates({ offset: -1, limit: 1, timeout: 0 });
@@ -793,6 +813,7 @@ export async function createApplication(
           try {
             stats.flush();
             downloads.cleanupInline(now());
+            albums.cleanup();
           } catch (error) {
             console.error("periodic flush failed", error);
           }

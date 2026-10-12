@@ -12,10 +12,15 @@ Deno.test("traditional commands precede explicit AI, saved facts are user contex
   const user = { id: 7, is_bot: false, first_name: "user" } as const;
   let nextId = 100;
   let modelCalls = 0;
+  let fileDownloads = 0;
   const sent: Message[] = [];
   let lastBody: Record<string, unknown> = {};
   globalThis.fetch = (_input, options) => {
     const url = String(_input);
+    if (url.includes("/file/botfake/")) {
+      fileDownloads++;
+      return Promise.resolve(new Response(new Uint8Array([1, 2, 3])));
+    }
     if (url.endsWith("/sendRichMessage")) {
       const payload = JSON.parse(String(options?.body));
       const message = {
@@ -68,6 +73,9 @@ Deno.test("traditional commands precede explicit AI, saved facts are user contex
               can_read_all_group_messages: true,
               supports_inline_queries: true,
             };
+          } else if (method === "getFile") {
+            const id = (payload as { file_id: string }).file_id;
+            result = { file_id: id, file_unique_id: id, file_path: `photos/${id}` };
           } else if (method === "sendMessage") {
             const message = {
               message_id: nextId++,
@@ -117,6 +125,33 @@ Deno.test("traditional commands precede explicit AI, saved facts are user contex
     await app.bot.handleUpdate(update(7, "/calc 1/3+1/6 @test_bot"));
     assertEquals(modelCalls, 4);
     assertStringIncludes(JSON.stringify(lastBody.contents), "1/3+1/6 = 0.5");
+    const albumMessage = (id: number, caption: string) =>
+      ({
+        message_id: id,
+        date: Math.floor(Date.now() / 1000),
+        chat,
+        from: user,
+        caption,
+        media_group_id: "test-album",
+        photo: [{ file_id: `photo-${id}`, file_unique_id: `uid-${id}`, width: 400, height: 400 }],
+      }) as Message;
+    const ordinary = albumMessage(901, "ordinary private album caption");
+    await Promise.all([
+      app.bot.handleUpdate({ update_id: 900, message: albumMessage(900, "@test_bot album") }),
+      app.bot.handleUpdate({ update_id: 901, message: ordinary }),
+      app.bot.handleUpdate({ update_id: 902, message: albumMessage(902, "") }),
+    ]);
+    assertEquals(modelCalls, 5);
+    assertEquals(fileDownloads, 3);
+    assertEquals(JSON.stringify(lastBody).includes("ordinary private album caption"), false);
+    assertEquals(temporary.db.all("SELECT * FROM ai_message_media").length, 3);
+    nextId = 1000;
+    // Telegram may omit media_group_id in the embedded replied-to photo.
+    await app.bot.handleUpdate(
+      update(903, "@test_bot inspect all", { ...ordinary, media_group_id: undefined }),
+    );
+    assertEquals(modelCalls, 6);
+    assertEquals(fileDownloads, 6);
     app.flush();
   } finally {
     globalThis.fetch = originalFetch;

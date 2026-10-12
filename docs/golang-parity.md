@@ -92,3 +92,16 @@ Go `d395a28545701a5640d91b1ff7057bee236a3f1e`；TS 前置 `bc40c80`。 沿用 Go
 不支持或超限媒体注明未上传；下载失败明确提示，本次不创建部分 Run、不调用模型。
 排行/日报注入精简事实。78 项回归通过。Go 配置真实小请求：官方 Gemini 3.7、DeepSeek V4 成功； Sub2API
 模型列表正常，但与 Go 相同的 tiered 生成路径返回 404。用户已确认保留配置并继续切换。
+
+## 相册索引与延迟下载
+
+Go `d395a28545701a5640d91b1ff7057bee236a3f1e`；TS 前置 `1170b70`。
+用户确认七天只记录图片文件索引；普通 caption 不入运行时库。TS V2 新增独立 album_index/album_files，
+V1 源码和 checksum 保持不变。明确触发后 idle=1s/maxWait=5s 聚合、排序、一次 claim；
+回复某张照片（即使 Telegram 省略 group
+ID）可取整组。混合组/过期/缺失/任一下载失败或超限拒绝部分输入。 其他照片 caption 不采集；当前触发
+caption 或被选中回复 caption 才成为请求数据。 Go 原索引与历史 caption
+完整归档，另校验并映射可用文件索引；Go 未记录 topic/unique ID/size， 以
+topic=-1（未知）和缺失值保留，不伪造信息。未知 topic 只由 Telegram chat/group/message 身份选取。
+新索引包含明确 topic；同 chat 不同 topic 隔离。79 项测试通过，包括真实 App 并发相册、 无 caption
+采集、后续回复整组、部分读取失败和导入映射全行摘要。

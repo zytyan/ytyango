@@ -12,7 +12,7 @@ async function fixture(root: string): Promise<string> {
       CANONICAL_SCHEMA.join("\n").replaceAll("ts_schema_versions", "schema_migrations"),
     );
     source.raw.exec(
-      "DROP TABLE legacy_coc_attrs; DROP TABLE import_archives; DROP TABLE traditional_facts; DROP TABLE ai_run_context;",
+      "DROP TABLE legacy_coc_attrs; DROP TABLE import_archives; DROP TABLE traditional_facts; DROP TABLE ai_run_context; DROP TABLE album_files; DROP TABLE album_index;",
     );
     for (let version = 1; version <= 11; version++) {
       source.run(
@@ -25,6 +25,12 @@ async function fixture(root: string): Promise<string> {
     }
     source.raw.exec(
       "CREATE TABLE character_attrs(user_id INTEGER,attr_name TEXT,attr_value TEXT); INSERT INTO character_attrs VALUES(7,'STR','80');",
+    );
+    source.raw.exec(
+      `CREATE TABLE ai_media_groups(chat_id INTEGER,media_group_id TEXT,first_seen_at INTEGER,updated_at INTEGER,expires_at INTEGER,photo_only INTEGER,PRIMARY KEY(chat_id,media_group_id));
+CREATE TABLE ai_media_group_photos(chat_id INTEGER,media_group_id TEXT,msg_id INTEGER,sent_at INTEGER,user_id INTEGER,username TEXT,atable_username TEXT,caption TEXT,telegram_file_id TEXT,PRIMARY KEY(chat_id,msg_id));
+INSERT INTO ai_media_groups VALUES(-100,'album',1,1,9999999999,1);
+INSERT INTO ai_media_group_photos VALUES(-100,'album',9,1,7,'user',NULL,'historical caption','album-file');`,
     );
     source.run(
       "INSERT INTO saved_pics(file_uid,file_id,bot_rate,rand_key) VALUES('u','f',6,?)",
@@ -76,7 +82,20 @@ Deno.test("Go V11 import preserves rows/tokens/payload/media/votes and leaves so
     assertEquals(manifest.tokens, { input: 11, output: 5, cached: 0 });
     const target = new MainDatabase(`${root}/target/dataset/main.db`, { readOnly: true });
     try {
-      assertEquals(target.validate().version, 1);
+      assertEquals(target.validate().version, 2);
+      assertEquals((manifest.albumMapping as { groups: number }).groups, 1);
+      assertEquals((manifest.albumMapping as { files: number }).files, 1);
+      assertEquals(target.get("SELECT topic_id,group_id,file_id FROM album_files"), {
+        topic_id: -1,
+        group_id: "album",
+        file_id: "album-file",
+      });
+      assertEquals(
+        target.all<{ payload: string }>(
+          "SELECT payload FROM import_archives WHERE source_table='ai_media_group_photos'",
+        )[0]!.payload.includes("historical caption"),
+        true,
+      );
       const key = target.raw.prepare("SELECT rand_key FROM saved_pics");
       key.setReadBigInts(true);
       assertEquals(key.get()!.rand_key, 191315037158113842n);
