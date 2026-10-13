@@ -50,3 +50,34 @@ Deno.test("typing aborts in-flight status on stop or request cancellation; pre-c
     assertEquals(calls, 1);
   }
 });
+
+Deno.test("a stalled typing API call times out and renewal continues without overlapping requests", async () => {
+  let calls = 0, active = 0, maxActive = 0;
+  const renewed = Promise.withResolvers<void>();
+  const telegram = {
+    sendTyping(_chatId: number, _topic?: number, signal?: AbortSignal) {
+      calls++;
+      active++;
+      maxActive = Math.max(maxActive, active);
+      if (calls === 1) {
+        return new Promise<void>((_resolve, reject) =>
+          signal!.addEventListener("abort", () => {
+            active--;
+            reject(signal!.reason);
+          }, { once: true })
+        );
+      }
+      active--;
+      renewed.resolve();
+      return Promise.resolve();
+    },
+  };
+  const stop = startTyping(telegram, -100, undefined, undefined, 0, 5);
+  try {
+    await renewed.promise;
+  } finally {
+    stop();
+  }
+  assertEquals(calls, 2);
+  assertEquals(maxActive, 1);
+});

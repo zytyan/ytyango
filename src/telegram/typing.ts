@@ -7,6 +7,7 @@ export function startTyping(
   topicId?: number,
   signal?: AbortSignal,
   intervalMs = 3000,
+  requestTimeoutMs = 2000,
 ): () => void {
   const controller = new AbortController();
   const actionSignal = signal ? AbortSignal.any([signal, controller.signal]) : controller.signal;
@@ -18,7 +19,11 @@ export function startTyping(
   const send = async () => {
     if (actionSignal.aborted) return;
     try {
-      await telegram.sendTyping(chatId, topicId, actionSignal);
+      await telegram.sendTyping(
+        chatId,
+        topicId,
+        AbortSignal.any([actionSignal, AbortSignal.timeout(requestTimeoutMs)]),
+      );
     } catch { /* Status delivery is best effort and cannot fail the AI request. */ }
     if (!actionSignal.aborted) timer = setTimeout(() => void send(), intervalMs);
   };

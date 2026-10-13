@@ -81,7 +81,12 @@ export interface TelegramPort {
   editReplyMarkup(chatId: number, messageId: number, markup: unknown): Promise<void>;
   answerCallbackQuery(id: string, options?: Record<string, unknown>): Promise<void>;
   deleteMessage(chatId: number, messageId: number): Promise<void>;
-  setReaction(chatId: number, messageId: number, emoji: string): Promise<void>;
+  setReaction(
+    chatId: number,
+    messageId: number,
+    emoji: string,
+    signal?: AbortSignal,
+  ): Promise<void>;
   getFile(fileId: string): Promise<TelegramFile>;
   downloadFile(file: TelegramFile, signal?: AbortSignal): Promise<Uint8Array>;
 }

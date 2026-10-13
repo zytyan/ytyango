@@ -59,6 +59,19 @@ Deno.test("latency correlates overlapping updates, measures session waiting, and
     assertEquals(b.transport_lag_ms, undefined);
     assertEquals(b.stages["provider.deepseek"]!.failures, 1);
     assertEquals(JSON.stringify(records).includes(error.message), false);
+    const rejected = { ok: false, error_code: 400 };
+    const returned = await traceUpdate(900003, "callback", undefined, () =>
+      latencyStage(
+        "telegram.answerCallbackQuery",
+        () => Promise.resolve(rejected),
+        (value) => !value.ok,
+      ));
+    assertEquals(returned, rejected);
+    assertEquals(
+      latencySnapshot().recent.find((t) => t.update_id === 900003)!
+        .stages["telegram.answerCallbackQuery"]!.failures,
+      1,
+    );
     assertEquals(
       latencySnapshot().active.some((t) => [900001, 900002].includes(t.update_id)),
       false,

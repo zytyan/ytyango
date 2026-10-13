@@ -123,7 +123,28 @@ export class AiService {
     return this.repository.findSessionByMessage(chatId, messageId);
   }
 
-  async handle(message: IncomingAiMessage): Promise<void> {
+  startActivity(message: IncomingAiMessage): () => void {
+    const controller = new AbortController();
+    const signal = message.signal
+      ? AbortSignal.any([message.signal, controller.signal])
+      : controller.signal;
+    const stopTyping = startTyping(this.telegram, message.chatId, message.topicId, signal);
+    if (!signal.aborted && this.repository.reactionsEnabled(message.userId)) {
+      void latencyStage("ai.reaction", () =>
+        this.telegram.setReaction(
+          message.chatId,
+          message.messageId,
+          "👀",
+          AbortSignal.any([signal, AbortSignal.timeout(2000)]),
+        )).catch(() => {});
+    }
+    return () => {
+      controller.abort();
+      stopTyping();
+    };
+  }
+
+  async handle(message: IncomingAiMessage, activityStarted = false): Promise<void> {
     if (!this.config().aiChats.includes(message.chatId)) return;
     const routing = parseSessionRouting(message.text ?? "");
     const previous = this.repository.runForRequest(message.chatId, message.messageId);
@@ -132,13 +153,13 @@ export class AiService {
       ? this.repository.getSession(previous.session_id)!
       : this.#resolveSession(message, routing);
     traceTags({ session_id: target.id, provider: target.provider, model: target.model });
-    const stopTyping = startTyping(this.telegram, message.chatId, message.topicId, message.signal);
+    const stopActivity = activityStarted ? () => {} : this.startActivity(message);
     try {
       await this.#locks.use(String(target.id), async () => {
         await this.#handleLocked(target, message);
       }, "queue.ai_session");
     } finally {
-      stopTyping();
+      stopActivity();
     }
   }
 
@@ -175,16 +196,6 @@ export class AiService {
   async #handleLocked(initialSession: AiSession, incoming: IncomingAiMessage): Promise<void> {
     const session = this.repository.getSession(initialSession.id) ?? initialSession;
     traceTags({ provider: session.provider, model: session.model });
-    try {
-      if (this.repository.reactionsEnabled(incoming.userId)) {
-        await latencyStage(
-          "ai.reaction",
-          () => this.telegram.setReaction(incoming.chatId, incoming.messageId, "👀"),
-        );
-      }
-    } catch {
-      // Reactions are best effort.
-    }
     const existing = this.repository.getRunByRequest(
       session.id,
       incoming.chatId,
@@ -296,7 +307,12 @@ export class AiService {
         );
         try {
           if (this.repository.reactionsEnabled(incoming.userId)) {
-            await this.telegram.setReaction(incoming.chatId, incoming.messageId, "😭");
+            await this.telegram.setReaction(
+              incoming.chatId,
+              incoming.messageId,
+              "😭",
+              AbortSignal.timeout(2000),
+            );
           }
         } catch {
           // Best effort.

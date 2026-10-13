@@ -248,7 +248,11 @@ export async function createApplication(
   configureBot?.(bot);
   bot.api.config.use(async (previous, method, payload, signal) => {
     if (method !== "getUpdates") {
-      return await latencyStage(`telegram.${method}`, () => previous(method, payload, signal));
+      return await latencyStage(
+        `telegram.${method}`,
+        () => previous(method, payload, signal),
+        (result) => !result.ok,
+      );
     }
     const result = await previous(method, payload, signal);
     if (result.ok && Array.isArray(result.result)) {
@@ -281,6 +285,7 @@ export async function createApplication(
   const interactions = new WeakMap<Context, Interaction>();
   const currentInteraction = (ctx: Context) => interactions.get(ctx)!;
   const shutdown = new AbortController();
+  const earlyActivity = new WeakSet<Context>();
 
   bot.use(async (ctx, next) => {
     const message = ctx.message;
@@ -312,6 +317,29 @@ export async function createApplication(
       ? "command"
       : "automatic";
     return await traceUpdate(ctx.update.update_id, kind, message?.date, next);
+  });
+
+  bot.use(async (ctx, next) => {
+    const message = ctx.message;
+    if (
+      !message || message.ephemeral_message_id ||
+      !configs.value.aiChats.includes(message.chat.id) ||
+      !isAiTrigger(
+        messageText(message),
+        identity.username,
+        message.reply_to_message?.from?.id === identity.id,
+      ) ||
+      repository.runForRequest(message.chat.id, message.message_id)?.status === "delivered"
+    ) {
+      return await next();
+    }
+    earlyActivity.add(ctx);
+    const stop = ai.startActivity({ ...toIncoming(message), signal: shutdown.signal });
+    try {
+      await next();
+    } finally {
+      stop();
+    }
   });
 
   // Outer middleware resumes after commands and traditional message handlers finish.
@@ -392,7 +420,7 @@ export async function createApplication(
       ...incoming,
       facts: [...replyFacts, ...current.facts],
       signal: shutdown.signal,
-    });
+    }, earlyActivity.has(ctx));
   });
 
   bot.use(async (ctx, next) => {

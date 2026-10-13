@@ -94,14 +94,20 @@ export function traceTags(tags: Trace["tags"]): void {
   if (trace) Object.assign(trace.tags, tags);
 }
 
-export async function latencyStage<T>(name: string, operation: () => Promise<T>): Promise<T> {
+export async function latencyStage<T>(
+  name: string,
+  operation: () => Promise<T>,
+  failedResult?: (value: T) => boolean,
+): Promise<T> {
   const trace = scope.getStore();
   if (!trace) return await operation();
   const id = trace.next++, start = performance.now();
   trace.running.set(id, { stage: name, start });
   let failed = false;
   try {
-    return await operation();
+    const result = await operation();
+    failed = failedResult?.(result) ?? false;
+    return result;
   } catch (error) {
     failed = true;
     throw error;
@@ -143,6 +149,10 @@ function summary(trace: Trace) {
 export function latencySnapshot() {
   return {
     active_count: active.size,
+    pending_dispatch_count: received.size,
+    oldest_pending_dispatch_ms: rounded(
+      Math.max(0, ...[...received.values()].map((t) => performance.now() - t.monotonic)),
+    ),
     event_loop_recent_max_lag_ms: rounded(Math.max(loopLagMs, previousLoopLagMs)),
     background: Object.fromEntries(background),
     active: [...active.values()].map(summary),

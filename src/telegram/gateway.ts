@@ -97,10 +97,21 @@ export class GrammyTelegramGateway implements TelegramPort {
     await this.bot.api.deleteMessage(chatId, messageId);
   }
 
-  async setReaction(chatId: number, messageId: number, emoji: string): Promise<void> {
-    await this.bot.api.setMessageReaction(chatId, messageId, [
-      { type: "emoji", emoji: emoji as never },
-    ]);
+  async setReaction(
+    chatId: number,
+    messageId: number,
+    emoji: string,
+    signal?: AbortSignal,
+  ): Promise<void> {
+    await this.bot.api.setMessageReaction(
+      chatId,
+      messageId,
+      [
+        { type: "emoji", emoji: emoji as never },
+      ],
+      {},
+      signal as unknown as Parameters<Bot["api"]["setMessageReaction"]>[4],
+    );
   }
 
   async getFile(fileId: string): Promise<TelegramFile> {
