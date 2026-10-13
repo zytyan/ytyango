@@ -171,6 +171,18 @@ Deno.test("delme without a callback message only acknowledges", async () => {
   }]);
 });
 
+Deno.test("delme never deletes an ephemeral message through ordinary message ID zero", async () => {
+  const { bot, calls } = await harness();
+  const update = callback(true);
+  update.callback_query!.message!.message_id = 0;
+  Object.assign(update.callback_query!.message!, { ephemeral_message_id: 88, receiver_user: user });
+  await bot.handleUpdate(update);
+  assertEquals(calls, [{
+    method: "answerCallbackQuery",
+    payload: { callback_query_id: "callback-1" },
+  }]);
+});
+
 Deno.test("CoC commands are not registered by the standalone roll feature", async () => {
   const { bot, calls } = await harness();
   for (const text of ["/cochelp", "/list_attr", "/del_attr", "/new_battle"]) {

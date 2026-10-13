@@ -66,7 +66,7 @@ export function registerRoll(
   bot.callbackQuery(DELETE_CALLBACK, async (ctx) => {
     await ctx.answerCallbackQuery();
     const message = ctx.callbackQuery.message;
-    if (message === undefined) return;
+    if (message === undefined || message.message_id === 0) return;
     await ctx.api.deleteMessage(message.chat.id, message.message_id);
     if ("reply_to_message" in message && message.reply_to_message !== undefined) {
       await ctx.api.deleteMessage(message.chat.id, message.reply_to_message.message_id);
