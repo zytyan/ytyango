@@ -29,6 +29,40 @@ import { SQL } from "./db/queries.ts";
 import { installLogging, startInnerHttp } from "./inner_http.ts";
 import { logger } from "./logging.ts";
 import { formatUsage } from "./ai/usage.ts";
+import {
+  commandMenu,
+  editMenuMarkup,
+  editMenuText,
+  incomingPrivateCommand,
+  PRIVATE_COMMANDS,
+  privateReplyOptions,
+  recordCallbackReceived,
+  replyPrivately,
+} from "./telegram/ephemeral.ts";
+import type { DownloadNotice } from "./download/notice.ts";
+
+function downloadNotice(ctx: Context): DownloadNotice {
+  return {
+    async send() {
+      const message = await replyPrivately(ctx, "正在下载，请稍等");
+      return message
+        ? { chatId: message.chat.id, messageId: message.message_id, raw: message }
+        : undefined;
+    },
+    async remove(sent) {
+      const message = sent.raw as Message;
+      if (message.ephemeral_message_id) {
+        await ctx.api.deleteEphemeralMessage(
+          message.chat.id,
+          ctx.from!.id,
+          message.ephemeral_message_id,
+        );
+      } else if (message.message_id) {
+        await ctx.api.deleteMessage(message.chat.id, message.message_id);
+      }
+    },
+  };
+}
 
 const SYSTEM_PROMPT_HELP =
   `没有找到任何System prompt，请使用 /sysprompt 提示词或使用该命令回复其他消息设置提示词。
@@ -228,8 +262,23 @@ export async function createApplication(
 
   // Outer middleware resumes after commands and traditional message handlers finish.
   bot.use(async (ctx, next) => {
+    recordCallbackReceived(ctx);
     if (!ctx.message) return await next();
     const message = ctx.message;
+    if (message.ephemeral_message_id) {
+      if (!await privateReplyOptions(ctx)) return;
+      if (!PRIVATE_COMMANDS.has(incomingPrivateCommand(message))) {
+        await replyPrivately(
+          ctx,
+          "临时输入仅支持会话查询、帮助和设置命令；AI 对话及工具结果请使用普通消息。",
+        );
+        return;
+      }
+      interactions.set(ctx, interaction(db, ctx));
+      // IDs are temporary and reusable: do not query/persist facts, sessions, albums or statistics.
+      await next();
+      return;
+    }
     if (configs.value.aiChats.includes(message.chat.id)) albums.capture(message);
     const topic = topicId(message);
     const current = interaction(db, ctx);
@@ -247,7 +296,7 @@ export async function createApplication(
       } catch (error) {
         console.warn("traditional handler failed", error);
         try {
-          await current.reply("操作失败，请稍后重新发起请求。");
+          await current.notice("操作失败，请稍后重新发起请求。");
         } catch { /* No automatic side-effect retry. */ }
         current.aiContext("traditional", "传统功能执行或交付失败。", "failure");
       }
@@ -288,7 +337,7 @@ export async function createApplication(
 
   bot.use(async (ctx, next) => {
     const message = ctx.message;
-    if (message?.from) {
+    if (message?.from && !message.ephemeral_message_id) {
       stats.record({
         chatId: message.chat.id,
         messageId: message.message_id,
@@ -321,32 +370,48 @@ export async function createApplication(
   bot.command("ai_reaction", async (ctx) => {
     const value = commandArgument(ctx.message).toLowerCase();
     if (!ctx.from || !["on", "off"].includes(value)) {
-      return await ctx.reply("用法：/ai_reaction on|off", replyOptions(ctx.message));
+      return await replyPrivately(ctx, "用法：/ai_reaction on|off", replyOptions(ctx.message));
     }
     repository.setReactions(ctx.from.id, value === "on", now());
-    await ctx.reply(`AI 表情回应已${value === "on" ? "开启" : "关闭"}`, replyOptions(ctx.message));
+    await replyPrivately(
+      ctx,
+      `AI 表情回应已${value === "on" ? "开启" : "关闭"}`,
+      replyOptions(ctx.message),
+    );
   });
 
   bot.command("sysprompt", async (ctx) => {
     const message = ctx.msg!;
     const prompt = commandArgument(message) ||
       (message.reply_to_message ? messageText(message.reply_to_message).trim() : "");
-    if (!prompt) return await ctx.reply(SYSTEM_PROMPT_HELP, replyOptions(message));
+    if (!prompt) return await replyPrivately(ctx, SYSTEM_PROMPT_HELP, replyOptions(message));
     repository.setSystemPrompt(message.chat.id, topicId(message), prompt, now());
-    await ctx.reply(`成功设置系统提示词:\n${prompt}`, replyOptions(message));
+    await replyPrivately(
+      ctx,
+      "已设置当前话题的系统提示词（影响该话题所有成员）。",
+      replyOptions(message),
+    );
   });
   bot.command("reset_sysprompt", async (ctx) => {
     repository.resetSystemPrompt(ctx.chat.id, topicId(ctx.message));
-    await ctx.reply("已恢复默认提示词", replyOptions(ctx.message));
+    await replyPrivately(
+      ctx,
+      "已恢复当前话题的默认提示词（影响该话题所有成员）。",
+      replyOptions(ctx.message),
+    );
   });
   bot.command("get_sysprompt", async (ctx) => {
     const prompt = repository.getSystemPrompt(ctx.chat.id, topicId(ctx.message)) ??
       DEFAULT_SYSTEM_PROMPT;
-    await ctx.reply(prompt, replyOptions(ctx.message));
+    await replyPrivately(ctx, prompt, replyOptions(ctx.message));
   });
   bot.command("new_session", async (ctx) => {
     ai.resetCurrent(ctx.chat.id, topicId(ctx.message));
-    await ctx.reply("已重新开始session，新建会话不会携带历史记录。", replyOptions(ctx.message));
+    await replyPrivately(
+      ctx,
+      "已重置当前话题的默认会话（影响该话题所有成员）；下一条 AI 消息开始新会话，不携带历史记录。",
+      replyOptions(ctx.message),
+    );
   });
   bot.command("session_id", async (ctx) => {
     const replied = ctx.msg!.reply_to_message;
@@ -358,10 +423,11 @@ export async function createApplication(
       : replied
       ? "您回复的消息不在会话中。"
       : "当前没有session，您可以回复特定消息来获取该消息的 session ID";
-    await ctx.reply(text, replyOptions(ctx.message));
+    await replyPrivately(ctx, text, replyOptions(ctx.message));
   });
   bot.command("session_help", async (ctx) => {
-    await ctx.reply(
+    await replyPrivately(
+      ctx,
       "会话相关帮助：\n/new_session 停止当前会话，创建新会话\n/session_id 获取当前会话ID，若回复特定消息，则获取该消息的会话ID",
       replyOptions(ctx.message),
     );
@@ -370,7 +436,7 @@ export async function createApplication(
   const showModels = async (ctx: Context) => {
     if (!ctx.message || !ctx.chat) return;
     if (!await canAdminister(ctx, configs.value.god)) {
-      await ctx.reply("只有群主或管理员可以切换模型", replyOptions(ctx.message));
+      await replyPrivately(ctx, "只有群主或管理员可以切换模型", replyOptions(ctx.message));
       return;
     }
     let sessionId = 0;
@@ -379,7 +445,11 @@ export async function createApplication(
     if (ctx.message.reply_to_message) {
       const session = ai.sessionForMessage(ctx.chat.id, ctx.message.reply_to_message.message_id);
       if (!session) {
-        await ctx.reply("被回复的消息不属于可切换的 AI 会话。", replyOptions(ctx.message));
+        await replyPrivately(
+          ctx,
+          "被回复的消息不属于可切换的 AI 会话。",
+          replyOptions(ctx.message),
+        );
         return;
       }
       sessionId = session.id;
@@ -389,7 +459,7 @@ export async function createApplication(
     const prompt = sessionId
       ? `请选择历史会话 #${sessionId} 使用的 AI 模型：`
       : "请选择当前聊天使用的 AI 模型：";
-    await ctx.reply(prompt, {
+    await replyPrivately(ctx, prompt, {
       ...replyOptions(ctx.message),
       reply_markup: modelKeyboard(current, provider, sessionId),
     });
@@ -398,12 +468,13 @@ export async function createApplication(
   bot.command("model", showModels);
   bot.command("show_usage", async (ctx) => {
     if (!await canAdminister(ctx, configs.value.god)) {
-      await ctx.reply("只有群主或管理员可以修改用量显示设置", replyOptions(ctx.message));
+      await replyPrivately(ctx, "只有群主或管理员可以修改用量显示设置", replyOptions(ctx.message));
       return;
     }
     const enabled = repository.toggleUsage(ctx.chat.id, now());
-    await ctx.reply(
-      `已${enabled ? "开启" : "关闭"} AI 回复的 Token 用量按钮。`,
+    await replyPrivately(
+      ctx,
+      `已${enabled ? "开启" : "关闭"} 当前群的 AI Token 用量按钮（影响全群）。`,
       replyOptions(ctx.message),
     );
   });
@@ -421,6 +492,7 @@ export async function createApplication(
         userId: ctx.from.id,
         userName: userLabel(ctx.message),
         signal: shutdown.signal,
+        notice: downloadNotice(ctx),
       });
       currentInteraction(ctx).aiContext(
         "download",
@@ -431,7 +503,7 @@ export async function createApplication(
       stats.increment(ctx.chat!.id, audioOnly ? "download_audio" : "download_video");
     } catch (error) {
       logger("download").warn("download failed", error);
-      await currentInteraction(ctx).reply("下载失败，请检查链接或稍后重新发起请求。");
+      await currentInteraction(ctx).notice("下载失败，请检查链接或稍后重新发起请求。");
       currentInteraction(ctx).aiContext("download", "下载失败。", "failure");
     }
   };
@@ -441,7 +513,7 @@ export async function createApplication(
   bot.command("score", async (ctx) => {
     const target = largestPhoto(ctx.msg) ? ctx.msg : ctx.msg!.reply_to_message;
     const photo = target ? largestPhoto(target) : undefined;
-    if (!target || !photo) return await ctx.reply("没有图片", replyOptions(ctx.message));
+    if (!target || !photo) return await replyPrivately(ctx, "没有图片");
     try {
       const result = await nsfw.moderate(photoInput(photo));
       const severity = result.severity;
@@ -463,7 +535,7 @@ export async function createApplication(
         sent.messageId,
       );
     } catch {
-      await currentInteraction(ctx).reply("识别失败");
+      await currentInteraction(ctx).notice("识别失败");
       currentInteraction(ctx).aiContext("score", "图片审核失败。", "failure");
     }
   });
@@ -483,7 +555,9 @@ export async function createApplication(
     currentInteraction(ctx).aiContext("statistics", "已发送昨日群统计日报。");
   });
   bot.command("chat_config", async (ctx) => {
-    await ctx.reply("当前群组的信息如下", { reply_markup: configKeyboard(stats, ctx.chat.id) });
+    await replyPrivately(ctx, "当前群组设置（修改影响全群）：", {
+      reply_markup: configKeyboard(stats, ctx.chat.id),
+    });
   });
 
   bot.on("inline_query", async (ctx) => {
@@ -630,6 +704,24 @@ export async function createApplication(
     const data = callback.data;
     const message = callback.message;
     if (!message) return await ctx.answerCallbackQuery({ text: "消息已不可用", show_alert: true });
+    if (
+      "ephemeral_message_id" in message && message.ephemeral_message_id &&
+      (!("receiver_user" in message) || message.receiver_user?.id !== ctx.from.id)
+    ) {
+      return await ctx.answerCallbackQuery({
+        text: "此临时菜单不属于你，请重新打开。",
+        show_alert: true,
+      });
+    }
+    if (
+      "ephemeral_message_id" in message && message.ephemeral_message_id &&
+      !data.startsWith("aimodel2:") && !data.startsWith("gcfg:")
+    ) {
+      return await ctx.answerCallbackQuery({
+        text: "此临时菜单操作不受支持，请重新打开。",
+        show_alert: true,
+      });
+    }
     if (data === "aiusage") {
       const usage = repository.usageForResponse(message.chat.id, message.message_id);
       await ctx.answerCallbackQuery(
@@ -674,18 +766,19 @@ export async function createApplication(
           });
         }
         repository.setSessionModel(sessionId, provider, model, now());
-        await ctx.editMessageText(
-          `历史会话 #${sessionId} 已切换到 ${option.label}；下次继续该会话时将从本地文本历史重建，不重放旧远端链。`,
-          {
-            reply_markup: modelKeyboard(model, provider, sessionId),
-          },
+        await editMenuText(
+          ctx,
+          `历史会话 #${sessionId} 已切换到 ${option.label}（影响该会话所有参与者）；下次继续时从本地历史重建。`,
+          modelKeyboard(model, provider, sessionId),
         );
       } else {
         repository.setChatModel(message.chat.id, provider, model, now());
         ai.resetCurrent(message.chat.id, topicId(message));
-        await ctx.editMessageText(`当前聊天已切换到 ${option.label}；下一条消息将开始新会话。`, {
-          reply_markup: modelKeyboard(model, provider),
-        });
+        await editMenuText(
+          ctx,
+          `当前群已切换到 ${option.label}（影响全群）；本话题下一条 AI 消息开始新会话。`,
+          modelKeyboard(model, provider),
+        );
       }
       await ctx.answerCallbackQuery({ text: `已切换到 ${option.label}` });
       return;
@@ -713,12 +806,12 @@ export async function createApplication(
           userId: ctx.from.id,
           userName: [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(" "),
           signal: shutdown.signal,
+          notice: downloadNotice(ctx),
         });
         stats.increment(message.chat.id, "download_video");
       } catch (error) {
-        await telegram.sendMessage(message.chat.id, `下载失败: ${String(error)}`, {
-          reply_parameters: { message_id: replyMessageId },
-        });
+        logger("download").warn("callback download failed", error);
+        await replyPrivately(ctx, "下载失败，请检查链接或稍后重新发起请求。");
       }
       return;
     }
@@ -764,11 +857,7 @@ export async function createApplication(
         return await ctx.answerCallbackQuery({ text: "本版本暂未上线", show_alert: true });
       }
       stats.setConfigField(message.chat.id, field, old !== "T");
-      await telegram.editReplyMarkup(
-        message.chat.id,
-        message.message_id,
-        configKeyboard(stats, message.chat.id),
-      );
+      await editMenuMarkup(ctx, configKeyboard(stats, message.chat.id));
       await ctx.answerCallbackQuery({ text: "设置已更新" });
       return;
     }
@@ -791,6 +880,8 @@ export async function createApplication(
         http = startInnerHttp(db, stats, configs.value.aiMediaPath, shutdown.signal, logging);
         albums.cleanup();
         await downloads.checkExecutables();
+        await bot.api.setMyCommands(commandMenu(true), { scope: { type: "all_group_chats" } });
+        await bot.api.setMyCommands(commandMenu(false), { scope: { type: "all_private_chats" } });
         if (configs.value.dropPendingUpdates) {
           await bot.api.getUpdates({ offset: -1, limit: 1, timeout: 0 });
         }

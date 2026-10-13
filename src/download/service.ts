@@ -2,7 +2,7 @@ import type { MainDatabase } from "../db/database.ts";
 import { Semaphore } from "../shared/concurrency.ts";
 import type { ProcessRunner, SentMessage, TelegramPort } from "../shared/types.ts";
 import { convertBilibiliLinks } from "./bilibili.ts";
-import { withDownloadNotice } from "./notice.ts";
+import { type DownloadNotice, withDownloadNotice } from "./notice.ts";
 import { isAbsolute, resolve } from "node:path";
 
 const DOWNLOAD_URL =
@@ -134,6 +134,7 @@ export interface DeliveryRequest {
   readonly userId: number;
   readonly userName: string;
   readonly signal?: AbortSignal;
+  readonly notice?: DownloadNotice;
 }
 
 export class DownloadService {
@@ -158,6 +159,8 @@ export class DownloadService {
       input.messageId,
       () => this.#deliver(input),
       input.signal,
+      1000,
+      input.notice,
     );
   }
 

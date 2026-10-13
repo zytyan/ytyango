@@ -2,6 +2,7 @@ import type { Context } from "grammy";
 import type { MainDatabase } from "./db/database.ts";
 import { SQL } from "./db/queries.ts";
 import { topicId } from "./telegram/topic.ts";
+import { replyPrivately } from "./telegram/ephemeral.ts";
 
 export interface TraditionalFact {
   feature: string;
@@ -27,6 +28,11 @@ export function interaction(db: MainDatabase, ctx: Context) {
       replyId = reply.message_id;
       return reply;
     },
+    async notice(text: string) {
+      const reply = await replyPrivately(ctx, text);
+      replyId = reply?.message_id || null;
+      return reply;
+    },
     aiContext(
       feature: string,
       text: string,
@@ -41,18 +47,20 @@ export function interaction(db: MainDatabase, ctx: Context) {
         context_text: text,
         created_at: Math.floor(Date.now() / 1000),
       };
-      db.run(
-        SQL.SaveFact,
-        feature,
-        message.chat.id,
-        topic,
-        fact.request_msg_id,
-        responseId,
-        status,
-        text,
-        fact.created_at,
-        responseId === null ? "failed" : "delivered",
-      );
+      if (!message.ephemeral_message_id) {
+        db.run(
+          SQL.SaveFact,
+          feature,
+          message.chat.id,
+          topic,
+          fact.request_msg_id,
+          responseId,
+          status,
+          text,
+          fact.created_at,
+          responseId === null ? "failed" : "delivered",
+        );
+      }
       facts.push(fact);
     },
   };

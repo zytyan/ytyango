@@ -39,7 +39,7 @@ export function toolHandlers(
       current(ctx).aiContext("calculator", `${expression} = ${result}`);
     } catch {
       if (force) {
-        await current(ctx).reply("计算失败，请检查表达式或计算范围。");
+        await current(ctx).notice("计算失败，请检查表达式或计算范围。");
         current(ctx).aiContext("calculator", "计算失败。", "failure");
       }
     }
@@ -57,7 +57,7 @@ export function toolHandlers(
       );
       current(ctx).aiContext("exchange", output);
     } catch {
-      await current(ctx).reply("汇率查询失败，请检查币种或稍后重试。");
+      await current(ctx).notice("汇率查询失败，请检查币种或稍后重试。");
       current(ctx).aiContext("exchange", "汇率查询失败。", "failure");
     }
   };
@@ -65,7 +65,7 @@ export function toolHandlers(
   bot.command("ocr", async (ctx) => {
     const target = ctx.message?.photo ? ctx.message : ctx.message?.reply_to_message;
     const photo = target?.photo?.at(-1);
-    if (!photo) return await current(ctx).reply("没有图片");
+    if (!photo) return await current(ctx).notice("没有图片");
     const result = await locks.use(photo.file_unique_id, async () => {
       const cached = ocrCache.get(photo.file_unique_id);
       if (cached !== undefined) return cached;
@@ -90,7 +90,7 @@ export function toolHandlers(
     if (!user) return;
     const photos = await ctx.api.getUserProfilePhotos(user.id, { limit: 1 });
     const photo = photos.photos[0]?.at(-1);
-    if (!photo) return await current(ctx).reply("该用户没有可用头像");
+    if (!photo) return await current(ctx).notice("该用户没有可用头像");
     await locks.use(`prpr:${photo.file_unique_id}`, async () => {
       const cached = db.get<{ prpr_file_id: string }>(SQL.GetPrprCache, photo.file_unique_id);
       const sticker = cached?.prpr_file_id ??
@@ -117,7 +117,7 @@ export function toolHandlers(
       : target?.document?.mime_type === "image/webp"
       ? target.document.file_id
       : undefined;
-    if (!id) return await current(ctx).reply("请回复静态 WebP 表情或文件");
+    if (!id) return await current(ctx).notice("请回复静态 WebP 表情或文件");
     const sent = await ctx.replyWithDocument(
       new InputFile(await webpToPng(await bytes(id)), "image.png"),
       {

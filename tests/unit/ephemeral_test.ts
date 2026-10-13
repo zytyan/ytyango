@@ -1,0 +1,92 @@
+import { assertEquals, assertRejects } from "@std/assert";
+import { Bot, Context } from "grammy";
+import type { Update, UserFromGetMe } from "grammy/types";
+import {
+  commandMenu,
+  privateReplyOptions,
+  recordCallbackReceived,
+  replyPrivately,
+} from "../../src/telegram/ephemeral.ts";
+
+Deno.test("ephemeral command declarations preserve public tools and private chat commands", () => {
+  const groups = commandMenu(true), privateChats = commandMenu(false);
+  assertEquals(groups.length, 21);
+  assertEquals(new Set(groups.map((c) => c.command)).size, groups.length);
+  for (const name of ["roll", "calc", "ocr", "downloadvideo", "downloadaudio", "getrank"]) {
+    assertEquals(groups.find((c) => c.command === name)!.is_ephemeral, false);
+  }
+  assertEquals(groups.find((c) => c.command === "session_help")!.is_ephemeral, true);
+  assertEquals(privateChats.every((c) => c.is_ephemeral === false), true);
+});
+
+Deno.test("callback eligibility expires after 15 seconds; expiry cannot publish a private menu response", async () => {
+  const bot = new Bot("fake");
+  const user = { id: 7, is_bot: false, first_name: "user" } as const;
+  const me = { id: 99, is_bot: true, first_name: "bot", username: "test_bot" } as const;
+  bot.api.config.use((_previous, method) => {
+    assertEquals(method, "getChatMember");
+    return Promise.resolve(
+      { ok: true, result: { user: me, status: "member" } } as Awaited<ReturnType<typeof _previous>>,
+    );
+  });
+  const context = (privateMenu: boolean) =>
+    new Context(
+      {
+        update_id: 1,
+        callback_query: {
+          id: "1234",
+          from: user,
+          chat_instance: "test",
+          data: "x",
+          message: {
+            message_id: privateMenu ? 0 : 2,
+            date: 1,
+            chat: { id: -100, type: "supergroup", title: "test" },
+            ...(privateMenu ? { ephemeral_message_id: 3, receiver_user: user } : {}),
+          },
+        },
+      } as Update,
+      bot.api,
+      me as UserFromGetMe,
+    );
+  const normal = context(false), hidden = context(true);
+  recordCallbackReceived(normal);
+  recordCallbackReceived(hidden);
+  assertEquals(await privateReplyOptions(normal), {
+    ephemeral_message_parameters: { receiver_user_id: 7, callback_query_id: "1234" },
+  });
+  const expired = Date.now() + 16_000;
+  assertEquals(await privateReplyOptions(normal, expired), {});
+  assertEquals(await privateReplyOptions(hidden, expired), undefined);
+});
+
+Deno.test("an ambiguous ephemeral send failure is never retried or sent publicly", async () => {
+  const bot = new Bot("fake");
+  const me = { id: 99, is_bot: true, first_name: "bot", username: "test_bot" } as const;
+  let sends = 0;
+  bot.api.config.use((_previous, method, payload) => {
+    assertEquals(method, "sendMessage");
+    assertEquals((payload as Record<string, unknown>).ephemeral_message_parameters, {
+      receiver_user_id: 7,
+    });
+    sends++;
+    return Promise.reject(new Error("response lost"));
+  });
+  const ctx = new Context(
+    {
+      update_id: 1,
+      message: {
+        message_id: 0,
+        ephemeral_message_id: 3,
+        date: Math.floor(Date.now() / 1000),
+        from: { id: 7, is_bot: false, first_name: "user" },
+        chat: { id: -100, type: "supergroup", title: "test" },
+        text: "/session_help",
+      },
+    } as Update,
+    bot.api,
+    me as UserFromGetMe,
+  );
+  await assertRejects(() => replyPrivately(ctx, "private detail"), Error, "response lost");
+  assertEquals(sends, 1);
+});

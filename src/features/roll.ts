@@ -1,3 +1,4 @@
+import { replyPrivately } from "../telegram/ephemeral.ts";
 import { randomInt } from "node:crypto";
 import { type Bot, type Context, InlineKeyboard } from "grammy";
 
@@ -49,10 +50,10 @@ export function registerRoll(
     try {
       text = roll(args);
     } catch {
-      const response = await ctx.reply("随机数范围无效或过大", {
-        reply_parameters: { message_id: ctx.msg.message_id },
-      });
-      record?.(ctx, "随机数范围无效或过大", "failure", response.message_id);
+      const response = await replyPrivately(ctx, "随机数范围无效或过大");
+      if (response?.message_id) {
+        record?.(ctx, "随机数范围无效或过大", "failure", response.message_id);
+      }
       return;
     }
     const response = await ctx.reply(text, {

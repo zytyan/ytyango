@@ -27,6 +27,9 @@ async function harness(failDeletion = false) {
     calls.push({ method, payload: JSON.parse(JSON.stringify(payload)) });
     let result: unknown;
     switch (method) {
+      case "getChatMember":
+        result = { user: botUser, status: "member" };
+        break;
       case "sendMessage":
         result = { message_id: 88, date: 1, chat, from: botUser, text: "Test reply" };
         break;
@@ -110,6 +113,9 @@ Deno.test("/roll Telegram invalid range returns a user-facing error", async () =
   const { bot, calls } = await harness();
   await bot.handleUpdate(command("/roll 0"));
   assertEquals(calls, [{
+    method: "getChatMember",
+    payload: { chat_id: chat.id, user_id: botUser.id },
+  }, {
     method: "sendMessage",
     payload: {
       chat_id: chat.id,

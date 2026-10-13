@@ -18,6 +18,31 @@ Deno.test("fast downloads skip the wait notice", async () => {
   assertEquals(calls, 0);
 });
 
+Deno.test("private download notices use the ephemeral ID for cleanup without deleting message zero", async () => {
+  const started = Promise.withResolvers<void>(), download = Promise.withResolvers<number>();
+  let removed = 0;
+  const telegram = {
+    sendMessage: () => Promise.reject(new Error("public notice forbidden")),
+    deleteMessage: () => Promise.reject(new Error("ordinary deletion forbidden")),
+  };
+  const message = { chatId: -100, messageId: 0, raw: { ephemeral_message_id: 9 } };
+  const result = withDownloadNotice(telegram, -100, 7, () => download.promise, undefined, 0, {
+    send() {
+      started.resolve();
+      return Promise.resolve(message);
+    },
+    remove(sent) {
+      assertEquals(sent, message);
+      removed++;
+      return Promise.resolve();
+    },
+  });
+  await started.promise;
+  download.resolve(42);
+  assertEquals(await result, 42);
+  assertEquals(removed, 1);
+});
+
 Deno.test("slow download notices retain reply identity and clean up even after failure or a late send", async () => {
   for (const fails of [false, true]) {
     const started = Promise.withResolvers<void>();
