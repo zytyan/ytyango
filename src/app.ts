@@ -28,6 +28,7 @@ import { albumIndex } from "./ai/albums.ts";
 import { SQL } from "./db/queries.ts";
 import { installLogging, startInnerHttp } from "./inner_http.ts";
 import { logger } from "./logging.ts";
+import { formatUsage } from "./ai/usage.ts";
 
 const SYSTEM_PROMPT_HELP =
   `没有找到任何System prompt，请使用 /sysprompt 提示词或使用该命令回复其他消息设置提示词。
@@ -180,25 +181,6 @@ async function canAdminister(ctx: Context, god: number): Promise<boolean> {
   if (ctx.from.id === god || ctx.chat.type === "private") return true;
   const member = await ctx.api.getChatMember(ctx.chat.id, ctx.from.id);
   return member.status === "administrator" || member.status === "creator";
-}
-
-function formatUsage(usage: Record<string, unknown>): string {
-  const value = (name: string) => Number(usage[name] ?? 0);
-  const count = value("input_message_count");
-  const messages = count > 0
-    ? `${count}（${value("input_first_msg_id")}-${value("input_last_msg_id")}）`
-    : "未记录";
-  const expire = value("cache_expire_at")
-    ? new Date(value("cache_expire_at") * 1000).toLocaleString("zh-CN", {
-      timeZone: "Asia/Shanghai",
-    })
-    : "无显式缓存";
-  const text = `ID: ${value("session_id")}\n消息: ${messages}\n模型: ${
-    String(usage.model)
-  }\n输入: ${(value("input_tokens") / 1000).toFixed(2)} ktoken\n输出: ${
-    (value("output_tokens") / 1000).toFixed(2)
-  } ktoken\n缓存: ${(value("cached_input_tokens") / 1000).toFixed(2)} ktoken\n缓存到期：${expire}`;
-  return [...text].length <= 200 ? text : `${[...text].slice(0, 199).join("")}…`;
 }
 
 export interface Application {

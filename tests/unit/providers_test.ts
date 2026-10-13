@@ -434,6 +434,26 @@ Deno.test("cancelling retry backoff sends no further generation attempts", async
   assertEquals([calls, waits], [1, 1]);
 });
 
+Deno.test("native Gemini usage includes tool-use prompts and adds reasoning only once", async () => {
+  const body = nativeResponse();
+  const mock = intercepted(() =>
+    json({
+      ...body,
+      usageMetadata: {
+        promptTokenCount: 5210,
+        toolUsePromptTokenCount: 4194,
+        candidatesTokenCount: 283,
+        thoughtsTokenCount: 305,
+        totalTokenCount: 9992,
+      },
+    })
+  );
+  const result = await mock.generate(request([user()], { provider: "sub2api" }));
+  assertEquals(result.usage.inputTokens, 9404);
+  assertEquals(result.usage.outputTokens, 588);
+  assertEquals(result.usage.thinkingTokens, 305);
+});
+
 Deno.test("SDK round-trips Gemini provider-executed code results without local tool execution", async () => {
   const wire = {
     ...nativeResponse(),

@@ -1,6 +1,11 @@
 -- name: GetReactions
 SELECT reactions_enabled FROM ai_user_settings WHERE user_id=?;
 
+-- name: UsageForResponse
+SELECT session_id,provider,model,input_tokens,output_tokens,cached_input_tokens,
+input_message_count,input_first_msg_id,input_last_msg_id,cache_expire_at,raw_payload
+FROM ai_runs WHERE response_chat_id=? AND response_msg_id=? AND status='delivered';
+
 -- name: SetReactions
 INSERT INTO ai_user_settings(user_id,reactions_enabled,updated_at) VALUES(?,?,?)
 ON CONFLICT(user_id) DO UPDATE SET reactions_enabled=excluded.reactions_enabled,updated_at=excluded.updated_at;

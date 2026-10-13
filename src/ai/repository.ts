@@ -491,9 +491,7 @@ ON CONFLICT(chat_id,topic_id) DO UPDATE SET prompt=excluded.prompt,updated_at=ex
 
   usageForResponse(chatId: number, messageId: number): Record<string, unknown> | undefined {
     return this.db.get<Record<string, unknown>>(
-      `SELECT r.session_id,r.model,r.input_tokens,r.output_tokens,
-r.cached_input_tokens,r.input_message_count,r.input_first_msg_id,r.input_last_msg_id,r.cache_expire_at
-FROM ai_runs r WHERE r.response_chat_id=? AND r.response_msg_id=? AND r.status='delivered'`,
+      SQL.UsageForResponse,
       chatId,
       messageId,
     );
