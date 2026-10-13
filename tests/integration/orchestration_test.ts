@@ -171,6 +171,14 @@ Deno.test("traditional commands precede explicit AI, saved facts are user contex
     );
     await app.bot.handleUpdate(update(908, "outside topic", forumAnswer));
     assertEquals(modelCalls, 8);
+    await app.bot.handleUpdate(update(909, "@test_bot see documentation", undefined, {
+      entities: [{ type: "text_link", offset: 14, length: 13, url: "https://example.com/manual" }],
+    }));
+    assertEquals(modelCalls, 9);
+    assertStringIncludes(JSON.stringify(lastBody.contents), "https://example.com/manual");
+    await app.bot.handleUpdate(update(910, "continue link discussion", sent.at(-1)!));
+    assertEquals(modelCalls, 10);
+    assertStringIncludes(JSON.stringify(lastBody.contents), "https://example.com/manual");
     app.flush();
   } finally {
     globalThis.fetch = originalFetch;

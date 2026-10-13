@@ -21,6 +21,7 @@ import { toolHandlers } from "./features/tool_handlers.ts";
 import { type ConfigField, StatsService } from "./stats/service.ts";
 import { GrammyTelegramGateway } from "./telegram/gateway.ts";
 import { topicId } from "./telegram/topic.ts";
+import { messageMarkdown } from "./telegram/markdown.ts";
 import { registerRoll } from "./features/roll.ts";
 import { type Interaction, interaction, isAiTrigger, type TraditionalFact } from "./interaction.ts";
 import { albumIndex } from "./ai/albums.ts";
@@ -123,7 +124,7 @@ function toIncoming(message: Message, withReply = true): IncomingAiMessage {
       ? [from.first_name, from.last_name].filter(Boolean).join(" ")
       : message.sender_chat?.title ?? "未知用户",
     atableUsername: from?.username,
-    text: messageText(message) || message.sticker?.emoji ||
+    text: messageMarkdown(message) || message.sticker?.emoji ||
       (message.sticker ? "[贴纸]" : undefined),
     reply: withReply && message.reply_to_message
       ? toIncoming(message.reply_to_message, false)
