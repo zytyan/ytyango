@@ -3,48 +3,119 @@ import { BoundedCache, KeyedMutex } from "../shared/concurrency.ts";
 
 const aliases: Record<string, string> = { RMB: "CNY", NTD: "TWD", SKW: "KRW" };
 export function parseExchange(text: string) {
-  const match = /^(\d+(?:\.\d+)?)\s*([a-z]{3})\s*(?:(?:to)?\s*([a-z]{3}))?$/i.exec(text.trim());
-  if (!match) return undefined;
+  const value = text.trim();
+  const match = /^(\d+(?:\.\d+)?)\s*([a-z]{3})\s*(?:(?:to)?\s*([a-z]{3}))?$/i.exec(value) ??
+    /^(\d+(?:\.\d+)?)\s*([a-z0-9]{2,12})(?:\s+(?:to\s+)?([a-z0-9]{2,12}))?$/i.exec(value);
+  if (!match || !/[a-z]/i.test(match[2]!) || (match[3] && !/[a-z]/i.test(match[3]))) {
+    return undefined;
+  }
+  const amount = Number(match[1]);
+  if (!Number.isFinite(amount)) return undefined;
   const currency = (value: string) => aliases[value.toUpperCase()] ?? value.toUpperCase();
-  return { amount: Number(match[1]), from: currency(match[2]!), to: currency(match[3] ?? "CNY") };
+  return { amount, from: currency(match[2]!), to: currency(match[3] ?? "CNY") };
 }
-const rateCache = new BoundedCache<string, { rates: Record<string, number>; updated: number }>(
-  20,
-  3600_000,
-);
+
+export type ExchangeUpdate = { precision: "day"; date: string } | {
+  precision: "second";
+  unix: number;
+};
+const localTime = (milliseconds: number) =>
+  new Date(milliseconds + 8 * 3600_000).toISOString().slice(0, 19).replace("T", " ");
+export function formatExchangeUpdate(updated: ExchangeUpdate | undefined): string {
+  if (!updated) return "";
+  if (updated.precision === "second") {
+    return `汇率更新于：${localTime(updated.unix * 1000)}（UTC+8）`;
+  }
+  const start = Date.parse(`${updated.date}T00:00:00Z`);
+  return `汇率更新于：${localTime(start)} 至 ${
+    localTime(start + 86400_000)
+  } 前（UTC+8，来源仅精确到日）`;
+}
+
+interface ExchangeRates {
+  rates: Record<string, number>;
+  updated: ExchangeUpdate;
+}
+const rateCache = new BoundedCache<string, ExchangeRates>(20, 3600_000);
 const locks = new KeyedMutex();
+const sources = ["cdn", "cloudflare", "legacy"] as const;
+async function exchangeRates(
+  source: typeof sources[number],
+  from: string,
+  fetcher: typeof fetch,
+): Promise<ExchangeRates> {
+  const key = `${source}:${from}`;
+  return await locks.use(key, async () => {
+    const cached = rateCache.get(key);
+    if (cached) return cached;
+    const code = from.toLowerCase();
+    const url = source === "cdn"
+      ? `https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/${code}.min.json`
+      : source === "cloudflare"
+      ? `https://latest.currency-api.pages.dev/v1/currencies/${code}.min.json`
+      : `https://open.er-api.com/v6/latest/${from}`;
+    const response = await fetcher(url, { signal: AbortSignal.timeout(10_000) });
+    if (!response.ok) {
+      await response.body?.cancel();
+      throw new Error("汇率服务暂时不可用");
+    }
+    const body = await response.json() as Record<string, unknown>;
+    let updated: ExchangeUpdate;
+    if (source === "legacy") {
+      const unix = body.time_last_update_unix;
+      if (
+        body.result !== "success" || typeof unix !== "number" || unix <= 0 ||
+        !Number.isFinite(unix) || !Number.isFinite(new Date(unix * 1000).getTime())
+      ) throw new Error("汇率更新时间无效");
+      updated = { precision: "second", unix };
+    } else {
+      const date = body.date;
+      if (
+        typeof date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(date) ||
+        !Number.isFinite(Date.parse(`${date}T00:00:00Z`)) ||
+        new Date(`${date}T00:00:00Z`).toISOString().slice(0, 10) !== date
+      ) throw new Error("汇率更新日期无效");
+      updated = { precision: "day", date };
+    }
+    const raw = source === "legacy" ? body.rates : body[code];
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new Error("汇率响应无效");
+    const rates: Record<string, number> = {};
+    for (const [currency, rate] of Object.entries(raw)) {
+      if (typeof rate === "number" && Number.isFinite(rate) && rate > 0) {
+        rates[currency.toUpperCase()] = rate;
+      }
+    }
+    if (!Object.keys(rates).length) throw new Error("汇率响应无效");
+    const result = { rates, updated };
+    rateCache.set(key, result);
+    return result;
+  });
+}
 export async function exchange(
   request: NonNullable<ReturnType<typeof parseExchange>>,
   fetcher: typeof fetch = fetch,
 ) {
-  return await locks.use(request.from, async () => {
-    if (request.from === request.to) {
-      return { ...request, result: request.amount, updated: Math.floor(Date.now() / 1000) };
+  if (
+    !Number.isFinite(request.amount) ||
+    !/^[A-Z0-9]{2,12}$/.test(request.from) || !/^[A-Z0-9]{2,12}$/.test(request.to)
+  ) throw new Error("汇率请求无效");
+  if (request.from === request.to) {
+    return { ...request, result: request.amount, updated: undefined };
+  }
+  for (const source of sources) {
+    let data: ExchangeRates;
+    try {
+      data = await exchangeRates(source, request.from, fetcher);
+    } catch {
+      continue;
     }
-    let cached = rateCache.get(request.from);
-    if (!cached) {
-      const response = await fetcher(
-        `https://open.er-api.com/v6/latest/${encodeURIComponent(request.from)}`,
-        { signal: AbortSignal.timeout(10_000) },
-      );
-      if (!response.ok) throw new Error("汇率服务暂时不可用");
-      const body = await response.json() as {
-        result: string;
-        rates: Record<string, number>;
-        time_last_update_unix: number;
-      };
-      if (
-        body.result !== "success" || !body.rates || !Number.isFinite(body.time_last_update_unix)
-      ) throw new Error("汇率响应无效");
-      cached = { rates: body.rates, updated: body.time_last_update_unix };
-      rateCache.set(request.from, cached);
-    }
-    const rate = cached.rates[request.to];
-    if (rate === undefined || !Number.isFinite(rate) || rate <= 0) throw new Error("不支持该币种");
+    const rate = data.rates[request.to];
+    if (rate === undefined) continue;
     const result = request.amount * rate;
     if (!Number.isFinite(result)) throw new Error("金额过大");
-    return { ...request, result, updated: cached.updated };
-  });
+    return { ...request, result, updated: data.updated };
+  }
+  throw new Error("不支持该币种或汇率服务暂时不可用");
 }
 export async function ocr(
   bytes: Uint8Array,

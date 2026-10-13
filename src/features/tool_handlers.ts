@@ -7,7 +7,7 @@ import { BoundedCache, KeyedMutex, Semaphore } from "../shared/concurrency.ts";
 import type { TelegramPort } from "../shared/types.ts";
 import { calculate, formatCalculation, isCalculation } from "./calculator.ts";
 import { fish, isFish, prpr, webpToPng } from "./images.ts";
-import { exchange, ocr, parseExchange } from "./tools.ts";
+import { exchange, formatExchangeUpdate, ocr, parseExchange } from "./tools.ts";
 
 export function toolHandlers(
   bot: Bot,
@@ -52,10 +52,9 @@ export function toolHandlers(
       const output = `${request.amount.toFixed(4)} ${request.from} = ${
         result.result.toFixed(4)
       } ${request.to}`;
-      await current(ctx).reply(
-        `${output}\n汇率更新于：${new Date(result.updated * 1000).toISOString()}`,
-      );
-      current(ctx).aiContext("exchange", output);
+      const reply = [output, formatExchangeUpdate(result.updated)].filter(Boolean).join("\n");
+      await current(ctx).reply(reply);
+      current(ctx).aiContext("exchange", reply);
     } catch {
       await current(ctx).notice("汇率查询失败，请检查币种或稍后重试。");
       current(ctx).aiContext("exchange", "汇率查询失败。", "failure");
