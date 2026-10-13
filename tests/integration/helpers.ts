@@ -30,6 +30,10 @@ export class FakeTelegram implements TelegramPort {
     { method: string; media?: UploadSource; options?: Record<string, unknown> }
   > = [];
   readonly fileBytes = new Uint8Array([1, 2, 3]);
+  sendTyping(_chatId: number, topicId?: number): Promise<void> {
+    this.calls.push({ method: "typing", options: topicId ? { message_thread_id: topicId } : {} });
+    return Promise.resolve();
+  }
   #id = 100;
 
   #sent(raw: unknown = {}): SentMessage {

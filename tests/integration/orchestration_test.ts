@@ -13,6 +13,7 @@ Deno.test("Go-compatible bot replies trigger AI after traditional commands; fact
   let nextId = 100;
   let modelCalls = 0;
   let fileDownloads = 0;
+  let typingCalls = 0;
   const sent: Message[] = [];
   let lastBody: Record<string, unknown> = {};
   globalThis.fetch = (_input, options) => {
@@ -86,6 +87,9 @@ Deno.test("Go-compatible bot replies trigger AI after traditional commands; fact
             } as Message;
             sent.push(message);
             result = message;
+          } else if (method === "sendChatAction") {
+            typingCalls++;
+            assertEquals((payload as { action: string }).action, "typing");
           } else if (!["setMessageReaction"].includes(method)) {
             throw new Error(`unexpected API ${method}`);
           }
@@ -113,9 +117,11 @@ Deno.test("Go-compatible bot replies trigger AI after traditional commands; fact
     assertEquals(temporary.db.all("SELECT * FROM ai_messages"), []);
     await app.bot.handleUpdate(update(2, "/roll 2 2"));
     assertEquals(modelCalls, 0);
+    assertEquals(typingCalls, 0);
     const traditional = sent.at(-1)!;
     await app.bot.handleUpdate(update(3, "hello", traditional));
     assertEquals(modelCalls, 1);
+    assertEquals(typingCalls, 1);
     await app.bot.handleUpdate(update(4, "@test_bot explain", traditional));
     assertEquals(modelCalls, 2);
     assertStringIncludes(JSON.stringify(lastBody.contents), "掷出了2");

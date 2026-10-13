@@ -52,6 +52,7 @@ export interface SentMessage {
 export type UploadSource = string | Uint8Array | { readonly path: string };
 
 export interface TelegramPort {
+  sendTyping(chatId: number, topicId?: number, signal?: AbortSignal): Promise<void>;
   sendMessage(
     chatId: number,
     text: string,

@@ -14,6 +14,16 @@ export class GrammyTelegramGateway implements TelegramPort {
     readonly localFileRoot = "/opt/tgbots/telegram-bot-api",
   ) {}
 
+  async sendTyping(chatId: number, topicId?: number, signal?: AbortSignal): Promise<void> {
+    await this.bot.api.sendChatAction(
+      chatId,
+      "typing",
+      topicId ? { message_thread_id: topicId } : {},
+      // Grammy's web declarations use a separate AbortSignal type with the same runtime API.
+      signal as unknown as Parameters<Bot["api"]["sendChatAction"]>[3],
+    );
+  }
+
   async sendMessage(
     chatId: number,
     text: string,

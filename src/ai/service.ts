@@ -7,6 +7,7 @@ import type { AiMessage, AiRequest, AiResult, AiSession } from "./types.ts";
 import { supportsImages } from "./types.ts";
 import { factText, type TraditionalFact } from "../interaction.ts";
 import { logger } from "../logging.ts";
+import { startTyping } from "../telegram/typing.ts";
 
 export const DEFAULT_SYSTEM_PROMPT = `这里是一个Telegram聊天 type:%CHAT_TYPE%,name:%CHAT_NAME%
 你是一个Telegram机器人，name: %BOT_NAME% username: %BOT_USERNAME%
@@ -125,12 +126,18 @@ export class AiService {
     if (!this.config().aiChats.includes(message.chatId)) return;
     const routing = parseSessionRouting(message.text ?? "");
     const previous = this.repository.runForRequest(message.chatId, message.messageId);
+    if (previous?.status === "delivered") return;
     const target = previous
       ? this.repository.getSession(previous.session_id)!
       : this.#resolveSession(message, routing);
-    await this.#locks.use(String(target.id), async () => {
-      await this.#handleLocked(target, message);
-    });
+    const stopTyping = startTyping(this.telegram, message.chatId, message.topicId, message.signal);
+    try {
+      await this.#locks.use(String(target.id), async () => {
+        await this.#handleLocked(target, message);
+      });
+    } finally {
+      stopTyping();
+    }
   }
 
   #resolveSession(message: IncomingAiMessage, routing: SessionRouting): AiSession {
