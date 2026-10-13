@@ -61,6 +61,21 @@ export function commandMenu(group: boolean): BotCommand[] {
   }));
 }
 
+export async function registerCommandMenus(api: Context["api"]): Promise<void> {
+  // Administrator scope takes precedence over all_group_chats. Replace legacy menus too.
+  for (
+    const type of [
+      "default",
+      "all_private_chats",
+      "all_group_chats",
+      "all_chat_administrators",
+    ] as const
+  ) {
+    const group = type === "all_group_chats" || type === "all_chat_administrators";
+    await api.setMyCommands(commandMenu(group), { scope: { type } });
+  }
+}
+
 /** A normal message is not a 15-second eligibility grant. Only bot admins can initiate privately. */
 export async function privateReplyOptions(
   ctx: Context,

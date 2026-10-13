@@ -5,6 +5,7 @@ import {
   commandMenu,
   privateReplyOptions,
   recordCallbackReceived,
+  registerCommandMenus,
   replyPrivately,
 } from "../../src/telegram/ephemeral.ts";
 
@@ -17,6 +18,30 @@ Deno.test("ephemeral command declarations preserve public tools and private chat
   }
   assertEquals(groups.find((c) => c.command === "session_help")!.is_ephemeral, true);
   assertEquals(privateChats.every((c) => c.is_ephemeral === false), true);
+});
+
+Deno.test("menu registration replaces stale administrator and default command overrides", async () => {
+  const bot = new Bot("fake");
+  const calls: Record<string, unknown>[] = [];
+  bot.api.config.use((_previous, method, payload) => {
+    assertEquals(method, "setMyCommands");
+    calls.push(payload as Record<string, unknown>);
+    return Promise.resolve({ ok: true, result: true } as Awaited<ReturnType<typeof _previous>>);
+  });
+  await registerCommandMenus(bot.api);
+  assertEquals(calls.length, 4);
+  assertEquals(calls.map((c) => (c.scope as { type: string }).type), [
+    "default",
+    "all_private_chats",
+    "all_group_chats",
+    "all_chat_administrators",
+  ]);
+  for (const call of calls) {
+    const group = ["all_group_chats", "all_chat_administrators"].includes(
+      (call.scope as { type: string }).type,
+    );
+    assertEquals(call.commands, commandMenu(group));
+  }
 });
 
 Deno.test("callback eligibility expires after 15 seconds; expiry cannot publish a private menu response", async () => {

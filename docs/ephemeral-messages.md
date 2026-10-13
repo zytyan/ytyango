@@ -69,3 +69,14 @@ keyboard。按钮保持既有 callback_data、接收者校验、管理员授权�
 RichMessage，更新正文和内置按钮；群开关不会仅编辑 reply_markup，
 以免原生按钮状态未更新。旧普通文字面板保留原来的文字/键盘编辑路径，私聊使用公开 RichMessage。
 本轮不新增设置副作用，也不将管理面板保存为 AI 上下文。
+
+## 菜单覆盖修复（2026-10-13）
+
+TS 前置 57375f0，封存 Go 仍为 d395a28。线上 getMyCommands 审计发现： all_group_chats 已有 21
+条命令和 11 个临时标记，但 all_chat_administrators 残留旧 10 条菜单， 优先级更高且缺少 /model
+等命令，导致管理员看不到更新。default 也残留旧菜单。 启动注册统一覆盖
+default、all_private_chats、all_group_chats、all_chat_administrators 四个范围， 其中两个群范围启用
+11 个临时命令，其他范围保留普通命令。 已检查配置群的 chat、chat_administrators 和配置 owner 的
+chat_member 范围， 以及默认/zh/en/de 语言菜单；未发现其他非空覆盖。一个失效配置群返回
+400，不能核验其专属范围。 未知用户专属范围和其他语言无法由 API 枚举，不声称全部检查完毕。
+[官方优先级](https://core.telegram.org/bots/api#determining-list-of-commands)以最先匹配的范围为准。

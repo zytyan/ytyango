@@ -30,13 +30,13 @@ import { installLogging, startInnerHttp } from "./inner_http.ts";
 import { logger } from "./logging.ts";
 import { formatUsage } from "./ai/usage.ts";
 import {
-  commandMenu,
   editMenuMarkup,
   editMenuText,
   incomingPrivateCommand,
   PRIVATE_COMMANDS,
   privateReplyOptions,
   recordCallbackReceived,
+  registerCommandMenus,
   replyMenuPrivately,
   replyPrivately,
 } from "./telegram/ephemeral.ts";
@@ -880,8 +880,7 @@ export async function createApplication(
         http = startInnerHttp(db, stats, configs.value.aiMediaPath, shutdown.signal, logging);
         albums.cleanup();
         await downloads.checkExecutables();
-        await bot.api.setMyCommands(commandMenu(true), { scope: { type: "all_group_chats" } });
-        await bot.api.setMyCommands(commandMenu(false), { scope: { type: "all_private_chats" } });
+        await registerCommandMenus(bot.api);
         if (configs.value.dropPendingUpdates) {
           await bot.api.getUpdates({ offset: -1, limit: 1, timeout: 0 });
         }
