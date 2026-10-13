@@ -4,6 +4,8 @@ import type { MainDatabase } from "./db/database.ts";
 import type { StatsService } from "./stats/service.ts";
 import { createBackup } from "./backup.ts";
 import { Semaphore } from "./shared/concurrency.ts";
+import { LOG_NAMES, logger, type LoggingControl, type LogName } from "./logging.ts";
+export { installLogging } from "./logging.ts";
 
 export function innerAddress(value = "", token = "") {
   if (value.trim().toUpperCase() === "OFF") return undefined;
@@ -16,35 +18,6 @@ export function innerAddress(value = "", token = "") {
     throw new Error("non-loopback inner HTTP requires GOYTYAN_BACKUP_TOKEN");
   }
   return { hostname: host, port: Number(url.port) };
-}
-
-export function installLogging(initial: number | (() => number)) {
-  let override: number | undefined;
-  const level = () => override ?? (typeof initial === "function" ? initial() : initial);
-  const original = {
-    debug: console.debug,
-    log: console.log,
-    info: console.info,
-    warn: console.warn,
-    error: console.error,
-  };
-  for (
-    const [name, severity] of [["debug", -4], ["log", 0], ["info", 0], ["warn", 4], [
-      "error",
-      8,
-    ]] as const
-  ) {
-    console[name] = (...args: unknown[]) => {
-      if (severity >= level()) original[name](...args);
-    };
-  }
-  return {
-    get: level,
-    set: (value: number) => {
-      override = value;
-    },
-    restore: () => Object.assign(console, original),
-  };
 }
 
 function authorized(request: Request, token: string): boolean {
@@ -93,7 +66,7 @@ export function innerHandler(options: {
   token: string;
   signal: AbortSignal;
   backupDurationMs?: number;
-  logging: { get: () => number; set: (value: number) => void };
+  logging: LoggingControl;
 }) {
   const backupSlot = new Semaphore(1), profileSlot = new Semaphore(1);
   return async (request: Request): Promise<Response> => {
@@ -124,15 +97,17 @@ export function innerHandler(options: {
         return new Response(null, { status: 200 });
       }
       if (method === "GET" && url.pathname === "/loggers") {
-        return new Response(`runtime\t${options.logging.get()}\n`);
+        return new Response(
+          LOG_NAMES.map((name) => `${name}\t${options.logging.get(name)}\n`).join(""),
+        );
       }
       if (method === "PUT" && url.pathname.startsWith("/loggers/")) {
-        const match = /^\/loggers\/runtime\/(-?\d+)$/.exec(url.pathname),
-          level = Number(match?.[1]);
-        if (!match || level < -128 || level > 127) {
+        const match = /^\/loggers\/([a-z-]+)\/(-?\d+)$/.exec(url.pathname),
+          level = Number(match?.[2]);
+        if (!match || !LOG_NAMES.includes(match[1] as LogName) || level < -128 || level > 127) {
           return new Response("invalid runtime log level", { status: 400 });
         }
-        options.logging.set(level);
+        options.logging.set(level, match[1] as LogName);
         return new Response(null, { status: 204 });
       }
       if (method === "GET" && url.pathname === "/debug/runtime") {
@@ -240,12 +215,12 @@ export function innerHandler(options: {
       }
       if (method === "GET" && url.pathname === "/") {
         return new Response(
-          "POST /mars-counter\nPOST /dio-ban\nGET /backupdb?db=main|all&media=0|1\nGET /loggers\nPUT /loggers/runtime/<level>\nGET /debug/runtime\nGET /debug/profile?seconds=1..60\nGET /debug/heap\n",
+          "POST /mars-counter\nPOST /dio-ban\nGET /backupdb?db=main|all&media=0|1\nGET /loggers\nPUT /loggers/<name>/<level>\nGET /debug/runtime\nGET /debug/profile?seconds=1..60\nGET /debug/heap\n",
         );
       }
       return new Response("not found", { status: 404 });
     } catch (error) {
-      console.error("inner HTTP request failed", url.pathname, error);
+      logger("inner-http").error("inner HTTP request failed", url.pathname, error);
       return new Response("request failed", { status: 500 });
     }
   };
@@ -314,7 +289,7 @@ export function startInnerHttp(
   stats: StatsService,
   mediaRoot: string,
   signal: AbortSignal,
-  logging: { get: () => number; set: (value: number) => void },
+  logging: LoggingControl,
 ) {
   const token = Deno.env.get("GOYTYAN_BACKUP_TOKEN") ?? "";
   const address = innerAddress(Deno.env.get("BOT_INNER_HTTP"), token);

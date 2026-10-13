@@ -27,6 +27,7 @@ import { type Interaction, interaction, isAiTrigger, type TraditionalFact } from
 import { albumIndex } from "./ai/albums.ts";
 import { SQL } from "./db/queries.ts";
 import { installLogging, startInnerHttp } from "./inner_http.ts";
+import { logger } from "./logging.ts";
 
 const SYSTEM_PROMPT_HELP =
   `没有找到任何System prompt，请使用 /sysprompt 提示词或使用该命令回复其他消息设置提示词。
@@ -444,7 +445,7 @@ export async function createApplication(
       );
       stats.increment(ctx.chat!.id, audioOnly ? "download_audio" : "download_video");
     } catch (error) {
-      console.warn("download failed", error);
+      logger("download").warn("download failed", error);
       await currentInteraction(ctx).reply("下载失败，请检查链接或稍后重新发起请求。");
       currentInteraction(ctx).aiContext("download", "下载失败。", "failure");
     }
@@ -584,7 +585,7 @@ export async function createApplication(
           return;
         }
       } catch (error) {
-        console.warn("bilibili conversion failed", error);
+        logger("download").warn("bilibili conversion failed", error);
       }
     }
     const photo = largestPhoto(message);
@@ -607,7 +608,7 @@ export async function createApplication(
             ),
         );
       } catch (error) {
-        console.warn("NSFW detection failed", error);
+        logger("moderation").warn("NSFW detection failed", error);
       }
     }
     if (
@@ -830,7 +831,7 @@ export async function createApplication(
                 parse_mode: "HTML",
               });
             } catch (error) {
-              console.error("daily statistics failed", chatId, error);
+              logger("stats").error("daily statistics failed", chatId, error);
             }
           }
         }, 30_000);

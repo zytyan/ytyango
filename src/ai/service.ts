@@ -6,6 +6,7 @@ import type { AiRepository, PendingAiMessage, RunRow, StoredAiMessage } from "./
 import type { AiMessage, AiRequest, AiResult, AiSession } from "./types.ts";
 import { supportsImages } from "./types.ts";
 import { factText, type TraditionalFact } from "../interaction.ts";
+import { logger } from "../logging.ts";
 
 export const DEFAULT_SYSTEM_PROMPT = `这里是一个Telegram聊天 type:%CHAT_TYPE%,name:%CHAT_NAME%
 你是一个Telegram机器人，name: %BOT_NAME% username: %BOT_USERNAME%
@@ -248,7 +249,17 @@ export class AiService {
           signal: incoming.signal,
         });
         this.repository.completeRun(run.id, result, Math.floor(this.clock.now().getTime() / 1000));
+        logger("ai").debug("generation completed", {
+          runId: run.id,
+          provider: session.provider,
+          model: session.model,
+        });
       } catch (error) {
+        logger("ai").warn("generation failed", {
+          runId: run.id,
+          provider: session.provider,
+          model: session.model,
+        });
         this.repository.failRun(
           run.id,
           "model_failed",
@@ -301,6 +312,7 @@ export class AiService {
         Math.floor(this.clock.now().getTime() / 1000),
       );
     } catch (error) {
+      logger("ai").warn("delivery failed", { runId: run.id });
       this.repository.failRun(
         run.id,
         "delivery_failed",

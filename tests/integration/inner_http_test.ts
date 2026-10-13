@@ -3,7 +3,39 @@ import { innerAddress, innerHandler } from "../../src/inner_http.ts";
 import { createBackup } from "../../src/backup.ts";
 import { StatsService } from "../../src/stats/service.ts";
 import { ContentAddressedMediaStore } from "../../src/ai/media_store.ts";
+import { installLogging } from "../../src/logging.ts";
 import { temporaryDatabase } from "./helpers.ts";
+
+Deno.test("inner HTTP lists and independently changes named logger levels", async () => {
+  const temporary = await temporaryDatabase();
+  const logging = installLogging(0);
+  const handler = innerHandler({
+    db: temporary.db,
+    stats: new StatsService(temporary.db),
+    mediaRoot: "unused",
+    token: "secret",
+    signal: new AbortController().signal,
+    logging,
+  });
+  const request = (path: string, method = "GET") =>
+    new Request(`http://localhost${path}`, {
+      method,
+      headers: { "X-Backup-Token": "secret" },
+    });
+  try {
+    assertEquals((await handler(request("/loggers/ai/4", "PUT"))).status, 204);
+    assertEquals(logging.get("ai"), 4);
+    assertEquals(logging.get("download"), 0);
+    const listing = await (await handler(request("/loggers"))).text();
+    assertEquals(listing.includes("ai\t4\n"), true);
+    assertEquals(listing.includes("download\t0\n"), true);
+    assertEquals((await handler(request("/loggers/unknown/4", "PUT"))).status, 400);
+    assertEquals((await handler(request("/loggers/ai/128", "PUT"))).status, 400);
+  } finally {
+    logging.restore();
+    await temporary.close();
+  }
+});
 
 Deno.test("inner HTTP authenticates every route and validates counters and log controls", async () => {
   assertEquals(innerAddress(), { hostname: "127.0.0.1", port: 4019 });
