@@ -60,7 +60,7 @@ Telegram、media、process、clock 端口。后续优先直接使用成熟库，
 ```sh
 mkdir -p run
 cp config.example.yaml run/test-config.yaml
-export YTYAN_CONFIG_FILE=/opt/tgbots/ytyanbot-ts/run/test-config.yaml
+export YTYAN_CONFIG_FILE=/opt/tgbots/ytyanbot/run/test-config.yaml
 ```
 
 支持 Go 版 YAML 字段，以及 `YTYAN_DATABASE_PATH`、`YTYAN_AI_MEDIA_PATH`、
@@ -92,7 +92,7 @@ deno task test
 deno task compile
 
 ./dist/ytyanbot-linux-x86_64 --version
-./dist/ytyanbot-linux-x86_64 db-init --database /opt/tgbots/ytyanbot-ts/run/new.db
+./dist/ytyanbot-linux-x86_64 db-init --database /opt/tgbots/ytyanbot/run/new.db
 ./dist/ytyanbot-linux-x86_64 db-check --database /path/to/ts.db --media /path/to/ai-media
 ./dist/ytyanbot-linux-x86_64 db-import --source /path/to/go.db --media /path/to/go-ai-media --output /tmp/new-import
 ./dist/ytyanbot-linux-x86_64 serve
@@ -151,3 +151,8 @@ Sub2API 模型列表可用，但当前 tiered 生成返回 404；用户已确认
 数据库规范 SQL 和一次性只读迁移见 [数据库文档](docs/database.md)， 实现 SHA、逐切片验证和实际验收见
 [基线同步记录](docs/golang-parity.md)。 CoC 人物属性、检定和战斗不进入运行时；历史数据另行归档。独立
 `/roll` 保留。 旧消息搜索与 AI memory 不重新引入。
+
+## 运行目录
+
+当前 TS 仓库及线上运行统一位于 `/opt/tgbots/ytyanbot`。旧 `ytyanbot-ts` 目录已停用，
+后续不要再从那里开发或部署。原 Go 的配置和离线数据保留在 `build/`；TS 数据位于 `run/`。

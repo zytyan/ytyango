@@ -1,5 +1,8 @@
 # Repository agent guide
 
+- The sole active checkout and runtime root is `/opt/tgbots/ytyanbot`. The former
+  `/opt/tgbots/ytyanbot-ts` directory is retired: do not develop, deploy or write there.
+
 - Continue the existing Deno/TypeScript rewrite, not the separate Node prototype.
 - Evaluate against the latest relevant Go and TS branch commits, not a historical frozen baseline.
   Record inspected SHAs for traceability, but refresh branch heads for every implementation slice.

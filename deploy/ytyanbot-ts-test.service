@@ -6,10 +6,10 @@ Wants=network-online.target
 [Service]
 Type=simple
 User=root
-WorkingDirectory=/opt/tgbots/ytyanbot-ts
+WorkingDirectory=/opt/tgbots/ytyanbot
 Environment=TZ=Asia/Shanghai
-Environment=YTYAN_CONFIG_FILE=/opt/tgbots/ytyanbot-ts/run/test-config.yaml
-ExecStart=/opt/tgbots/ytyanbot-ts/dist/ytyanbot-linux-x86_64 serve
+Environment=YTYAN_CONFIG_FILE=/opt/tgbots/ytyanbot/run/test-config.yaml
+ExecStart=/opt/tgbots/ytyanbot/dist/ytyanbot-linux-x86_64 serve
 Restart=on-failure
 RestartSec=5s
 NoNewPrivileges=true
