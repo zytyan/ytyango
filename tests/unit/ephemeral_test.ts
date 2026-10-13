@@ -23,10 +23,13 @@ Deno.test("callback eligibility expires after 15 seconds; expiry cannot publish 
   const bot = new Bot("fake");
   const user = { id: 7, is_bot: false, first_name: "user" } as const;
   const me = { id: 99, is_bot: true, first_name: "bot", username: "test_bot" } as const;
+  let admin = false;
   bot.api.config.use((_previous, method) => {
     assertEquals(method, "getChatMember");
     return Promise.resolve(
-      { ok: true, result: { user: me, status: "member" } } as Awaited<ReturnType<typeof _previous>>,
+      { ok: true, result: { user: me, status: admin ? "administrator" : "member" } } as Awaited<
+        ReturnType<typeof _previous>
+      >,
     );
   });
   const context = (privateMenu: boolean) =>
@@ -56,8 +59,14 @@ Deno.test("callback eligibility expires after 15 seconds; expiry cannot publish 
     ephemeral_message_parameters: { receiver_user_id: 7, callback_query_id: "1234" },
   });
   const expired = Date.now() + 16_000;
-  assertEquals(await privateReplyOptions(normal, expired), {});
+  assertEquals(await privateReplyOptions(normal, expired), { reply_parameters: { message_id: 2 } });
   assertEquals(await privateReplyOptions(hidden, expired), undefined);
+  admin = true;
+  Object.assign(hidden.callbackQuery!.message!, { is_topic_message: true, message_thread_id: 55 });
+  assertEquals(await privateReplyOptions(hidden, expired), {
+    message_thread_id: 55,
+    ephemeral_message_parameters: { receiver_user_id: 7 },
+  });
 });
 
 Deno.test("an ambiguous ephemeral send failure is never retried or sent publicly", async () => {

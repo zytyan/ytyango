@@ -67,9 +67,10 @@ export async function privateReplyOptions(
   now = Date.now(),
 ): Promise<PrivateReplyOptions | undefined> {
   const message = ctx.message;
+  const source = message ?? ctx.callbackQuery?.message;
   const normal: ReplyOptions = {
-    ...(message?.message_id ? { reply_parameters: { message_id: message.message_id } } : {}),
-    ...(message && topicId(message) ? { message_thread_id: topicId(message) } : {}),
+    ...(source?.message_id ? { reply_parameters: { message_id: source.message_id } } : {}),
+    ...(topicId(source) ? { message_thread_id: topicId(source) } : {}),
   };
   if (!ctx.chat || !ctx.from || !["group", "supergroup"].includes(ctx.chat.type)) return normal;
   if (ctx.from.is_bot) return message?.ephemeral_message_id ? undefined : normal;
