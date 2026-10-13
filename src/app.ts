@@ -726,6 +726,7 @@ export async function createApplication(
           messageId: replyMessageId,
           userId: ctx.from.id,
           userName: [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(" "),
+          signal: shutdown.signal,
         });
         stats.increment(message.chat.id, "download_video");
       } catch (error) {

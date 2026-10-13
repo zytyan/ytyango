@@ -2,6 +2,7 @@ import type { MainDatabase } from "../db/database.ts";
 import { Semaphore } from "../shared/concurrency.ts";
 import type { ProcessRunner, SentMessage, TelegramPort } from "../shared/types.ts";
 import { convertBilibiliLinks } from "./bilibili.ts";
+import { withDownloadNotice } from "./notice.ts";
 import { isAbsolute, resolve } from "node:path";
 
 const DOWNLOAD_URL =
@@ -151,6 +152,16 @@ export class DownloadService {
   ) {}
 
   async deliver(input: DeliveryRequest): Promise<SentMessage> {
+    return await withDownloadNotice(
+      this.telegram,
+      input.chatId,
+      input.messageId,
+      () => this.#deliver(input),
+      input.signal,
+    );
+  }
+
+  async #deliver(input: DeliveryRequest): Promise<SentMessage> {
     const cached = this.#find(input.key);
     if (cached?.file_id) {
       const sent = await this.#sendCached(cached, input);
