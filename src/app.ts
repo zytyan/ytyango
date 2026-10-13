@@ -37,6 +37,7 @@ import {
   PRIVATE_COMMANDS,
   privateReplyOptions,
   recordCallbackReceived,
+  replyMenuPrivately,
   replyPrivately,
 } from "./telegram/ephemeral.ts";
 import type { DownloadNotice } from "./download/notice.ts";
@@ -459,10 +460,7 @@ export async function createApplication(
     const prompt = sessionId
       ? `请选择历史会话 #${sessionId} 使用的 AI 模型：`
       : "请选择当前聊天使用的 AI 模型：";
-    await replyPrivately(ctx, prompt, {
-      ...replyOptions(ctx.message),
-      reply_markup: modelKeyboard(current, provider, sessionId),
-    });
+    await replyMenuPrivately(ctx, prompt, modelKeyboard(current, provider, sessionId));
   };
   bot.command("change_model", showModels);
   bot.command("model", showModels);
@@ -555,9 +553,11 @@ export async function createApplication(
     currentInteraction(ctx).aiContext("statistics", "已发送昨日群统计日报。");
   });
   bot.command("chat_config", async (ctx) => {
-    await replyPrivately(ctx, "当前群组设置（修改影响全群）：", {
-      reply_markup: configKeyboard(stats, ctx.chat.id),
-    });
+    await replyMenuPrivately(
+      ctx,
+      "当前群组设置（修改影响全群）：",
+      configKeyboard(stats, ctx.chat.id),
+    );
   });
 
   bot.on("inline_query", async (ctx) => {

@@ -25,13 +25,14 @@ async function fixture() {
       if (method === "getMe") result = botUser;
       else if (method === "getChatMember") {
         result = { user: botUser, status: admin ? "administrator" : "member" };
-      } else if (method === "sendMessage") {
+      } else if (method === "sendMessage" || method === "sendRichMessage") {
         const privateParameters = payload.ephemeral_message_parameters;
         result = {
           chat,
           date: Math.floor(Date.now() / 1000),
           from: botUser,
           text: payload.text,
+          rich_message: payload.rich_message,
           ...(privateParameters
             ? { message_id: 0, ephemeral_message_id: nextId++, receiver_user: user }
             : { message_id: nextId++ }),
@@ -65,11 +66,12 @@ async function fixture() {
       ...extra,
     },
   });
-  const menu = (privateMenu = true, receiverId = 7): Message => ({
+  const menu = (privateMenu = true, receiverId = 7, rich = false): Message => ({
     chat,
     from: botUser,
     date: Math.floor(Date.now() / 1000),
     text: "menu",
+    ...(rich ? { rich_message: { blocks: [] } } : {}),
     ...(privateMenu
       ? { message_id: 0, ephemeral_message_id: 51, receiver_user: { ...user, id: receiverId } }
       : { message_id: 51 }),
@@ -117,7 +119,9 @@ Deno.test("management replies and input errors are private; successful tools rem
       await f.app.bot.handleUpdate(
         f.update(command, { is_topic_message: true, message_thread_id: 55 }),
       );
-      const sends = f.calls.slice(before).filter((c) => c.method === "sendMessage");
+      const sends = f.calls.slice(before).filter((c) =>
+        c.method === "sendMessage" || c.method === "sendRichMessage"
+      );
       assertEquals(sends.length, 1, command);
       assertEquals(
         sends[0]!.payload.ephemeral_message_parameters,
@@ -125,6 +129,21 @@ Deno.test("management replies and input errors are private; successful tools rem
         command,
       );
       assertEquals(sends[0]!.payload.message_thread_id, 55);
+      if (["/model", "/change_model", "/chat_config"].includes(command)) {
+        assertEquals(sends[0]!.method, "sendRichMessage");
+        assertEquals(sends[0]!.payload.reply_markup, undefined);
+        const body = sends[0]!.payload.rich_message as {
+          blocks: { type: string; buttons?: { callback_data: string }[] }[];
+        };
+        assertEquals(body.blocks[0]!.type, "paragraph");
+        assertEquals(body.blocks.slice(1).every((b) => b.type === "buttons"), true);
+        assertEquals(
+          body.blocks[1]!.buttons![0]!.callback_data.startsWith(
+            command === "/chat_config" ? "gcfg:" : "aimodel2:",
+          ),
+          true,
+        );
+      }
     }
     assertEquals(f.db.all("SELECT * FROM ai_runs"), []);
     assertEquals(f.db.all("SELECT * FROM traditional_facts WHERE reply_msg_id=0"), []);
@@ -144,6 +163,38 @@ Deno.test("management replies and input errors are private; successful tools rem
     assertEquals(f.calls.at(-1)!.payload.ephemeral_message_parameters, undefined);
   } finally {
     f.app.flush();
+    await f.close();
+  }
+});
+
+Deno.test("native rich management buttons edit the whole body and retain ephemeral identity", async () => {
+  const f = await fixture();
+  try {
+    await f.app.bot.handleUpdate(f.callback("aimodel2:0:0", f.menu(true, 7, true)));
+    const model = f.calls.find((c) => c.method === "editEphemeralMessageText")!;
+    assertEquals(model.payload.ephemeral_message_id, 51);
+    assertEquals(model.payload.receiver_user_id, 7);
+    assertEquals(model.payload.reply_markup, undefined);
+    const rich = model.payload.rich_message as { blocks: { text?: string }[] };
+    assertStringIncludes(rich.blocks[0]!.text!, "影响全群");
+    const before = f.calls.length;
+    await f.app.bot.handleUpdate(f.callback("gcfg:auto_calculate:F", f.menu(true, 7, true)));
+    const config = f.calls.slice(before).find((c) => c.method === "editEphemeralMessageText")!;
+    const body = config.payload.rich_message as {
+      blocks: { buttons?: { text: string; callback_data: string }[] }[];
+    };
+    assertEquals(body.blocks[2]!.buttons![0]!.callback_data, "gcfg:auto_calculate:T");
+    assertStringIncludes(body.blocks[2]!.buttons![0]!.text, "✅");
+    assertEquals(f.calls.slice(before).some((c) => c.method.includes("ReplyMarkup")), false);
+    await f.app.bot.handleUpdate(f.callback("gcfg:auto_calculate:T", f.menu(false, 7, true)));
+    const publicEdit = f.calls.find((c) => c.method === "editMessageText")!;
+    assertEquals(publicEdit.payload.message_id, 51);
+    assertEquals(publicEdit.payload.rich_message !== undefined, true);
+    f.setAdmin(false);
+    await f.app.bot.handleUpdate(f.update("/model", { message_id: 0, ephemeral_message_id: 7 }));
+    assertEquals(f.calls.at(-1)!.method, "sendRichMessage");
+    assertEquals(f.calls.at(-1)!.payload.reply_parameters, { ephemeral_message_id: 7 });
+  } finally {
     await f.close();
   }
 });

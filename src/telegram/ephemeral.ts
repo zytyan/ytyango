@@ -121,27 +121,67 @@ export async function replyPrivately(ctx: Context, text: string, options: ReplyO
   });
 }
 
+/** Native callback buttons are part of the rich body, not a separate keyboard. */
+export function richMenu(text: string, markup: InlineKeyboardMarkup) {
+  return {
+    blocks: [
+      { type: "paragraph", text },
+      ...markup.inline_keyboard.map((row: { text: string; callback_data?: string }[]) => ({
+        type: "buttons",
+        buttons: row.map((button) => {
+          if (!button.callback_data) throw new Error("Management menus require callback buttons");
+          return { text: button.text, callback_data: button.callback_data };
+        }),
+      })),
+    ],
+  };
+}
+
+export async function replyMenuPrivately(
+  ctx: Context,
+  text: string,
+  markup: InlineKeyboardMarkup,
+) {
+  const target = await privateReplyOptions(ctx);
+  if (!target || !ctx.chat) return undefined;
+  // The pinned SDK's raw API proxy supports new Bot API methods before its types do.
+  const api = ctx.api.raw as unknown as {
+    sendRichMessage(payload: Record<string, unknown>): Promise<Message>;
+  };
+  return await api.sendRichMessage({
+    chat_id: ctx.chat.id,
+    rich_message: richMenu(text, markup),
+    ...target,
+  });
+}
+
 export async function editMenuText(
   ctx: Context,
   text: string,
   markup: InlineKeyboardMarkup,
 ): Promise<void> {
   const message = ctx.callbackQuery?.message;
+  const rich = message && "rich_message" in message && message.rich_message;
+  const options = rich ? { rich_message: richMenu(text, markup) } : { reply_markup: markup };
   if (message && "ephemeral_message_id" in message && message.ephemeral_message_id) {
     await ctx.api.editEphemeralMessageText(
       message.chat.id,
       ctx.from!.id,
       message.ephemeral_message_id,
-      text,
-      { reply_markup: markup },
+      rich ? "" : text,
+      options,
     );
   } else {
-    await ctx.editMessageText(text, { reply_markup: markup });
+    await ctx.editMessageText(rich ? "" : text, options);
   }
 }
 
 export async function editMenuMarkup(ctx: Context, markup: InlineKeyboardMarkup): Promise<void> {
   const message = ctx.callbackQuery?.message;
+  if (message && "rich_message" in message && message.rich_message) {
+    await editMenuText(ctx, "当前群组设置（修改影响全群）：", markup);
+    return;
+  }
   if (message && "ephemeral_message_id" in message && message.ephemeral_message_id) {
     await ctx.api.editEphemeralMessageReplyMarkup(
       message.chat.id,

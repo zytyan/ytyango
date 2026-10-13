@@ -57,3 +57,15 @@ message_id=0 的引用。
 
 独立删除按钮的零 ID 补充检查：TS 前置 `bd93eb5`，Go 最新头仍为上述 SHA。 公共 /roll 的 delme
 回调对临时或零 ID 消息仅确认点击，不调用普通删除接口。
+
+## RichMessage 管理面板（2026-10-13）
+
+TS 前置 59b5979；封存 Go archive/go/20261013/codex/ai-db-v2 仍为 d395a28。 模型选择和群设置改用
+sendRichMessage，正文使用 paragraph、操作使用原生 buttons block， 不是另加 inline
+keyboard。按钮保持既有 callback_data、接收者校验、管理员授权和影响范围说明。
+[官方按钮格式](https://core.telegram.org/bots/api#inputrichblockbuttons)支持原生 callback 按钮；
+[临时编辑](https://core.telegram.org/bots/api#editephemeralmessagetext)接受 rich_message。
+临时消息资格、话题和回复目标沿用既有判定，发送失败不公开补发、不重试。 新面板点击后整体编辑
+RichMessage，更新正文和内置按钮；群开关不会仅编辑 reply_markup，
+以免原生按钮状态未更新。旧普通文字面板保留原来的文字/键盘编辑路径，私聊使用公开 RichMessage。
+本轮不新增设置副作用，也不将管理面板保存为 AI 上下文。
