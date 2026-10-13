@@ -11,33 +11,23 @@ const usage = {
   input_first_msg_id: 1,
   input_last_msg_id: 5,
 };
-Deno.test("usage separates exact reported tokens, reasoning and undocumented input reference", () => {
+Deno.test("usage restores the Go layout without changing totals or showing raw diagnostics", () => {
   const alert = formatUsage({
     ...usage,
-    raw_payload: new TextEncoder().encode(JSON.stringify({
-      usage: {
-        total_input_tokens: 161,
-        total_output_tokens: 485,
-        total_thought_tokens: 624,
-        raw_prompt_token: 1129,
-      },
-    })),
+    raw_payload: JSON.stringify({ usage: { raw_prompt_token: 1129 } }),
   });
-  assertStringIncludes(alert, "输入（接口上报）: 161 Token");
-  assertStringIncludes(alert, "输出: 1109（正文485+推理624） Token");
-  assertStringIncludes(alert, "原始输入参考: 1129（口径未确认）");
-  assertStringIncludes(alert, "协议: Interactions");
-  assertEquals([...alert].length <= 200, true);
+  assertEquals(
+    alert,
+    "ID: 9\n消息: 5（1-5）\n模型: gemini-3-flash-preview\n输入: 0.16 ktoken\n输出: 1.11 ktoken\n缓存: 0.00 ktoken\n缓存到期：无显式缓存",
+  );
+  assertEquals(usage.input_tokens, 161);
 });
 
-Deno.test("legacy usage stays readable without raw metadata and primary counts fit Telegram's alert limit", () => {
-  const alert = formatUsage({
-    ...usage,
-    model: "model".repeat(40),
-    raw_payload: new Uint8Array([0]),
-    cached_input_tokens: 100,
-  });
-  assertStringIncludes(alert, "输出: 1109（含推理） Token");
-  assertStringIncludes(alert, "缓存（输入内）: 100 Token");
-  assertEquals([...alert].length <= 200, true);
+Deno.test("usage retains Shanghai cache expiry, missing history and the Unicode alert limit", () => {
+  const alert = formatUsage({ ...usage, input_message_count: 0, cache_expire_at: 1 });
+  assertStringIncludes(alert, "消息: 未记录");
+  assertStringIncludes(alert, "缓存到期：1970-01-01 08:00:01");
+  const long = formatUsage({ ...usage, model: "😀".repeat(250) });
+  assertEquals([...long].length, 200);
+  assertEquals(long.endsWith("…"), true);
 });
