@@ -13,6 +13,7 @@ import {
 } from "./messages.ts";
 import { explicitCache } from "./google_cache.ts";
 import { systemClock } from "../shared/types.ts";
+import { latencyStage, traceTags } from "../shared/latency.ts";
 
 const encoder = new TextEncoder();
 const bytes = (value: unknown) => encoder.encode(JSON.stringify(value));
@@ -61,9 +62,14 @@ export function createAiGenerator(
       const capture: typeof fetch = async (url, init) => {
         const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
         replayLegacy(body, source, mode, request.historyRebuildLossy);
-        const response = await fetcher(url, { ...init, body: JSON.stringify(body) });
+        const response = await latencyStage(
+          "provider.headers",
+          () => fetcher(url, { ...init, body: JSON.stringify(body) }),
+        );
         // Preserve original bytes, including fields the SDK does not understand.
-        raw = new Uint8Array(await response.clone().arrayBuffer());
+        raw = new Uint8Array(
+          await latencyStage("provider.body", () => response.clone().arrayBuffer()),
+        );
         return response;
       };
       const google = createGoogle({
@@ -119,6 +125,10 @@ export function createAiGenerator(
         },
       });
       const native = JSON.parse(new TextDecoder().decode(raw)) as Record<string, unknown>;
+      const responseModel = native.modelVersion ?? native.model;
+      if (typeof responseModel === "string" && /^[\w.-]{1,120}$/.test(responseModel)) {
+        traceTags({ response_model: responseModel });
+      }
       const interactionId = result.providerMetadata?.google?.interactionId;
       if (mode === "interactions" && (typeof interactionId !== "string" || !interactionId)) {
         throw new Error("Gemini Interactions API did not return an interaction id");
@@ -180,7 +190,7 @@ export function createAiGenerator(
         request.signal!.throwIfAborted();
         attempts++;
         try {
-          return await callOnce(...args);
+          return await latencyStage(`provider.${args[0]}`, () => callOnce(...args));
         } catch (error) {
           request.signal!.throwIfAborted();
           const transient = APICallError.isInstance(error) &&
@@ -189,7 +199,10 @@ export function createAiGenerator(
                 error.statusCode < 600) ||
               (error.statusCode === undefined && error.isRetryable));
           if (!transient || attempts >= 5) throw error;
-          await sleep(3000 * 1.5 ** (attempts - 1) * (0.9 + Math.random() * 0.2), request.signal);
+          await latencyStage(
+            "provider.retry_backoff",
+            () => sleep(3000 * 1.5 ** (attempts - 1) * (0.9 + Math.random() * 0.2), request.signal),
+          );
         }
       }
       throw new Error("AI generation attempt limit reached");
@@ -197,7 +210,7 @@ export function createAiGenerator(
 
     if (request.provider === "deepseek") return await call("deepseek");
     if (request.provider === "sub2api") return await call("generateContent");
-    const cache = await explicitCache(request, key, fetcher);
+    const cache = await latencyStage("ai.cache", () => explicitCache(request, key, fetcher));
     if (cache) {
       try {
         return await call("generateContent", request.messages.slice(cache.tailStart), cache.state);

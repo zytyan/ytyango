@@ -29,6 +29,17 @@ import { SQL } from "./db/queries.ts";
 import { installLogging, startInnerHttp } from "./inner_http.ts";
 import { logger } from "./logging.ts";
 import { formatUsage } from "./ai/usage.ts";
+import { isCalculation } from "./features/calculator.ts";
+import { isFish } from "./features/images.ts";
+import { parseExchange } from "./features/tools.ts";
+import {
+  backgroundTiming,
+  forgetUpdate,
+  latencyStage,
+  startLatencyMonitor,
+  traceUpdate,
+  updatesReceived,
+} from "./shared/latency.ts";
 import {
   editMenuMarkup,
   editMenuText,
@@ -235,6 +246,16 @@ export async function createApplication(
     client: { apiRoot: initial.telegramApiUrl, timeoutSeconds: 130 },
   });
   configureBot?.(bot);
+  bot.api.config.use(async (previous, method, payload, signal) => {
+    if (method !== "getUpdates") {
+      return await latencyStage(`telegram.${method}`, () => previous(method, payload, signal));
+    }
+    const result = await previous(method, payload, signal);
+    if (result.ok && Array.isArray(result.result)) {
+      updatesReceived((result.result as { update_id: number }[]).map((update) => update.update_id));
+    }
+    return result;
+  });
   await bot.init();
   const identity = bot.botInfo;
   const telegram = new GrammyTelegramGateway(bot, initial.botToken, initial.telegramApiUrl);
@@ -260,6 +281,38 @@ export async function createApplication(
   const interactions = new WeakMap<Context, Interaction>();
   const currentInteraction = (ctx: Context) => interactions.get(ctx)!;
   const shutdown = new AbortController();
+
+  bot.use(async (ctx, next) => {
+    const message = ctx.message;
+    const text = messageText(message);
+    const aiTrigger = message && configs.value.aiChats.includes(message.chat.id) &&
+      isAiTrigger(text, identity.username, message.reply_to_message?.from?.id === identity.id);
+    const possibleAutomatic = message &&
+      (message.photo || /b23\.tv|bilibili\.com|bili2233\.cn/i.test(text) || isCalculation(text) ||
+        parseExchange(text) || isFish(text));
+    const cfg = possibleAutomatic ? stats.config(message.chat.id) : undefined;
+    const automatic = message && cfg &&
+      (message.photo && cfg.autoCheckAdult ||
+        /b23\.tv|bilibili\.com|bili2233\.cn/i.test(text) && cfg.autoCvtBili ||
+        isCalculation(text) && cfg.autoCalculate || parseExchange(text) && cfg.autoExchange ||
+        isFish(text));
+    if (
+      !ctx.callbackQuery && !ctx.inlineQuery && !text.startsWith("/") && !aiTrigger && !automatic
+    ) {
+      forgetUpdate(ctx.update.update_id);
+      return await next();
+    }
+    const kind = ctx.callbackQuery
+      ? "callback"
+      : ctx.inlineQuery
+      ? "inline"
+      : aiTrigger
+      ? "ai"
+      : text.startsWith("/")
+      ? "command"
+      : "automatic";
+    return await traceUpdate(ctx.update.update_id, kind, message?.date, next);
+  });
 
   // Outer middleware resumes after commands and traditional message handlers finish.
   bot.use(async (ctx, next) => {
@@ -293,7 +346,7 @@ export async function createApplication(
     if (previous.length) current.facts.push(...previous);
     else {
       try {
-        await next();
+        await latencyStage("traditional", next);
       } catch (error) {
         console.warn("traditional handler failed", error);
         try {
@@ -318,10 +371,16 @@ export async function createApplication(
     if (!repository.runForRequest(message.chat.id, message.message_id)) {
       if (!albums.claim(message)) return;
       try {
-        const media = await albums.media(message, shutdown.signal);
+        const media = await latencyStage(
+          "album.current",
+          () => albums.media(message, shutdown.signal),
+        );
         if (media) Object.assign(incoming, { media, completeAlbum: true });
         if (replied && incoming.reply) {
-          const replyMedia = await albums.media(replied, shutdown.signal);
+          const replyMedia = await latencyStage(
+            "album.reply",
+            () => albums.media(replied, shutdown.signal),
+          );
           if (replyMedia) Object.assign(incoming.reply, { media: replyMedia, completeAlbum: true });
         }
       } catch (error) {
@@ -876,6 +935,7 @@ export async function createApplication(
       let http: Deno.HttpServer | undefined;
       let flushTimer: ReturnType<typeof setInterval> | undefined;
       let dailyTimer: ReturnType<typeof setInterval> | undefined;
+      const stopLatencyMonitor = startLatencyMonitor();
       try {
         http = startInnerHttp(db, stats, configs.value.aiMediaPath, shutdown.signal, logging);
         albums.cleanup();
@@ -886,7 +946,7 @@ export async function createApplication(
         }
         flushTimer = setInterval(() => {
           try {
-            stats.flush();
+            backgroundTiming("stats.flush", () => stats.flush());
             downloads.cleanupInline(now());
             albums.cleanup();
           } catch (error) {
@@ -923,6 +983,7 @@ export async function createApplication(
           else signal.addEventListener("abort", () => resolve(), { once: true });
         });
       } finally {
+        stopLatencyMonitor();
         clearInterval(flushTimer);
         clearInterval(dailyTimer);
         shutdown.abort();

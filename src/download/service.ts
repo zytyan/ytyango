@@ -4,6 +4,7 @@ import type { ProcessRunner, SentMessage, TelegramPort } from "../shared/types.t
 import { convertBilibiliLinks } from "./bilibili.ts";
 import { type DownloadNotice, withDownloadNotice } from "./notice.ts";
 import { isAbsolute, resolve } from "node:path";
+import { latencyStage } from "../shared/latency.ts";
 
 const DOWNLOAD_URL =
   /(?:(?:bilibili\.com|www\.bilibili\.com|b23\.tv|youtu\.be|youtube\.com)\/[a-zA-Z\d_%.~:/?#[\]@!$&'()*+,;=\-]+)/i;
@@ -177,7 +178,7 @@ export class DownloadService {
     const flightKey = this.#key(input.key);
     const running = this.#inflight.get(flightKey);
     if (running) {
-      const { record } = await running;
+      const { record } = await latencyStage("queue.download_singleflight", () => running);
       const sent = await this.#sendCached(record, input);
       this.db.run(
         "UPDATE yt_dl_results SET upload_count=upload_count+1 WHERE file_id=?",
@@ -197,7 +198,10 @@ export class DownloadService {
   async #downloadAndUpload(
     input: DeliveryRequest,
   ): Promise<{ record: DownloadRecord; response: SentMessage }> {
-    const downloaded = await this.#semaphore.use(() => this.#download(input.key, input.signal));
+    const downloaded = await this.#semaphore.use(
+      () => latencyStage("download.fetch", () => this.#download(input.key, input.signal)),
+      "queue.download",
+    );
     try {
       const probe = input.key.audioOnly
         ? {}

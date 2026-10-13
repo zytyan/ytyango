@@ -104,7 +104,11 @@ export class NsfwService {
     if (photo.width < 128 || photo.height < 128) throw new Error("image too small");
     const cached = this.#cache.get(photo.fileId);
     if (cached) return cached;
-    return await this.#rateLimit.use("cloudflare", () => this.#scoreUncached(photo));
+    return await this.#rateLimit.use(
+      "cloudflare",
+      () => latencyStage("moderation", () => this.#scoreUncached(photo)),
+      "queue.moderation",
+    );
   }
 
   async #scoreUncached(photo: NsfwPhoto): Promise<Detection> {
@@ -318,3 +322,4 @@ ORDER BY rand_key LIMIT 1`,
     }
   }
 }
+import { latencyStage } from "../shared/latency.ts";

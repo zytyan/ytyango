@@ -64,9 +64,23 @@ Deno.test("inner HTTP authenticates every route and validates counters and log c
       body: value === undefined ? undefined : JSON.stringify(value),
     });
   try {
-    for (const path of ["/", "/loggers", "/backupdb", "/debug/profile", "/mars-counter"]) {
+    for (
+      const path of [
+        "/",
+        "/loggers",
+        "/backupdb",
+        "/debug/profile",
+        "/debug/latency",
+        "/mars-counter",
+      ]
+    ) {
       assertEquals((await handler(new Request(`http://localhost${path}`))).status, 401);
     }
+    const timing = await handler(request("/debug/latency"));
+    assertEquals(timing.status, 200);
+    const snapshot = await timing.json();
+    assertEquals(Array.isArray(snapshot.active), true);
+    assertEquals(Array.isArray(snapshot.recent), true);
     assertEquals(
       (await handler(request("/mars-counter", "POST", { group_id: -100, mars_count: 9 }))).status,
       200,

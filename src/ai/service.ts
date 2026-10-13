@@ -8,6 +8,7 @@ import { supportsImages } from "./types.ts";
 import { factText, type TraditionalFact } from "../interaction.ts";
 import { logger } from "../logging.ts";
 import { startTyping } from "../telegram/typing.ts";
+import { latencyStage, traceTags } from "../shared/latency.ts";
 
 export const DEFAULT_SYSTEM_PROMPT = `这里是一个Telegram聊天 type:%CHAT_TYPE%,name:%CHAT_NAME%
 你是一个Telegram机器人，name: %BOT_NAME% username: %BOT_USERNAME%
@@ -130,11 +131,12 @@ export class AiService {
     const target = previous
       ? this.repository.getSession(previous.session_id)!
       : this.#resolveSession(message, routing);
+    traceTags({ session_id: target.id, provider: target.provider, model: target.model });
     const stopTyping = startTyping(this.telegram, message.chatId, message.topicId, message.signal);
     try {
       await this.#locks.use(String(target.id), async () => {
         await this.#handleLocked(target, message);
-      });
+      }, "queue.ai_session");
     } finally {
       stopTyping();
     }
@@ -172,9 +174,13 @@ export class AiService {
 
   async #handleLocked(initialSession: AiSession, incoming: IncomingAiMessage): Promise<void> {
     const session = this.repository.getSession(initialSession.id) ?? initialSession;
+    traceTags({ provider: session.provider, model: session.model });
     try {
       if (this.repository.reactionsEnabled(incoming.userId)) {
-        await this.telegram.setReaction(incoming.chatId, incoming.messageId, "👀");
+        await latencyStage(
+          "ai.reaction",
+          () => this.telegram.setReaction(incoming.chatId, incoming.messageId, "👀"),
+        );
       }
     } catch {
       // Reactions are best effort.
@@ -191,9 +197,21 @@ export class AiService {
         !existing && incoming.reply &&
         !this.repository.findSessionByMessage(incoming.chatId, incoming.reply.messageId)
       ) {
-        pending.push(await this.#prepareMessage(incoming.reply, true, session));
+        pending.push(
+          await latencyStage(
+            "ai.media.reply",
+            () => this.#prepareMessage(incoming.reply!, true, session),
+          ),
+        );
       }
-      if (!existing) pending.push(await this.#prepareMessage(incoming, false, session));
+      if (!existing) {
+        pending.push(
+          await latencyStage(
+            "ai.media.current",
+            () => this.#prepareMessage(incoming, false, session),
+          ),
+        );
+      }
     } catch (error) {
       await this.telegram.sendMessage(
         incoming.chatId,
@@ -206,6 +224,7 @@ export class AiService {
     }
     const now = Math.floor(this.clock.now().getTime() / 1000);
     const run = existing ?? this.repository.beginRun(session.id, pending, now);
+    traceTags({ run_id: run.id });
     if (run.status === "delivered") return;
     if (run.status === "model_failed" || run.status === "persistence_failed") {
       throw new Error(`previous AI attempt failed (${run.status})`);
@@ -215,7 +234,10 @@ export class AiService {
       result = storedResult(run);
     } else {
       try {
-        const loaded = await this.#loadMessages(session.id, pending);
+        const loaded = await latencyStage(
+          "ai.history",
+          () => this.#loadMessages(session.id, pending),
+        );
         const drop = Math.max(0, Math.ceil((loaded.length - 200) / 50) * 50);
         const window = loaded.slice(drop);
         const promptTemplate =
@@ -236,23 +258,24 @@ export class AiService {
             })),
           }, (_key, value) => value instanceof Uint8Array ? { bytes: Array.from(value) } : value),
         );
-        result = await this.generate({
-          sessionId: session.id,
-          provider: session.provider,
-          model: session.model,
-          systemPrompt: this.#renderPrompt(promptTemplate, incoming),
-          messages: window,
-          newMessages: window.filter((item) =>
-            pending.some((value) => value.message.messageId === item.messageId)
-          ),
-          historyRebuildLossy: session.historyRebuildLossy,
-          allowCodeExecution: window.every((item) =>
-            item.media.every((media) => !media.mimeType.startsWith("video/"))
-          ),
-          explicitCache: this.config().geminiExplicitCache,
-          state: this.repository.loadProviderState(session.id),
-          signal: incoming.signal,
-        });
+        result = await latencyStage("ai.generate", () =>
+          this.generate({
+            sessionId: session.id,
+            provider: session.provider,
+            model: session.model,
+            systemPrompt: this.#renderPrompt(promptTemplate, incoming),
+            messages: window,
+            newMessages: window.filter((item) =>
+              pending.some((value) => value.message.messageId === item.messageId)
+            ),
+            historyRebuildLossy: session.historyRebuildLossy,
+            allowCodeExecution: window.every((item) =>
+              item.media.every((media) => !media.mimeType.startsWith("video/"))
+            ),
+            explicitCache: this.config().geminiExplicitCache,
+            state: this.repository.loadProviderState(session.id),
+            signal: incoming.signal,
+          }));
         this.repository.completeRun(run.id, result, Math.floor(this.clock.now().getTime() / 1000));
         logger("ai").debug("generation completed", {
           runId: run.id,
@@ -297,7 +320,10 @@ export class AiService {
       };
     }
     try {
-      const response = await this.telegram.sendRichMessage(incoming.chatId, display, options);
+      const response = await latencyStage(
+        "ai.delivery",
+        () => this.telegram.sendRichMessage(incoming.chatId, display, options),
+      );
       this.repository.deliverRun(
         run.id,
         {

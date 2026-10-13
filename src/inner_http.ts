@@ -110,6 +110,9 @@ export function innerHandler(options: {
         options.logging.set(level, match[1] as LogName);
         return new Response(null, { status: 204 });
       }
+      if (method === "GET" && url.pathname === "/debug/latency") {
+        return Response.json(latencySnapshot());
+      }
       if (method === "GET" && url.pathname === "/debug/runtime") {
         return Response.json({
           runtime: "Deno",
@@ -215,7 +218,7 @@ export function innerHandler(options: {
       }
       if (method === "GET" && url.pathname === "/") {
         return new Response(
-          "POST /mars-counter\nPOST /dio-ban\nGET /backupdb?db=main|all&media=0|1\nGET /loggers\nPUT /loggers/<name>/<level>\nGET /debug/runtime\nGET /debug/profile?seconds=1..60\nGET /debug/heap\n",
+          "POST /mars-counter\nPOST /dio-ban\nGET /backupdb?db=main|all&media=0|1\nGET /loggers\nPUT /loggers/<name>/<level>\nGET /debug/runtime\nGET /debug/latency\nGET /debug/profile?seconds=1..60\nGET /debug/heap\n",
         );
       }
       return new Response("not found", { status: 404 });
@@ -306,3 +309,4 @@ export function startInnerHttp(
     innerHandler({ db, stats, mediaRoot, signal, token, logging, backupDurationMs }),
   );
 }
+import { latencySnapshot } from "./shared/latency.ts";

@@ -3,6 +3,7 @@ import { createApplication } from "../../src/app.ts";
 import { ConfigStore, parseConfig } from "../../src/config.ts";
 import { temporaryDatabase } from "./helpers.ts";
 import type { Message, Update } from "grammy/types";
+import { latencySnapshot } from "../../src/shared/latency.ts";
 
 Deno.test("Go-compatible bot replies trigger AI after traditional commands; facts remain user context", async () => {
   const temporary = await temporaryDatabase();
@@ -114,6 +115,7 @@ Deno.test("Go-compatible bot replies trigger AI after traditional commands; fact
       },
     });
     await app.bot.handleUpdate(update(1, "ordinary chat"));
+    assertEquals(latencySnapshot().recent.some((t) => t.update_id === 1), false);
     assertEquals(temporary.db.all("SELECT * FROM ai_messages"), []);
     await app.bot.handleUpdate(update(2, "/roll 2 2"));
     assertEquals(modelCalls, 0);

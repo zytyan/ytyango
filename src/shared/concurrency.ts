@@ -8,8 +8,8 @@ export class Semaphore {
     this.#limit = limit;
   }
 
-  async use<T>(operation: () => Promise<T>): Promise<T> {
-    await this.#acquire();
+  async use<T>(operation: () => Promise<T>, stage = "queue.semaphore"): Promise<T> {
+    await latencyStage(stage, () => this.#acquire());
     try {
       return await operation();
     } finally {
@@ -35,13 +35,13 @@ export class Semaphore {
 export class KeyedMutex {
   readonly #tails = new Map<string, Promise<void>>();
 
-  async use<T>(key: string, operation: () => Promise<T>): Promise<T> {
+  async use<T>(key: string, operation: () => Promise<T>, stage = "queue.mutex"): Promise<T> {
     const previous = this.#tails.get(key) ?? Promise.resolve();
     let release!: () => void;
     const current = new Promise<void>((resolve) => release = resolve);
     const tail = previous.then(() => current);
     this.#tails.set(key, tail);
-    await previous;
+    await latencyStage(stage, () => previous);
     try {
       return await operation();
     } finally {
@@ -94,3 +94,4 @@ export class SingleFlight<K, V> {
     return pending;
   }
 }
+import { latencyStage } from "./latency.ts";
