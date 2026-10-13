@@ -1,6 +1,8 @@
 import { Bot, InputFile } from "grammy";
 import type { Message } from "grammy/types";
 import type { SentMessage, TelegramFile, TelegramPort, UploadSource } from "../shared/types.ts";
+import { basename } from "node:path";
+import { pathToFileURL } from "node:url";
 
 function sent(message: Message): SentMessage {
   return { chatId: message.chat.id, messageId: message.message_id, raw: message };
@@ -145,7 +147,22 @@ export class GrammyTelegramGateway implements TelegramPort {
 
   #input(value: UploadSource): string | InputFile {
     if (typeof value === "string") return value;
-    return new InputFile(value instanceof Uint8Array ? value : value.path);
+    if (value instanceof Uint8Array) return new InputFile(value);
+    if (["localhost", "127.0.0.1", "[::1]"].includes(new URL(this.apiRoot).hostname)) {
+      // Local Bot API reads the shared file itself. Do not wrap its URI in InputFile.
+      return pathToFileURL(value.path).href;
+    }
+    // The Web build cannot read string paths; remote API uploads need a bounded stream.
+    const bytes = (async function* () {
+      using file = await Deno.open(value.path, { read: true });
+      const buffer = new Uint8Array(64 * 1024);
+      while (true) {
+        const count = await file.read(buffer);
+        if (count === null) return;
+        yield buffer.slice(0, count);
+      }
+    })();
+    return new InputFile(bytes, basename(value.path));
   }
 }
 

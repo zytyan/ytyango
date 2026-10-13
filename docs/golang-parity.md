@@ -203,3 +203,15 @@ usage、SDK 转换和会话累计；详细结论见 token-accounting.md。 输�
 topic，而非被续接历史会话的 topic。
 完成、失败、取消停止定时器并中止未完成状态请求；单请求不重叠发送，状态失败不阻止 AI。
 非触发消息、传统命令和已交付的重复请求不发送 typing。
+
+## 本地 API 下载文件发送修复（2026-10-13）
+
+TS 前置 7a118ed；封存 Go archive/go/20261013/codex/ai-db-v2 为 d395a28。 线上 B 站 bbdown-go
+下载成功，但 sendVideo 报 InputFile.toRaw TypeError， 根因为固定 grammY Web 版本不能把路径字符串作为
+InputFile 二进制来源。 按照用户要求，本机 loopback Bot API 的路径型图片/视频/音频直接发送标准
+file:// URI， 由 API 读取共享文件，不进行 multipart 上传。URI 编码保留空格、中文、百分号和 #
+的文件名语义。 文件保留至 API 成功返回，再记录 file_id、复用缓存、清理临时目录；不重试发送副作用。
+真实服务均为 tgbotapi/tgbots，PrivateTmp=no、RootDirectory 为空，能够共享 /tmp。 远端 API
+的路径型上传以 64 KiB 有界异步文件读取替代无效字符串 InputFile； 已有 file_id 与内存图片保持原路径。
+回归经过真实 grammY 请求编码，验证本地 JSON file URI、远端 multipart 字节， 以及 B
+站视频/音频交付、缓存命中、API 读文件时文件存在和完成后的临时清理。
