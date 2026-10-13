@@ -94,7 +94,10 @@ export async function privateReplyOptions(
   try {
     const member = await ctx.api.getChatMember(ctx.chat.id, ctx.me.id);
     admin = member.status === "administrator" || member.status === "creator";
-  } catch { /* Unknown rights do not grant private sending permissions. */ }
+  } catch {
+    // A failed permissions lookup must not accidentally publish a private response.
+    return undefined;
+  }
   const callbackMessage = ctx.callbackQuery?.message;
   const privateInput = message?.ephemeral_message_id ||
     (callbackMessage && "ephemeral_message_id" in callbackMessage &&

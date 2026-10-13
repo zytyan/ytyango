@@ -99,3 +99,30 @@ Deno.test("an ambiguous ephemeral send failure is never retried or sent publicly
   await assertRejects(() => replyPrivately(ctx, "private detail"), Error, "response lost");
   assertEquals(sends, 1);
 });
+
+Deno.test("unknown bot membership cannot turn a private query into a public response", async () => {
+  const bot = new Bot("fake");
+  const me = { id: 99, is_bot: true, first_name: "bot", username: "test_bot" } as const;
+  let lookups = 0;
+  bot.api.config.use((_previous, method) => {
+    assertEquals(method, "getChatMember");
+    lookups++;
+    return Promise.reject(new Error("membership unavailable"));
+  });
+  const ctx = new Context(
+    {
+      update_id: 1,
+      message: {
+        message_id: 5,
+        date: Math.floor(Date.now() / 1000),
+        from: { id: 7, is_bot: false, first_name: "user" },
+        chat: { id: -100, type: "supergroup", title: "test" },
+        text: "/get_sysprompt",
+      },
+    } as Update,
+    bot.api,
+    me as UserFromGetMe,
+  );
+  assertEquals(await replyPrivately(ctx, "private prompt"), undefined);
+  assertEquals(lookups, 1);
+});
