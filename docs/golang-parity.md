@@ -176,3 +176,13 @@ URL 经过回归；原始文本仍用于命令和触发判断， 普通聊天不
 runtime、ai、download、moderation、stats、inner-http 分别设置日志等级。 GET /loggers
 列出当前有效等级，PUT /loggers/<name>/<level> 修改单模块；未覆盖的模块继承全局及配置热重载。 AI
 日志只写 Run/provider/model 元数据，不写消息正文。诊断和备份格式仍沿用已确认的 V8/tar.gz。
+
+## 用户确认恢复 Go AI 策略（2026-10-13）
+
+刷新 Go `d395a28545701a5640d91b1ff7057bee236a3f1e`，TS 前置 `f40b78a`。
+按用户明确选择覆盖此前约定：回复任意本 bot 消息可触发，Go 子串 mention、斜杠命令排除、1000 UTF-8
+字节上限； 同群允许跨 topic 回复/会话 ID 续接，跨群仍拒绝。传统事实取被回复消息自身 topic，仍作为
+user 数据。 总生成期限 15 分钟；SDK 禁用自动重试，408/429/5xx/SDK 标记的网络错误按 Go
+式退避，生成与兼容恢复共享五次上限。 成功空结果的 payload/usage
+保留，不重复生成以免丢失已计费成功请求。Telegram 交付和传统副作用不重试。 AGENTS、AI-first 计划和
+SDK 验收记录同步更新。

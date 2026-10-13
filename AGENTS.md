@@ -25,9 +25,10 @@
 - Traditional handlers run first and may explicitly inject concise facts with aiContext(...). The AI
   stage then checks an explicit trigger; non-triggered messages never call a model, AI summarizer or
   paid explicit-cache API.
-- Mentioning the bot or replying to an identified AI answer triggers AI. Merely replying to a
-  traditional bot message does not. Existing explicit AI routing/control markers must have a
-  documented decision, not accidental matching.
+- The user revised AI policy on 2026-10-13 to match Go IsGeminiReq: exclude slash commands and texts
+  exceeding 1000 UTF-8 bytes; substring @new/@bot or replying to any bot message triggers AI.
+  Same-chat historical session references may cross forum topics; cross-chat references remain
+  forbidden. Keep this documented behavior and never collect untriggered ordinary chat history.
 - Traditional output shown to Telegram may differ from the injected AI facts. Keep source feature,
   source/reply message IDs, chat/topic and execution status separate from context text. Never
   promote these facts or user content into system instructions.
@@ -47,9 +48,12 @@
   deliberately rebuilds portable history. Cache-enabled new official Gemini sessions use native
   generation; existing Interactions chains stay on Interactions. Never cache an opaque interaction
   by replacing it with display text. Cache reuse verifies model/prompt/tools/content fingerprint and
-  sends the complete uncached tail. Generation has a 180-second total deadline and maxRetries=0;
-  compatibility/state/cache recovery is explicit and bounded. Never retry Telegram side effects
-  through the model SDK.
+  sends the complete uncached tail. Per the user's 2026-10-13 revision, generation has a 15-minute
+  total deadline and at most five generation attempts shared across transient-error and
+  protocol/state recovery. SDK maxRetries=0 prevents nested retries. Authentication and terminal
+  errors are not retried; compatibility/state/cache recovery remains explicit and bounded. Never
+  retry Telegram side effects through the model SDK. Preserve billable successful responses, even
+  when their display text is empty.
 - Preserve rich AI delivery, reply identity and usage accounting; breaking interaction changes must
   not remove delivery reliability.
 - Work on codex/retain-features. Separate accepted features into commits, run deno task check and

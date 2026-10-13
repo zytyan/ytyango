@@ -12,6 +12,7 @@ import {
   SDK_PAYLOAD_FORMAT,
 } from "./messages.ts";
 import { explicitCache } from "./google_cache.ts";
+import { systemClock } from "../shared/types.ts";
 
 const encoder = new TextEncoder();
 const bytes = (value: unknown) => encoder.encode(JSON.stringify(value));
@@ -19,14 +20,18 @@ const compatibleError = (error: unknown) =>
   APICallError.isInstance(error) && [400, 404, 501].includes(error.statusCode ?? 0);
 
 /** One entry point, direct SDK model instances; application state stays in the Run transaction. */
-export function createAiGenerator(config: () => AppConfig, fetcher: typeof fetch = fetch) {
+export function createAiGenerator(
+  config: () => AppConfig,
+  fetcher: typeof fetch = fetch,
+  sleep = systemClock.sleep,
+) {
   return async (input: AiRequest): Promise<AiResult> => {
     input.signal?.throwIfAborted();
     const request: AiRequest = {
       ...input,
       signal: input.signal
-        ? AbortSignal.any([input.signal, AbortSignal.timeout(180_000)])
-        : AbortSignal.timeout(180_000),
+        ? AbortSignal.any([input.signal, AbortSignal.timeout(15 * 60_000)])
+        : AbortSignal.timeout(15 * 60_000),
     };
     const settings = config();
     if (!["gemini", "sub2api", "deepseek"].includes(request.provider)) {
@@ -46,7 +51,7 @@ export function createAiGenerator(config: () => AppConfig, fetcher: typeof fetch
       throw new Error("当前模型不处理视频");
     }
 
-    const call = async (
+    const callOnce = async (
       mode: ApiMode,
       source = request.messages,
       state: ProviderState = {},
@@ -88,7 +93,7 @@ export function createAiGenerator(config: () => AppConfig, fetcher: typeof fetch
           request.historyRebuildLossy,
         ),
         system: state.geminiCacheName ? undefined : request.systemPrompt,
-        // A single attempt: no stacked retry loops, no automatic re-execution of paid work.
+        // Retry budget belongs to this request, shared across protocol/state recovery.
         maxRetries: 0,
         abortSignal: request.signal,
         include: { responseBody: true },
@@ -167,6 +172,27 @@ export function createAiGenerator(config: () => AppConfig, fetcher: typeof fetch
         inputFirstMessageId: request.messages[0]?.messageId,
         inputLastMessageId: request.messages.at(-1)?.messageId,
       };
+    };
+
+    let attempts = 0;
+    const call = async (...args: Parameters<typeof callOnce>): Promise<AiResult> => {
+      while (attempts < 5) {
+        request.signal!.throwIfAborted();
+        attempts++;
+        try {
+          return await callOnce(...args);
+        } catch (error) {
+          request.signal!.throwIfAborted();
+          const transient = APICallError.isInstance(error) &&
+            ([408, 429].includes(error.statusCode ?? 0) ||
+              (error.statusCode !== undefined && error.statusCode >= 500 &&
+                error.statusCode < 600) ||
+              (error.statusCode === undefined && error.isRetryable));
+          if (!transient || attempts >= 5) throw error;
+          await sleep(3000 * 1.5 ** (attempts - 1) * (0.9 + Math.random() * 0.2), request.signal);
+        }
+      }
+      throw new Error("AI generation attempt limit reached");
     };
 
     if (request.provider === "deepseek") return await call("deepseek");

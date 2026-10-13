@@ -4,7 +4,7 @@ import { ConfigStore, parseConfig } from "../../src/config.ts";
 import { temporaryDatabase } from "./helpers.ts";
 import type { Message, Update } from "grammy/types";
 
-Deno.test("traditional commands precede explicit AI, saved facts are user context, traditional replies alone do not trigger", async () => {
+Deno.test("Go-compatible bot replies trigger AI after traditional commands; facts remain user context", async () => {
   const temporary = await temporaryDatabase();
   const originalFetch = globalThis.fetch;
   const chat = { id: -100, type: "supergroup", title: "test" } as const;
@@ -115,18 +115,19 @@ Deno.test("traditional commands precede explicit AI, saved facts are user contex
     assertEquals(modelCalls, 0);
     const traditional = sent.at(-1)!;
     await app.bot.handleUpdate(update(3, "hello", traditional));
-    assertEquals(modelCalls, 0);
-    await app.bot.handleUpdate(update(4, "@test_bot explain", traditional));
     assertEquals(modelCalls, 1);
+    await app.bot.handleUpdate(update(4, "@test_bot explain", traditional));
+    assertEquals(modelCalls, 2);
     assertStringIncludes(JSON.stringify(lastBody.contents), "掷出了2");
     assertEquals(JSON.stringify(lastBody.systemInstruction).includes("掷出了2"), false);
     await app.bot.handleUpdate(update(5, "/roll 3 3 @test_bot"));
     assertEquals(modelCalls, 2);
-    assertStringIncludes(JSON.stringify(lastBody.contents), "掷出了3");
     await app.bot.handleUpdate(update(6, "continue", sent.at(-1)!));
     assertEquals(modelCalls, 3);
     assertStringIncludes(JSON.stringify(lastBody.contents), "掷出了3");
     await app.bot.handleUpdate(update(7, "/calc 1/3+1/6 @test_bot"));
+    assertEquals(modelCalls, 3);
+    await app.bot.handleUpdate(update(8, "explain this calculation", sent.at(-1)!));
     assertEquals(modelCalls, 4);
     assertStringIncludes(JSON.stringify(lastBody.contents), "1/3+1/6 = 0.5");
     const albumMessage = (id: number, caption: string) =>
@@ -157,28 +158,46 @@ Deno.test("traditional commands precede explicit AI, saved facts are user contex
     assertEquals(modelCalls, 6);
     assertEquals(fileDownloads, 6);
     const ordinaryAnswer = sent.at(-1)!;
+    const latestSession = () =>
+      temporary.db.get<{ session_id: number }>(
+        "SELECT session_id FROM ai_runs ORDER BY id DESC LIMIT 1",
+      )!.session_id;
+    const ordinarySession = latestSession();
     const forum = { is_topic_message: true, message_thread_id: 55 };
     await app.bot.handleUpdate(update(904, "cross topic", ordinaryAnswer, forum));
-    assertEquals(modelCalls, 6);
-    await app.bot.handleUpdate(update(905, "@test_bot forum conversation", undefined, forum));
     assertEquals(modelCalls, 7);
-    const forumAnswer = { ...sent.at(-1)!, ...forum };
-    await app.bot.handleUpdate(update(906, "continue forum", forumAnswer, forum));
+    assertEquals(latestSession(), ordinarySession);
+    await app.bot.handleUpdate(update(905, "@test_bot forum conversation", undefined, forum));
     assertEquals(modelCalls, 8);
+    const forumAnswer = { ...sent.at(-1)!, ...forum };
+    const forumSession = latestSession();
+    await app.bot.handleUpdate(update(906, "continue forum", forumAnswer, forum));
+    assertEquals(modelCalls, 9);
     assertStringIncludes(JSON.stringify(lastBody.contents), "forum conversation");
     await app.bot.handleUpdate(
       update(907, "wrong topic", forumAnswer, { ...forum, message_thread_id: 56 }),
     );
     await app.bot.handleUpdate(update(908, "outside topic", forumAnswer));
-    assertEquals(modelCalls, 8);
+    assertEquals(modelCalls, 11);
+    assertEquals(latestSession(), forumSession);
     await app.bot.handleUpdate(update(909, "@test_bot see documentation", undefined, {
       entities: [{ type: "text_link", offset: 14, length: 13, url: "https://example.com/manual" }],
     }));
-    assertEquals(modelCalls, 9);
+    assertEquals(modelCalls, 12);
     assertStringIncludes(JSON.stringify(lastBody.contents), "https://example.com/manual");
     await app.bot.handleUpdate(update(910, "continue link discussion", sent.at(-1)!));
-    assertEquals(modelCalls, 10);
+    assertEquals(modelCalls, 13);
     assertStringIncludes(JSON.stringify(lastBody.contents), "https://example.com/manual");
+    await app.bot.handleUpdate(
+      update(911, `@test_bot @${forumSession} resume across topic`, undefined, {
+        ...forum,
+        message_thread_id: 56,
+      }),
+    );
+    assertEquals(modelCalls, 14);
+    assertEquals(latestSession(), forumSession);
+    await app.bot.handleUpdate(update(912, "中".repeat(334), sent.at(-1)!));
+    assertEquals(modelCalls, 14);
     app.flush();
   } finally {
     globalThis.fetch = originalFetch;

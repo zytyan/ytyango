@@ -137,13 +137,11 @@ export class AiService {
     let target: AiSession | undefined;
     if (!routing.createNew && routing.explicitSessionId) {
       const explicit = this.repository.getSession(routing.explicitSessionId);
-      if (
-        explicit?.chatId === message.chatId && (explicit.topicId ?? 0) === (message.topicId ?? 0)
-      ) target = explicit;
+      if (explicit?.chatId === message.chatId) target = explicit;
     }
     if (!routing.createNew && !target && message.reply) {
       const replied = this.repository.findSessionByMessage(message.chatId, message.reply.messageId);
-      if ((replied?.topicId ?? 0) === (message.topicId ?? 0)) target = replied;
+      if (replied?.chatId === message.chatId) target = replied;
     }
     if (!routing.createNew && !target && routing.ignoreCurrent) {
       const id = this.#current.get(topicKey(message));

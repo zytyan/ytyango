@@ -110,7 +110,7 @@ function intercepted(responder: (call: Call, index: number) => Response) {
     calls.push(call);
     return Promise.resolve(responder(call, calls.length));
   };
-  return { calls, generate: createAiGenerator(() => config, fetcher) };
+  return { calls, generate: createAiGenerator(() => config, fetcher, () => Promise.resolve()) };
 }
 
 Deno.test("DeepSeek SDK preserves native payload, reasoning replay and usage exactly once", async () => {
@@ -358,10 +358,10 @@ Deno.test("Provider/model switching does not replay another provider's opaque pa
   assert(JSON.stringify(mock.calls[0]!.body).includes("portable"));
 });
 
-Deno.test("Transient errors are not retried and cancellation/missing key makes no request", async () => {
+Deno.test("Transient errors have five bounded attempts and cancellation/missing key makes no request", async () => {
   const mock = intercepted(() => json({ error: { message: "busy" } }, 503));
   await assertRejects(() => mock.generate(request([user()])));
-  assertEquals(mock.calls.length, 1);
+  assertEquals(mock.calls.length, 5);
   const abort = new AbortController();
   abort.abort(new Error("cancelled"));
   await assertRejects(
@@ -369,7 +369,7 @@ Deno.test("Transient errors are not retried and cancellation/missing key makes n
     Error,
     "cancelled",
   );
-  assertEquals(mock.calls.length, 1);
+  assertEquals(mock.calls.length, 5);
   await assertRejects(
     () =>
       createAiGenerator(() => ({ ...config, sub2apiKey: "" }))(
@@ -396,6 +396,42 @@ Deno.test("Corrupt legacy payload is rejected rather than dropping its signature
     )
   );
   assertEquals(mock.calls.length, 0);
+});
+
+Deno.test("transient recovery returns successful usage once and terminal errors do not retry", async () => {
+  for (const status of [408, 429, 503]) {
+    const mock = intercepted((_call, index) =>
+      index === 1 ? json({ error: { message: "temporary" } }, status) : json(nativeResponse())
+    );
+    const result = await mock.generate(request([user()], { provider: "sub2api" }));
+    assertEquals(mock.calls.length, 2);
+    assertEquals(result.usage.inputTokens, 11);
+    assertEquals(result.usage.outputTokens, 5);
+  }
+  for (const status of [400, 401, 403, 404]) {
+    const mock = intercepted(() => json({ error: { message: "terminal" } }, status));
+    await assertRejects(() => mock.generate(request([user()], { provider: "sub2api" })));
+    assertEquals(mock.calls.length, 1);
+  }
+});
+
+Deno.test("cancelling retry backoff sends no further generation attempts", async () => {
+  const abort = new AbortController();
+  let calls = 0, waits = 0;
+  const generate = createAiGenerator(() => config, () => {
+    calls++;
+    return Promise.resolve(json({ error: { message: "busy" } }, 503));
+  }, (_delay, signal) => {
+    waits++;
+    abort.abort(new Error("cancelled during backoff"));
+    return Promise.reject(signal!.reason);
+  });
+  await assertRejects(
+    () => generate(request([user()], { provider: "sub2api", signal: abort.signal })),
+    Error,
+    "cancelled during backoff",
+  );
+  assertEquals([calls, waits], [1, 1]);
 });
 
 Deno.test("SDK round-trips Gemini provider-executed code results without local tool execution", async () => {

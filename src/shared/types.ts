@@ -7,11 +7,18 @@ export const systemClock: Clock = {
   now: () => new Date(),
   sleep: (milliseconds, signal) =>
     new Promise((resolve, reject) => {
-      const timer = setTimeout(resolve, milliseconds);
-      signal?.addEventListener("abort", () => {
+      if (signal?.aborted) return reject(signal.reason);
+      const done = () => {
+        signal?.removeEventListener("abort", abort);
+        resolve();
+      };
+      const timer = setTimeout(done, milliseconds);
+      const abort = () => {
         clearTimeout(timer);
-        reject(signal.reason ?? new DOMException("aborted", "AbortError"));
-      }, { once: true });
+        signal?.removeEventListener("abort", abort);
+        reject(signal?.reason ?? new DOMException("aborted", "AbortError"));
+      };
+      signal?.addEventListener("abort", abort, { once: true });
     }),
 };
 

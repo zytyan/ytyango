@@ -271,13 +271,16 @@ export async function createApplication(
       }
     }
     const replied = message.reply_to_message;
-    const aiReply = Boolean(
-      replied && db.get(SQL.IsAiResponse, message.chat.id, replied.message_id, topic),
-    );
-    if (!isAiTrigger(messageText(message), identity.username, aiReply)) return;
+    const botReply = replied?.from?.id === identity.id;
+    if (!isAiTrigger(messageText(message), identity.username, botReply)) return;
     if (!configs.value.aiChats.includes(message.chat.id)) return;
     const replyFacts = replied
-      ? db.all<TraditionalFact>(SQL.ReplyFacts, message.chat.id, topic, replied.message_id)
+      ? db.all<TraditionalFact>(
+        SQL.ReplyFacts,
+        message.chat.id,
+        topicId(replied),
+        replied.message_id,
+      )
       : [];
     const incoming = toIncoming(message);
     if (!repository.runForRequest(message.chat.id, message.message_id)) {

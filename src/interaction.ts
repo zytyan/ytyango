@@ -59,10 +59,10 @@ export function interaction(db: MainDatabase, ctx: Context) {
 }
 export type Interaction = ReturnType<typeof interaction>;
 
-export function isAiTrigger(text: string, username: string, repliedToAi: boolean): boolean {
-  const escaped = username.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return new RegExp(`(?:^|\\s)@(?:${escaped}|new)(?=$|\\s|[，。！？,.!?])`, "i").test(text) ||
-    repliedToAi;
+export function isAiTrigger(text: string, username: string, repliedToBot: boolean): boolean {
+  // Match Go IsGeminiReq, including its UTF-8 length and substring rules.
+  if (text.startsWith("/") || new TextEncoder().encode(text).length > 1000) return false;
+  return text.includes("@new") || text.includes(`@${username}`) || repliedToBot;
 }
 
 export function factText(facts: readonly TraditionalFact[]): string {
