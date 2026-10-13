@@ -1,4 +1,4 @@
-import { assertEquals, assertRejects } from "@std/assert";
+import { assertEquals, assertRejects, assertStringIncludes } from "@std/assert";
 import type { AppConfig } from "../../src/config.ts";
 import { NsfwService } from "../../src/nsfw/service.ts";
 import { StatsService } from "../../src/stats/service.ts";
@@ -7,6 +7,38 @@ import { FakeTelegram, temporaryDatabase } from "./helpers.ts";
 const config = {
   contentModerator: { accountId: "account", apiToken: "key" },
 } as AppConfig;
+
+Deno.test("daily report uses today's chat-local heading while counting yesterday across timezone boundaries", async () => {
+  const temporary = await temporaryDatabase();
+  try {
+    const stats = new StatsService(temporary.db);
+    const sent = Date.parse("2026-10-13T00:30:00Z") / 1000;
+    for (
+      const [id, timezone, heading] of [
+        [-100, 8 * 3600, "2026年10月13日"],
+        [-101, -5 * 3600, "2026年10月12日"],
+      ] as const
+    ) {
+      temporary.db.run("INSERT INTO chat_cfg VALUES(?,0,0,0,0,0,0,?)", id, timezone);
+      stats.record({
+        chatId: id,
+        messageId: 1,
+        sentAt: sent - 86400,
+        user: { id: 7, firstName: "测试" },
+        text: "yesterday",
+        photo: false,
+        video: false,
+        sticker: false,
+        forwarded: false,
+      });
+      const report = stats.dailyMessage(id, sent - 86400, sent);
+      assertStringIncludes(report, `今天是${heading}`);
+      assertStringIncludes(report, "整整1条");
+    }
+  } finally {
+    await temporary.close();
+  }
+});
 
 Deno.test("statistics count graphemes and timezone buckets transactionally", async () => {
   const temporary = await temporaryDatabase();

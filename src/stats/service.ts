@@ -228,7 +228,11 @@ last_name=excluded.last_name,username=excluded.username`,
     return lines.join("\n");
   }
 
-  dailyMessage(chatId: number, targetUnix: number): string {
+  dailyMessage(
+    chatId: number,
+    targetUnix: number,
+    reportedAt = Math.floor(Date.now() / 1000),
+  ): string {
     const stat = this.#snapshot(chatId, targetUnix);
     this.#save(stat);
     const active = [...stat.users].sort((a, b) => b[1].messageCount - a[1].messageCount).slice(
@@ -252,13 +256,10 @@ last_name=excluded.last_name,username=excluded.username`,
     const timeLink = messageId
       ? `<a href="https://t.me/c/${groupLinkId}/${messageId}">${activeTime}</a>`
       : activeTime;
-    const date = new Date((stat.statDate * 86_400 - stat.timezone) * 1000);
-    const dateText = new Intl.DateTimeFormat("zh-CN", {
-      timeZone: "UTC",
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    }).format(date).replaceAll("/", "年").replace(/年(\d{2})年/, "年$1月") + "日";
+    const date = new Date((reportedAt + stat.timezone) * 1000);
+    const dateText = `${date.getUTCFullYear()}年${
+      String(date.getUTCMonth() + 1).padStart(2, "0")
+    }月${String(date.getUTCDate()).padStart(2, "0")}日`;
     return `早上好！吹水群！
 今天是${dateText}，昨天的发言统计，最后的结果是满打满算的整整${stat.messageCount}条，你们这些家伙都不用上班的吗？
 多亏了${escapeHtml(activeNames)}没完没了的摸鱼吹水，光${escapeHtml(mostActive)}一个人就发了${
