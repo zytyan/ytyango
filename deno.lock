@@ -4,6 +4,7 @@
     "jsr:@std/assert@1.0.19": "1.0.19",
     "jsr:@std/internal@^1.0.12": "1.0.14",
     "jsr:@std/yaml@1.1.2": "1.1.2",
+    "npm:@ai-sdk/anthropic@4.0.71": "4.0.71_zod@4.4.3",
     "npm:@ai-sdk/deepseek@3.0.58": "3.0.58_zod@4.4.3",
     "npm:@ai-sdk/google@4.0.87": "4.0.87_zod@4.4.3",
     "npm:ai@7.0.127": "7.0.127_zod@4.4.3",
@@ -26,6 +27,14 @@
     }
   },
   "npm": {
+    "@ai-sdk/anthropic@4.0.71_zod@4.4.3": {
+      "integrity": "sha512-wiv3jhUH0RrvGzSolJMZfZ2cI9As45LhwYmcAoWvNivXjC7wzJ4W/Udq9/u7EGnGsT8lpmFKEKBrMXVeUO97Dg==",
+      "dependencies": [
+        "@ai-sdk/provider",
+        "@ai-sdk/provider-utils",
+        "zod"
+      ]
+    },
     "@ai-sdk/deepseek@3.0.58_zod@4.4.3": {
       "integrity": "sha512-tOafL69mHQGJH3g/mu4k0evkP/cRLSHCWe7L9rcVV4b0S1zI2rpWDZbToZO7D4X/uox9baVmgRQ5AoUTeaDs0A==",
       "dependencies": [
@@ -167,6 +176,7 @@
     "dependencies": [
       "jsr:@std/assert@1.0.19",
       "jsr:@std/yaml@1.1.2",
+      "npm:@ai-sdk/anthropic@4.0.71",
       "npm:@ai-sdk/deepseek@3.0.58",
       "npm:@ai-sdk/google@4.0.87",
       "npm:ai@7.0.127",

@@ -140,3 +140,11 @@ SDK 切片之后：
 - 再按新 schema/导入计划重组持久化与 aiContext；不要在一次提交里同时改 SDK、数据库和全 bot 架构。
 
 SDK 净收益主要是手写协议减少和模型消息统一；不预先承诺整个仓库缩减比例。
+
+## 2026-10-14 DeepSeek 原生搜索补充
+
+最新账号模型列表提供 deepseek-flash（V4.1 Flash，图片）与 deepseek-v4-pro。 两者通过现有
+createAiGenerator 中的 Vercel generateText 调用 DeepSeek Anthropic 兼容 Messages 和原生
+web_search，具体协议重建、SDK 最小权限与真实验收见
+[DeepSeek 搜索接入](deepseek-search.md)。继续保留旧 DeepSeek Chat/native 重放路径和历史数据，
+不引入搜索框架、Agent 或新服务账号。

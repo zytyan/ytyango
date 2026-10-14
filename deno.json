@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "exports": "./src/main.ts",
   "imports": {
+    "@ai-sdk/anthropic": "npm:@ai-sdk/anthropic@4.0.71",
     "ai": "npm:ai@7.0.127",
     "@ai-sdk/google": "npm:@ai-sdk/google@4.0.87",
     "@ai-sdk/deepseek": "npm:@ai-sdk/deepseek@3.0.58",

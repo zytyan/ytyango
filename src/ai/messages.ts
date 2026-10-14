@@ -2,7 +2,7 @@ import type { ModelMessage } from "ai";
 import type { AiMessage, AiProviderName } from "./types.ts";
 import { supportsImages } from "./types.ts";
 
-export type ApiMode = "generateContent" | "interactions" | "deepseek";
+export type ApiMode = "generateContent" | "interactions" | "deepseek" | "deepseek-anthropic";
 export const SDK_PAYLOAD_FORMAT = "vercel-ai-messages-v1";
 const decoder = new TextDecoder();
 
@@ -107,7 +107,7 @@ export function replayLegacy(
   mode: ApiMode,
   lossy: boolean,
 ): void {
-  if (lossy) return;
+  if (lossy || mode === "deepseek-anthropic") return;
   const formats = {
     generateContent: "gemini-content-v1",
     interactions: "gemini-interaction-steps-v1",

@@ -1,9 +1,16 @@
 import { APICallError, generateText } from "ai";
 import { createGoogle } from "@ai-sdk/google";
 import { createDeepSeek } from "@ai-sdk/deepseek";
+import { AnthropicLanguageModel, anthropicTools } from "@ai-sdk/anthropic/internal";
 import type { AppConfig } from "../config.ts";
 import type { AiRequest, AiResult, ProviderState } from "./types.ts";
-import { MODEL_GEMINI_37_FLASH, MODEL_GEMINI_ARGON, MODEL_GEMINI_FLASH } from "./types.ts";
+import {
+  MODEL_DEEPSEEK_FLASH,
+  MODEL_DEEPSEEK_PRO,
+  MODEL_GEMINI_37_FLASH,
+  MODEL_GEMINI_ARGON,
+  MODEL_GEMINI_FLASH,
+} from "./types.ts";
 import {
   type ApiMode,
   modelMessages,
@@ -78,7 +85,20 @@ export function createAiGenerator(
         ...(request.provider === "sub2api" ? { baseURL: settings.sub2apiBaseUrl } : {}),
         ...(mode === "interactions" ? { headers: { "Api-Revision": "2026-05-20" } } : {}),
       });
-      const model = mode === "deepseek"
+      const deepseekNative = mode === "deepseek-anthropic";
+      // Direct exported SDK instance avoids the default factory's import-time environment reads.
+      const model = deepseekNative
+        ? new AnthropicLanguageModel(request.model, {
+          provider: "deepseek.anthropic",
+          baseURL: settings.deepSeekBaseUrl.replace(/\/v1$/, "") + "/anthropic/v1",
+          headers: {
+            "x-api-key": key,
+            authorization: `Bearer ${key}`,
+            "anthropic-version": "2023-06-01",
+          },
+          fetch: capture,
+        })
+        : mode === "deepseek"
         ? createDeepSeek({ apiKey: key, baseURL: settings.deepSeekBaseUrl, fetch: capture })(
           request.model,
         )
@@ -103,34 +123,45 @@ export function createAiGenerator(
         maxRetries: 0,
         abortSignal: request.signal,
         include: { responseBody: true },
-        tools: mode === "deepseek" || state.geminiCacheName ? undefined : {
-          google_search: google.tools.googleSearch({}),
-          ...(request.allowCodeExecution ? { code_execution: google.tools.codeExecution({}) } : {}),
-        },
-        providerOptions: mode === "deepseek" ? { deepseek: { thinking: { type: "enabled" } } } : {
-          google: mode === "interactions"
-            ? {
-              store: true,
-              previousInteractionId,
-              thinkingSummaries: "auto",
-              ...(request.model === MODEL_GEMINI_ARGON
-                ? { thinkingLevel: "medium" }
-                : request.model === MODEL_GEMINI_FLASH
-                ? { thinkingLevel: "low" }
-                : {}),
-            }
-            : {
-              cachedContent: state.geminiCacheName,
-              thinkingConfig: {
-                includeThoughts: true,
+        maxOutputTokens: deepseekNative ? 32768 : undefined,
+        tools: deepseekNative
+          ? { web_search: anthropicTools.webSearch_20250305({ maxUses: 3 }) }
+          : mode === "deepseek" || state.geminiCacheName
+          ? undefined
+          : {
+            google_search: google.tools.googleSearch({}),
+            ...(request.allowCodeExecution
+              ? { code_execution: google.tools.codeExecution({}) }
+              : {}),
+          },
+        providerOptions: deepseekNative
+          ? undefined
+          : mode === "deepseek"
+          ? { deepseek: { thinking: { type: "enabled" } } }
+          : {
+            google: mode === "interactions"
+              ? {
+                store: true,
+                previousInteractionId,
+                thinkingSummaries: "auto",
                 ...(request.model === MODEL_GEMINI_ARGON
                   ? { thinkingLevel: "medium" }
                   : request.model === MODEL_GEMINI_FLASH
                   ? { thinkingLevel: "low" }
                   : {}),
+              }
+              : {
+                cachedContent: state.geminiCacheName,
+                thinkingConfig: {
+                  includeThoughts: true,
+                  ...(request.model === MODEL_GEMINI_ARGON
+                    ? { thinkingLevel: "medium" }
+                    : request.model === MODEL_GEMINI_FLASH
+                    ? { thinkingLevel: "low" }
+                    : {}),
+                },
               },
-            },
-        },
+          },
       });
       const native = JSON.parse(new TextDecoder().decode(raw)) as Record<string, unknown>;
       const responseModel = native.modelVersion ?? native.model;
@@ -143,7 +174,9 @@ export function createAiGenerator(
       }
       const candidates = native.candidates as { content?: Record<string, unknown> }[] | undefined;
       const choices = native.choices as { message?: Record<string, unknown> }[] | undefined;
-      const nativeAssistant = mode === "deepseek"
+      const nativeAssistant = deepseekNative
+        ? native.content
+        : mode === "deepseek"
         ? choices?.[0]?.message
         : mode === "interactions"
         ? (native.steps as Record<string, unknown>[] | undefined)?.filter((step) =>
@@ -162,7 +195,20 @@ export function createAiGenerator(
       const blockReason = (native.promptFeedback as { blockReason?: string } | undefined)
         ?.blockReason;
       return {
-        displayText: result.text,
+        displayText: deepseekNative && result.sources.length
+          ? result.text + "\n\n搜索来源：\n" +
+            [...new Map(
+              result.sources.filter((source) =>
+                source.sourceType === "url" && /^https?:\/\//.test(source.url)
+              ).map((source) => [source.sourceType === "url" ? source.url : source.id, source]),
+            ).values()].slice(0, 8).map((source) =>
+              source.sourceType === "url"
+                ? `- [${(source.title ?? source.url).replace(/[\[\]\\]/g, "\\$&").slice(0, 160)}](${
+                  source.url.replace(/[()\\]/g, "\\$&")
+                })`
+                : ""
+            ).join("\n")
+          : result.text,
         assistantPayload: bytes({
           provider: request.provider,
           mode,
@@ -216,7 +262,13 @@ export function createAiGenerator(
       throw new Error("AI generation attempt limit reached");
     };
 
-    if (request.provider === "deepseek") return await call("deepseek");
+    if (request.provider === "deepseek") {
+      return await call(
+        request.model === MODEL_DEEPSEEK_FLASH || request.model === MODEL_DEEPSEEK_PRO
+          ? "deepseek-anthropic"
+          : "deepseek",
+      );
+    }
     if (request.provider === "sub2api") return await call("generateContent");
     const cache = await latencyStage("ai.cache", () => explicitCache(request, key, fetcher));
     if (cache) {

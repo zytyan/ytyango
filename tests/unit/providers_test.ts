@@ -1,7 +1,7 @@
 import { assert, assertEquals, assertRejects } from "@std/assert";
 import { createAiGenerator } from "../../src/ai/providers.ts";
 import { SDK_PAYLOAD_FORMAT } from "../../src/ai/messages.ts";
-import { MODEL_OPTIONS, parseModelCallback } from "../../src/ai/types.ts";
+import { MODEL_OPTIONS, parseModelCallback, supportsImages } from "../../src/ai/types.ts";
 import type { AiMessage, AiRequest, AiResult } from "../../src/ai/types.ts";
 import { parseConfig } from "../../src/config.ts";
 
@@ -600,4 +600,115 @@ Deno.test("Argon native compatibility fallback uses its real model ID and medium
     "medium",
   );
   assertEquals(body.cachedContent, undefined);
+});
+
+const nativeDeepseekResponse = () => ({
+  id: "msg-ds",
+  type: "message",
+  role: "assistant",
+  model: "deepseek-flash",
+  content: [
+    { type: "thinking", thinking: "reasoning", signature: "signed-reasoning" },
+    {
+      type: "server_tool_use",
+      id: "srvtoolu-1",
+      name: "web_search",
+      input: { query: "latest release" },
+    },
+    {
+      type: "web_search_tool_result",
+      tool_use_id: "srvtoolu-1",
+      content: [
+        {
+          type: "web_search_result",
+          url: "https://example.com/release",
+          title: "Release",
+          encrypted_content: "opaque",
+          page_age: null,
+        },
+      ],
+    },
+    { type: "text", text: "Latest release", citations: null },
+  ],
+  stop_reason: "end_turn",
+  stop_sequence: null,
+  usage: {
+    input_tokens: 20,
+    output_tokens: 6,
+    cache_read_input_tokens: 4,
+    cache_creation_input_tokens: 0,
+  },
+});
+
+Deno.test("latest DeepSeek native search retains server tools, sources, reasoning and usage across replies", async () => {
+  const mock = intercepted(() => json(nativeDeepseekResponse()));
+  const first = await mock.generate(
+    request([user()], { provider: "deepseek", model: "deepseek-flash" }),
+  );
+  assertEquals(mock.calls[0]!.url, "https://deepseek.example/anthropic/v1/messages");
+  assertEquals(mock.calls[0]!.headers.get("x-api-key"), "mock-deepseek");
+  const tools = mock.calls[0]!.body.tools as { type: string; max_uses: number }[];
+  assertEquals(tools[0]!.type, "web_search_20250305");
+  assertEquals(tools[0]!.max_uses, 3);
+  assertEquals(first.usage.inputTokens, 24);
+  assertEquals(first.usage.cachedInputTokens, 4);
+  assertEquals(first.usage.outputTokens, 6);
+  assert(first.displayText.includes("https://example.com/release"));
+  assertEquals(JSON.parse(decoder.decode(first.raw)), nativeDeepseekResponse());
+  const saved = JSON.parse(decoder.decode(first.assistantPayload));
+  assertEquals(saved.mode, "deepseek-anthropic");
+  assertEquals(saved.native, nativeDeepseekResponse().content);
+  await mock.generate(
+    request([user(), assistant(first), user({ messageId: 3 })], {
+      provider: "deepseek",
+      model: "deepseek-flash",
+    }),
+  );
+  assert(JSON.stringify(mock.calls[1]!.body.messages).includes("signed-reasoning"));
+  assert(JSON.stringify(mock.calls[1]!.body.messages).includes("web_search_tool_result"));
+});
+
+Deno.test("latest DeepSeek imports old Chat history portably and Pro exposes the same native search", async () => {
+  const mock = intercepted(() => json(nativeDeepseekResponse()));
+  const old = user({
+    role: "model",
+    messageId: 2,
+    text: "old answer",
+    assistantPayloadFormat: "deepseek-message-v1",
+    assistantPayload: encoder.encode(
+      JSON.stringify({
+        role: "assistant",
+        content: "old answer",
+        reasoning_content: "legacy reasoning",
+      }),
+    ),
+  });
+  await mock.generate(
+    request([user(), old, user({ messageId: 3 })], {
+      provider: "deepseek",
+      model: "deepseek-v4-pro",
+    }),
+  );
+  assertEquals(mock.calls[0]!.body.model, "deepseek-v4-pro");
+  assert(JSON.stringify(mock.calls[0]!.body.messages).includes("old answer"));
+  assertEquals(
+    JSON.parse(decoder.decode(old.assistantPayload!)).reasoning_content,
+    "legacy reasoning",
+  );
+});
+
+Deno.test("latest Flash supports images and retired menu slots retain stable callback indexes", async () => {
+  assertEquals(supportsImages("deepseek", "deepseek-flash"), true);
+  assertEquals(supportsImages("deepseek", "deepseek-v4-pro"), false);
+  for (const index of [4, 5, 6]) {
+    assertEquals(parseModelCallback(`aimodel2:9:${index}`)?.option.model, "deepseek-flash");
+  }
+  assertEquals(parseModelCallback("aimodel2:9:7")?.option.model, "gemini-4-argon");
+  const mock = intercepted(() => json(nativeDeepseekResponse()));
+  const photo = user({
+    messageType: "image",
+    media: [{ kind: "image", mimeType: "image/png", bytes: new Uint8Array([1, 2, 3]) }],
+  });
+  await mock.generate(request([photo], { provider: "deepseek", model: "deepseek-flash" }));
+  assert(JSON.stringify(mock.calls[0]!.body.messages).includes('"type":"image"'));
 });

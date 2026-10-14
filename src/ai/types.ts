@@ -2,7 +2,16 @@ export const MODEL_GEMINI_ARGON = "gemini-4-argon";
 export const MODEL_GEMINI_FLASH = "gemini-3-flash-preview";
 export const MODEL_GEMINI_37_FLASH = "gemini-3.7-flash";
 export const MODEL_GEMINI_FLASH_LITE = "gemini-3.1-flash-lite";
-export const MODEL_DEEPSEEK_FLASH = "deepseek-v4-flash";
+export const MODEL_DEEPSEEK_FLASH = "deepseek-flash";
+export const MODEL_DEEPSEEK_PRO = "deepseek-v4-pro";
+export const isRetiredDeepSeekModel = (model: string) =>
+  [
+    "deepseek-v4-flash",
+    "deepseek-v4-flash-vision-exp",
+    "deepseek-v4.1-flash-expires-on-0910",
+    "deepseek-chat",
+    "deepseek-reasoner",
+  ].includes(model);
 
 export type AiProviderName = "gemini" | "sub2api" | "deepseek";
 export type AiRole = "user" | "model" | "system";
@@ -96,22 +105,28 @@ export const MODEL_OPTIONS = Object.freeze([
   },
   { model: MODEL_GEMINI_FLASH, label: "Gemini 3 Flash Preview", provider: "gemini" as const },
   { model: MODEL_GEMINI_FLASH_LITE, label: "Gemini 3.1 Flash-Lite", provider: "gemini" as const },
-  { model: MODEL_DEEPSEEK_FLASH, label: "DeepSeek V4 Flash", provider: "deepseek" as const },
   {
-    model: "deepseek-v4-flash-vision-exp",
-    label: "DeepSeek V4 Flash Vision（图片）",
+    model: MODEL_DEEPSEEK_FLASH,
+    label: "DeepSeek V4.1 Flash（图片/搜索）",
     provider: "deepseek" as const,
   },
   {
-    model: "deepseek-v4.1-flash-expires-on-0910",
-    label: "DeepSeek V4.1 Flash（多模态内测）",
+    model: MODEL_DEEPSEEK_FLASH,
+    label: "DeepSeek V4.1 Flash（图片/搜索）",
+    provider: "deepseek" as const,
+  },
+  {
+    model: MODEL_DEEPSEEK_FLASH,
+    label: "DeepSeek V4.1 Flash（图片/搜索）",
     provider: "deepseek" as const,
   },
   { model: MODEL_GEMINI_ARGON, label: "Gemini 4 Argon", provider: "gemini" as const },
+  { model: MODEL_DEEPSEEK_PRO, label: "DeepSeek V4 Pro（搜索）", provider: "deepseek" as const },
 ]);
 
 export function supportsImages(provider: AiProviderName, model: string): boolean {
-  return provider !== "deepseek" || model === "deepseek-v4-flash-vision-exp" ||
+  return provider !== "deepseek" || model === MODEL_DEEPSEEK_FLASH ||
+    model === "deepseek-v4-flash-vision-exp" ||
     model === "deepseek-v4.1-flash-expires-on-0910";
 }
 
