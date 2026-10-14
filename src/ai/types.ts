@@ -1,3 +1,4 @@
+export const MODEL_GEMINI_ARGON = "gemini-4-argon";
 export const MODEL_GEMINI_FLASH = "gemini-3-flash-preview";
 export const MODEL_GEMINI_37_FLASH = "gemini-3.7-flash";
 export const MODEL_GEMINI_FLASH_LITE = "gemini-3.1-flash-lite";
@@ -106,6 +107,7 @@ export const MODEL_OPTIONS = Object.freeze([
     label: "DeepSeek V4.1 Flash（多模态内测）",
     provider: "deepseek" as const,
   },
+  { model: MODEL_GEMINI_ARGON, label: "Gemini 4 Argon", provider: "gemini" as const },
 ]);
 
 export function supportsImages(provider: AiProviderName, model: string): boolean {

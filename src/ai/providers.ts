@@ -3,7 +3,7 @@ import { createGoogle } from "@ai-sdk/google";
 import { createDeepSeek } from "@ai-sdk/deepseek";
 import type { AppConfig } from "../config.ts";
 import type { AiRequest, AiResult, ProviderState } from "./types.ts";
-import { MODEL_GEMINI_37_FLASH, MODEL_GEMINI_FLASH } from "./types.ts";
+import { MODEL_GEMINI_37_FLASH, MODEL_GEMINI_ARGON, MODEL_GEMINI_FLASH } from "./types.ts";
 import {
   type ApiMode,
   modelMessages,
@@ -113,13 +113,21 @@ export function createAiGenerator(
               store: true,
               previousInteractionId,
               thinkingSummaries: "auto",
-              ...(request.model === MODEL_GEMINI_FLASH ? { thinkingLevel: "low" } : {}),
+              ...(request.model === MODEL_GEMINI_ARGON
+                ? { thinkingLevel: "medium" }
+                : request.model === MODEL_GEMINI_FLASH
+                ? { thinkingLevel: "low" }
+                : {}),
             }
             : {
               cachedContent: state.geminiCacheName,
               thinkingConfig: {
                 includeThoughts: true,
-                ...(request.model === MODEL_GEMINI_FLASH ? { thinkingLevel: "low" } : {}),
+                ...(request.model === MODEL_GEMINI_ARGON
+                  ? { thinkingLevel: "medium" }
+                  : request.model === MODEL_GEMINI_FLASH
+                  ? { thinkingLevel: "low" }
+                  : {}),
               },
             },
         },
@@ -229,7 +237,10 @@ export function createAiGenerator(
       (message.assistantPayloadFormat === SDK_PAYLOAD_FORMAT &&
         (savedPayload(message) as { mode?: string }).mode === "interactions")
     );
-    if (request.explicitCache && !linked && !interactionHistory) {
+    if (
+      request.explicitCache && request.model !== MODEL_GEMINI_ARGON && !linked &&
+      !interactionHistory
+    ) {
       return await call("generateContent");
     }
     try {

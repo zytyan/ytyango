@@ -1,3 +1,4 @@
+import { MODEL_GEMINI_ARGON } from "./types.ts";
 import type { AiRequest, ProviderState } from "./types.ts";
 import { cacheContent } from "./messages.ts";
 
@@ -9,7 +10,10 @@ export async function explicitCache(
   key: string,
   fetcher: typeof fetch,
 ): Promise<{ state: ProviderState; tailStart: number } | undefined> {
-  if (!request.explicitCache || request.provider !== "gemini" || request.historyRebuildLossy) {
+  if (
+    !request.explicitCache || request.provider !== "gemini" || request.historyRebuildLossy ||
+    request.model === MODEL_GEMINI_ARGON
+  ) {
     return undefined;
   }
   const now = Math.floor(Date.now() / 1000);

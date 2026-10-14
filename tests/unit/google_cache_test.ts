@@ -226,3 +226,10 @@ Deno.test("Unsupported cache creation falls back without retry; authentication f
     "HTTP 401",
   );
 });
+
+Deno.test("Argon never calls paid explicit cache or countTokens endpoints", async () => {
+  const result = await explicitCache(request({ model: "gemini-4-argon" }), "fake", () => {
+    throw new Error("unsupported explicit cache must never call API");
+  });
+  assertEquals(result, undefined);
+});

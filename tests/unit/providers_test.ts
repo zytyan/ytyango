@@ -558,3 +558,46 @@ Deno.test("Model callbacks distinguish equal model names and stay below Telegram
     "aimodel2:1:0junk",
   ].forEach((data) => assertEquals(parseModelCallback(data), undefined));
 });
+
+Deno.test("Argon is appended to model choices and uses medium Interactions despite explicit cache settings", async () => {
+  const index = MODEL_OPTIONS.findIndex((option) => option.model === "gemini-4-argon");
+  assertEquals(index, 7);
+  assertEquals(parseModelCallback(`aimodel2:9:${index}`)?.option.provider, "gemini");
+  const mock = intercepted(() => json(interactionResponse()));
+  const first = await mock.generate(request([user()], {
+    model: "gemini-4-argon",
+    explicitCache: true,
+    state: { geminiCacheName: "old", geminiCacheExpireTime: 9999999999 },
+  }));
+  assertEquals(mock.calls.length, 1);
+  assert(mock.calls[0]!.url.endsWith("/interactions"));
+  assertEquals(mock.calls[0]!.body.model, "gemini-4-argon");
+  assertEquals(
+    (mock.calls[0]!.body.generation_config as Record<string, unknown>).thinking_level,
+    "medium",
+  );
+  assertEquals(first.usage.outputTokens, 6);
+  await mock.generate(request([user(), assistant(first), user({ messageId: 3 })], {
+    model: "gemini-4-argon",
+    explicitCache: true,
+    state: first.state,
+  }));
+  assertEquals(mock.calls[1]!.body.previous_interaction_id, "interaction-2");
+  assertEquals((mock.calls[1]!.body.input as unknown[]).length, 1);
+});
+
+Deno.test("Argon native compatibility fallback uses its real model ID and medium thinking without explicit cache", async () => {
+  const mock = intercepted((_call, index) =>
+    index === 1 ? json({ error: { message: "unsupported endpoint" } }, 404) : json(nativeResponse())
+  );
+  await mock.generate(request([user()], { model: "gemini-4-argon", explicitCache: true }));
+  assertEquals(mock.calls.length, 2);
+  assert(mock.calls[1]!.url.endsWith("/models/gemini-4-argon:generateContent"));
+  const body = mock.calls[1]!.body;
+  assertEquals(
+    (body.generationConfig as { thinkingConfig: { thinkingLevel: string } }).thinkingConfig
+      .thinkingLevel,
+    "medium",
+  );
+  assertEquals(body.cachedContent, undefined);
+});
