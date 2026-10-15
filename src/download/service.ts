@@ -272,15 +272,17 @@ file_id=excluded.file_id,title=excluded.title,description=excluded.description,u
     this.db.run("DELETE FROM bili_inline_results WHERE created_at<?", now - 30 * 24 * 3600);
   }
 
-  createInlineContext(now: number): number {
+  createInlineContext(now: number): bigint {
     this.db.run(
       "INSERT INTO bili_inline_results(text,chat_id,msg_id,created_at) VALUES('',0,0,?)",
       now,
     );
-    return this.db.get<{ id: number }>("SELECT last_insert_rowid() AS id")!.id;
+    return BigInt(
+      this.db.get<{ id: string }>("SELECT CAST(last_insert_rowid() AS TEXT) AS id")!.id,
+    );
   }
 
-  updateInlineContext(uid: number, text: string, chatId: number, messageId: number): void {
+  updateInlineContext(uid: bigint, text: string, chatId: number, messageId: number): void {
     this.db.run(
       "UPDATE bili_inline_results SET text=?,chat_id=?,msg_id=? WHERE uid=?",
       text,
@@ -291,7 +293,7 @@ file_id=excluded.file_id,title=excluded.title,description=excluded.description,u
   }
 
   getInlineContext(
-    uid: number,
+    uid: bigint,
     now: number,
   ): { text: string; chatId: number; messageId: number } | undefined {
     const row = this.db.get<{ text: string; chat_id: number; msg_id: number }>(

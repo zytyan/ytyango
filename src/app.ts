@@ -1,6 +1,6 @@
 import { run, type RunnerHandle } from "@grammyjs/runner";
 import { Bot, Context } from "grammy";
-import type { InlineKeyboardMarkup, Message, PhotoSize } from "grammy/types";
+import type { InlineKeyboardMarkup, InlineQueryResult, Message, PhotoSize } from "grammy/types";
 import { AiRepository } from "./ai/repository.ts";
 import {
   AiService,
@@ -13,7 +13,12 @@ import { type AiProviderName, MODEL_OPTIONS, parseModelCallback } from "./ai/typ
 import { ContentAddressedMediaStore } from "./ai/media_store.ts";
 import type { ConfigStore } from "./config.ts";
 import type { MainDatabase } from "./db/database.ts";
-import { BilibiliLinkError, convertBilibiliLinks, hasBilibiliVideo } from "./download/bilibili.ts";
+import {
+  BilibiliLinkError,
+  convertBilibiliLinks,
+  hasBilibiliVideo,
+  parseBilibiliInlineId,
+} from "./download/bilibili.ts";
 import { DownloadService, parseDownloadKey } from "./download/service.ts";
 import { type NsfwPhoto, NsfwService } from "./nsfw/service.ts";
 import { DenoProcessRunner } from "./shared/process.ts";
@@ -668,32 +673,54 @@ export async function createApplication(
       }], { cache_time: 0 });
       return;
     }
-    try {
-      const links = await convertBilibiliLinks(query);
-      const uid = downloads.createInlineContext(now());
-      const markup = hasBilibiliVideo(links.bvText)
-        ? {
-          inline_keyboard: [[{ text: "下载视频", callback_data: `il:bili:${uid.toString(16)}` }]],
+    const rawResult = (
+      title = "没有检测到可转换的Bilibili链接或出现错误，点击可原样发送",
+    ): InlineQueryResult[] => [{
+      type: "article",
+      id: "raw",
+      title,
+      input_message_content: { message_text: query },
+    }];
+    let results = rawResult();
+    if (/b23\.tv|bilibili\.com|bili2233\.cn/i.test(query)) {
+      try {
+        const links = await latencyStage("inline.bilibili", () => convertBilibiliLinks(query));
+        if (links.hasAv || links.hasBv) {
+          const uid = await latencyStage(
+            "inline.context",
+            () => Promise.resolve(downloads.createInlineContext(now())),
+          );
+          const markup = hasBilibiliVideo(links.bvText)
+            ? {
+              inline_keyboard: [[{
+                text: "下载视频",
+                callback_data: `il:bili:${uid.toString(16)}`,
+              }]],
+            }
+            : undefined;
+          const result = (id: string, title: string, text: string): InlineQueryResult => ({
+            type: "article",
+            id,
+            title,
+            input_message_content: { message_text: text },
+            reply_markup: markup,
+          });
+          results = [result(`bv-${uid}`, "转换后的链接", links.bvText)];
+          if (links.hasAv) {
+            results.push(result(`av-${uid}`, "转换后的链接（使用AV号）", links.avText));
+          }
         }
-        : undefined;
-      const result = (id: string, title: string, text: string) => ({
-        type: "article" as const,
-        id,
-        title,
-        input_message_content: { message_text: text },
-        reply_markup: markup,
-      });
-      const results = [result(`bv-${uid}`, "转换后的链接", links.bvText)];
-      if (links.hasAv) results.push(result(`av-${uid}`, "转换后的链接（使用AV号）", links.avText));
-      await ctx.answerInlineQuery(results, { cache_time: 0 });
-    } catch {
-      await ctx.answerInlineQuery([{
-        type: "article",
-        id: "raw",
-        title: "没有检测到可转换的Bilibili链接或出现错误，点击可原样发送",
-        input_message_content: { message_text: query },
-      }], { cache_time: 0 });
+      } catch (error) {
+        const code = (error as { code?: unknown } | null)?.code;
+        logger("download").warn("bilibili inline conversion failed", {
+          error_type: error instanceof Error ? error.name : "unknown",
+          code: typeof code === "string" && /^[A-Z_]{1,64}$/.test(code) ? code : undefined,
+        });
+        if (error instanceof BilibiliLinkError) results = rawResult(error.message);
+      }
     }
+    // Answer exactly once: Telegram API failures must not masquerade as conversion failures.
+    await ctx.answerInlineQuery(results, { cache_time: 0, is_personal: true });
   });
 
   bot.on("message", async (ctx) => {
@@ -706,8 +733,10 @@ export async function createApplication(
       for (const row of message.reply_markup.inline_keyboard) {
         for (const button of row) {
           if ("callback_data" in button && button.callback_data?.startsWith("il:bili:")) {
-            const uid = Number.parseInt(button.callback_data.slice(8), 16);
-            downloads.updateInlineContext(uid, text, message.chat.id, message.message_id);
+            const uid = parseBilibiliInlineId(button.callback_data);
+            if (uid !== undefined) {
+              downloads.updateInlineContext(uid, text, message.chat.id, message.message_id);
+            }
           }
         }
       }
@@ -892,7 +921,8 @@ export async function createApplication(
       let source = messageText(message);
       let replyMessageId = message.message_id;
       if (data.startsWith("il:bili:")) {
-        const context = downloads.getInlineContext(Number.parseInt(data.slice(8), 16), now());
+        const uid = parseBilibiliInlineId(data);
+        const context = uid === undefined ? undefined : downloads.getInlineContext(uid, now());
         if (!context) {
           return await ctx.answerCallbackQuery({
             text: "下载上下文已过期，请重新发送链接",

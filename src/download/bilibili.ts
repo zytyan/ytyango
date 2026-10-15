@@ -179,3 +179,11 @@ export async function convertBilibiliLinks(
 export function hasBilibiliVideo(text: string): boolean {
   return VIDEO.test(text);
 }
+
+/** Opaque SQLite IDs may exceed Number.MAX_SAFE_INTEGER; callback data stays hexadecimal. */
+export function parseBilibiliInlineId(data: string): bigint | undefined {
+  const match = /^il:bili:([0-9a-f]{1,16})$/i.exec(data);
+  if (!match) return undefined;
+  const id = BigInt(`0x${match[1]}`);
+  return id > 0n && id <= 9223372036854775807n ? id : undefined;
+}

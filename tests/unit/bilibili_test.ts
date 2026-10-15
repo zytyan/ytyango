@@ -76,3 +76,20 @@ Deno.test("expired short links report Bilibili JSON errors and reject loops or e
     "非B站跳转地址",
   );
 });
+
+Deno.test("inline callback IDs retain 64-bit precision and reject malformed or out-of-range values", async () => {
+  const { parseBilibiliInlineId } = await import("../../src/download/bilibili.ts");
+  const id = 191315037158114041n;
+  assertEquals(parseBilibiliInlineId(`il:bili:${id.toString(16)}`), id);
+  assertEquals(parseBilibiliInlineId("il:bili:7fffffffffffffff"), 9223372036854775807n);
+  for (
+    const value of [
+      "il:bili:8000000000000000",
+      "il:bili:0",
+      "il:bili:-1",
+      "il:bili:12garbage",
+      "il:bili:",
+      "il:bili:10000000000000000",
+    ]
+  ) assertEquals(parseBilibiliInlineId(value), undefined);
+});
