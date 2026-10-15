@@ -833,10 +833,60 @@ export async function createApplication(
     }
   });
 
+  async function downloadFromCallback(
+    ctx: Context,
+    source: string,
+    chatId: number,
+    messageId: number,
+  ): Promise<void> {
+    await ctx.answerCallbackQuery({ text: "开始下载" });
+    try {
+      await downloads.deliver({
+        key: await parseDownloadKey(source, false),
+        chatId,
+        messageId,
+        userId: ctx.from!.id,
+        userName: [ctx.from!.first_name, ctx.from!.last_name].filter(Boolean).join(" "),
+        signal: shutdown.signal,
+        // Inline callbacks have no ctx.chat; the download's bound target supplies the notice.
+        notice: ctx.chat ? downloadNotice(ctx) : undefined,
+      });
+      stats.increment(chatId, "download_video");
+    } catch (error) {
+      logger("download").warn("callback download failed", error);
+      const text = error instanceof BilibiliLinkError
+        ? error.message
+        : "下载失败，请检查链接或稍后重新发起请求。";
+      if (ctx.chat) await replyPrivately(ctx, text);
+      else {
+        await telegram.sendMessage(chatId, text, {
+          reply_parameters: { message_id: messageId },
+        });
+      }
+    }
+  }
+
   bot.on("callback_query:data", async (ctx) => {
     const callback = ctx.callbackQuery;
     const data = callback.data;
     const message = callback.message;
+    if (!message && callback.inline_message_id && data.startsWith("il:bili:")) {
+      const uid = parseBilibiliInlineId(data);
+      const context = uid === undefined ? undefined : downloads.getInlineContext(uid, now());
+      if (!context) {
+        return await ctx.answerCallbackQuery({
+          text: "下载上下文已过期，请重新发送 inline 消息",
+          show_alert: true,
+        });
+      }
+      if (!context.text || !context.chatId || !context.messageId) {
+        return await ctx.answerCallbackQuery({
+          text: "尚未收到这条 inline 消息，请在 Bot 所在群重新发送链接后下载。",
+          show_alert: true,
+        });
+      }
+      return await downloadFromCallback(ctx, context.text, context.chatId, context.messageId);
+    }
     if (!message) return await ctx.answerCallbackQuery({ text: "消息已不可用", show_alert: true });
     if (
       "ephemeral_message_id" in message && message.ephemeral_message_id &&
@@ -918,42 +968,13 @@ export async function createApplication(
       return;
     }
     if (data === "download:bilibili" || data.startsWith("il:bili:")) {
-      let source = messageText(message);
-      let replyMessageId = message.message_id;
-      if (data.startsWith("il:bili:")) {
-        const uid = parseBilibiliInlineId(data);
-        const context = uid === undefined ? undefined : downloads.getInlineContext(uid, now());
-        if (!context) {
-          return await ctx.answerCallbackQuery({
-            text: "下载上下文已过期，请重新发送链接",
-            show_alert: true,
-          });
-        }
-        source = context.text;
-        replyMessageId = context.messageId;
-      }
-      await ctx.answerCallbackQuery({ text: "开始下载" });
-      try {
-        await downloads.deliver({
-          key: await parseDownloadKey(source, false),
-          chatId: message.chat.id,
-          messageId: replyMessageId,
-          userId: ctx.from.id,
-          userName: [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(" "),
-          signal: shutdown.signal,
-          notice: downloadNotice(ctx),
-        });
-        stats.increment(message.chat.id, "download_video");
-      } catch (error) {
-        logger("download").warn("callback download failed", error);
-        await replyPrivately(
-          ctx,
-          error instanceof BilibiliLinkError
-            ? error.message
-            : "下载失败，请检查链接或稍后重新发起请求。",
-        );
-      }
-      return;
+      // A supplied message is authoritative; a query's stored binding may be from another send.
+      return await downloadFromCallback(
+        ctx,
+        messageText(message),
+        message.chat.id,
+        message.message_id,
+      );
     }
     if (data.startsWith("nsfw:")) {
       const [, ratingText, fileUniqueId] = data.split(":");

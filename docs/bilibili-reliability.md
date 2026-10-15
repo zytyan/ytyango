@@ -47,3 +47,25 @@ int64 UID 使 SQLite 自增继续使用这个范围。原实现插入空上下�
 增加 inline.bilibili / inline.context 延迟阶段以及不含原查询内容的异常类型日志。Telegram 回答
 移到转换异常捕获之外，避免把交付故障误报为转换故障或重复回答。回归覆盖大 ID 创建、回调编码、 via_bot
 消息绑定、上下文读取/到期及 Telegram 回答失败只尝试一次。
+
+## Inline 下载回调（2026-10-15）
+
+本轮刷新分支检查 TS `6f15d0d9f28e090c7775965e3097cda677e54ab6`，Go 开发封存分支仍为
+`d395a28545701a5640d91b1ff7057bee236a3f1e`，对照 handlers/ytdlp.go 的 DownloadInlinedBv。
+
+Telegram 的 inline callback 提供 inline_message_id，通常没有普通 message；TS 的全局 message
+空值检查先返回“消息已不可用”，没有进入下载处理。只读检查最近成功转换的上下文已绑定 文本、聊天和消息
+ID，因此该检查是本次按钮失败的直接原因，与下载器无关。
+
+恢复 Go 的绑定查找路径：在普通 message 检查之前处理 il:bili 回调，精确解析 bigint UID，读取 30
+天内上下文，以绑定的 chat_id/msg_id 下载并回复原消息。下载状态和失败提示也使用绑定目标， 避免依赖
+inline 回调中不存在的 ctx.chat。继续复用本地 API file://、上传缓存、并发和清理逻辑。 普通回调带
+message 时，当前消息的文本和地址为准，防止使用旧绑定把回复送到别的消息。
+
+没有收到 via_bot 消息时，Telegram 不提供可发送媒体的 chat_id；inline_message_id 和 chat_instance
+不是 sendVideo 的目标地址。这种未绑定情况明确提示在 Bot 所在群发送链接，不向猜测的群或点击者
+私聊发送媒体，不解码 Telegram 的不透明 ID。过期/非法 UID 同样不启动下载。
+
+集成回归覆盖仅含 inline_message_id 的缓存视频交付、交付失败提示、未绑定、过期、非法 UID，以及
+普通消息回调使用当前消息目标；所有 API 被拦截，不给真实 Telegram 发送验收消息。
+官方约束：https://core.telegram.org/bots/api#callbackquery 。
