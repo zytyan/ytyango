@@ -1,13 +1,13 @@
 import type { MainDatabase } from "../db/database.ts";
 import { Semaphore } from "../shared/concurrency.ts";
 import type { ProcessRunner, SentMessage, TelegramPort } from "../shared/types.ts";
-import { convertBilibiliLinks } from "./bilibili.ts";
+import { convertBilibiliLinks, hasBilibiliVideo } from "./bilibili.ts";
 import { type DownloadNotice, withDownloadNotice } from "./notice.ts";
 import { isAbsolute, resolve } from "node:path";
 import { latencyStage } from "../shared/latency.ts";
 
 const DOWNLOAD_URL =
-  /(?:(?:bilibili\.com|www\.bilibili\.com|b23\.tv|youtu\.be|youtube\.com)\/[a-zA-Z\d_%.~:/?#[\]@!$&'()*+,;=\-]+)/i;
+  /(?:(?:bilibili\.com|www\.bilibili\.com|b23\.tv|bili2233\.cn|youtu\.be|youtube\.com)\/[a-zA-Z\d_%.~:/?#[\]@!$&'()*+,;=\-]+)/i;
 const RESOLUTION = /\b(144|360|480|720|1080)p?\b/i;
 const decoder = new TextDecoder();
 
@@ -74,19 +74,23 @@ async function firstMediaFile(root: string, audioOnly: boolean): Promise<string>
   throw new Error(`${root} 目录中没有文件`);
 }
 
-export async function findBilibiliCookies(): Promise<string> {
-  for (
-    const path of [
-      "bili_cookies.json",
-      "build/bili_cookies.json",
-      "../ytyanbot/build/bili_cookies.json",
-      "/opt/tgbots/ytyanbot/build/bili_cookies.json",
-    ]
-  ) {
+export async function findBilibiliCookies(
+  paths: readonly string[] = [
+    "/opt/tgbots/ytyanbot/build/bili_cookies.json",
+    "bili_cookies.json",
+    "build/bili_cookies.json",
+    "../ytyanbot/build/bili_cookies.json",
+  ],
+  stat: typeof Deno.stat = Deno.stat,
+): Promise<string> {
+  for (const path of paths) {
     try {
-      if ((await Deno.stat(path)).isFile) return resolve(path);
+      if ((await stat(path)).isFile) return resolve(path);
     } catch (error) {
-      if (!(error instanceof Deno.errors.NotFound)) throw error;
+      if (
+        !(error instanceof Deno.errors.NotFound) && !(error instanceof Deno.errors.NotCapable) &&
+        !(error instanceof Deno.errors.PermissionDenied)
+      ) throw error;
     }
   }
   throw new Error("找不到 Bilibili 账户文件 bili_cookies.json");
@@ -120,11 +124,25 @@ export function bbdownOutput(output: Uint8Array, workDir: string, audioOnly: boo
   return path;
 }
 
-export async function parseDownloadKey(text: string, audioOnly: boolean): Promise<DownloadKey> {
+export async function parseDownloadKey(
+  text: string,
+  audioOnly: boolean,
+  fetcher: typeof fetch = fetch,
+): Promise<DownloadKey> {
   const found = text.match(DOWNLOAD_URL)?.[0];
-  if (!found) throw new Error(`没有在聊天 ${text} 中找到任何可下载的链接`);
+  if (!found) throw new Error("未找到支持的视频链接");
   let url = `https://${found}`;
-  if (url.includes("b23.tv")) url = (await convertBilibiliLinks(url)).bvText;
+  if (
+    ["b23.tv", "bili2233.cn", "bilibili.com", "www.bilibili.com", "m.bilibili.com"].includes(
+      new URL(url).hostname,
+    )
+  ) {
+    const converted = await convertBilibiliLinks(url, fetcher);
+    if (!converted.hasBv || !hasBilibiliVideo(converted.bvText)) {
+      throw new Error("链接不是可下载的B站视频");
+    }
+    url = converted.bvText;
+  }
   return { url, audioOnly, resolution: audioOnly ? 0 : Number(text.match(RESOLUTION)?.[1] ?? 720) };
 }
 

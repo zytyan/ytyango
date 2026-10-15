@@ -41,9 +41,56 @@ export interface ConvertedBilibiliLinks {
   readonly needClean: boolean;
 }
 
-async function redirectLocation(url: string, fetcher: typeof fetch): Promise<string | undefined> {
-  const response = await fetcher(url, { redirect: "manual", signal: AbortSignal.timeout(10_000) });
-  return response.headers.get("location") ?? undefined;
+export class BilibiliLinkError extends Error {
+  constructor(reason: string) {
+    super(`B站短链解析失败（${reason}），请重发或提供完整视频链接。`);
+    this.name = "BilibiliLinkError";
+  }
+}
+
+const shortHost = (host: string) => ["b23.tv", "bili2233.cn"].includes(host);
+const biliHost = (host: string) =>
+  ["bilibili.com", "www.bilibili.com", "m.bilibili.com", "mall.bilibili.com"].includes(host);
+
+async function expandShortLink(initial: URL, fetcher: typeof fetch): Promise<URL> {
+  let url = initial;
+  const signal = AbortSignal.timeout(10_000);
+  const seen = new Set<string>();
+  for (let hop = 0; hop < 5; hop++) {
+    if (!shortHost(url.hostname)) return url;
+    if (seen.has(url.href)) throw new BilibiliLinkError("循环跳转");
+    seen.add(url.href);
+    const response = await fetcher(url.href, { redirect: "manual", signal });
+    const location = response.headers.get("location");
+    if (response.status >= 300 && response.status < 400 && location) {
+      await response.body?.cancel();
+      let next: URL;
+      try {
+        next = new URL(location, url);
+      } catch {
+        throw new BilibiliLinkError("无效跳转地址");
+      }
+      if (
+        !["http:", "https:"].includes(next.protocol) || next.username || next.password ||
+        (next.port && next.port !== "443" && next.port !== "80") ||
+        (!shortHost(next.hostname) && !biliHost(next.hostname))
+      ) throw new BilibiliLinkError("非B站跳转地址");
+      next.protocol = "https:";
+      url = next;
+      continue;
+    }
+    if (response.ok && response.headers.get("content-type")?.includes("application/json")) {
+      const body = await response.json().catch(() => undefined) as { code?: unknown } | undefined;
+      const code = body?.code;
+      throw new BilibiliLinkError(
+        typeof code === "number" && Number.isFinite(code) ? `上游返回 ${code}` : "没有有效跳转",
+      );
+    }
+    await response.body?.cancel();
+    throw new BilibiliLinkError(response.ok ? "没有有效跳转" : `HTTP ${response.status}`);
+  }
+  if (shortHost(url.hostname)) throw new BilibiliLinkError("跳转次数过多");
+  return url;
 }
 
 async function convertOne(raw: string, fetcher: typeof fetch): Promise<{
@@ -60,15 +107,12 @@ async function convertOne(raw: string, fetcher: typeof fetch): Promise<{
     return { av: raw, bv: raw, hasAv: false, hasBv: false, cleaned: false };
   }
   url.protocol = "https:";
-  if (["b23.tv", "bili2233.cn"].includes(url.hostname)) {
-    const location = await redirectLocation(url.href, fetcher);
-    if (!location) return { av: raw, bv: raw, hasAv: false, hasBv: false, cleaned: false };
-    url = new URL(location);
-  }
+  const expanded = shortHost(url.hostname);
+  if (expanded) url = await expandShortLink(url, fetcher);
   const allowed = url.hostname === "mall.bilibili.com"
     ? new Set(["itemsId"])
     : new Set(["p", "start_progress", "t"]);
-  let cleaned = false;
+  let cleaned = expanded;
   for (const key of [...url.searchParams.keys()]) {
     if (!allowed.has(key)) {
       url.searchParams.delete(key);

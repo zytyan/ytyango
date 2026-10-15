@@ -24,3 +24,46 @@ Deno.test("bbdown-go selects audio output and rejects missing or escaping paths"
   assertThrows(() => bbdownOutput(bytes({ video_path: "../outside.mp4" }), "/tmp/download", false));
   assertThrows(() => bbdownOutput(bytes({ video_path: "/etc/passwd" }), "/tmp/download", false));
 });
+
+Deno.test("cookie discovery skips denied candidates and uses the canonical production path first", async () => {
+  const { findBilibiliCookies } = await import("../../src/download/service.ts");
+  const checked: string[] = [];
+  const stat: typeof Deno.stat = (path) => {
+    checked.push(String(path));
+    if (String(path) === "blocked") return Promise.reject(new Deno.errors.NotCapable("blocked"));
+    return Promise.resolve({ isFile: true } as Deno.FileInfo);
+  };
+  assertEquals(
+    await findBilibiliCookies(undefined, stat),
+    "/opt/tgbots/ytyanbot/build/bili_cookies.json",
+  );
+  assertEquals(checked, ["/opt/tgbots/ytyanbot/build/bili_cookies.json"]);
+  assertEquals(
+    await findBilibiliCookies(["blocked", "/allowed/account.json"], stat),
+    "/allowed/account.json",
+  );
+});
+
+Deno.test("Bilibili download parsing handles the short-link alias and canonicalizes tracking before cache lookup", async () => {
+  const { parseDownloadKey } = await import("../../src/download/service.ts");
+  const key = await parseDownloadKey(
+    "https://bili2233.cn/test 480p",
+    false,
+    () =>
+      Promise.resolve(
+        new Response(null, {
+          status: 302,
+          headers: {
+            location: "https://www.bilibili.com/video/BV1pmJy6mEre?p=1&share_session_id=tracking",
+          },
+        }),
+      ),
+  );
+  assertEquals(key, {
+    url: "https://www.bilibili.com/video/BV1pmJy6mEre?p=1",
+    audioOnly: false,
+    resolution: 480,
+  });
+  const { assertRejects } = await import("@std/assert");
+  await assertRejects(() => parseDownloadKey("https://www.bilibili.com/read/cv1", false));
+});

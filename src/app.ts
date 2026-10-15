@@ -13,7 +13,7 @@ import { type AiProviderName, MODEL_OPTIONS, parseModelCallback } from "./ai/typ
 import { ContentAddressedMediaStore } from "./ai/media_store.ts";
 import type { ConfigStore } from "./config.ts";
 import type { MainDatabase } from "./db/database.ts";
-import { convertBilibiliLinks, hasBilibiliVideo } from "./download/bilibili.ts";
+import { BilibiliLinkError, convertBilibiliLinks, hasBilibiliVideo } from "./download/bilibili.ts";
 import { DownloadService, parseDownloadKey } from "./download/service.ts";
 import { type NsfwPhoto, NsfwService } from "./nsfw/service.ts";
 import { DenoProcessRunner } from "./shared/process.ts";
@@ -594,7 +594,11 @@ export async function createApplication(
       stats.increment(ctx.chat!.id, audioOnly ? "download_audio" : "download_video");
     } catch (error) {
       logger("download").warn("download failed", error);
-      await currentInteraction(ctx).notice("下载失败，请检查链接或稍后重新发起请求。");
+      await currentInteraction(ctx).notice(
+        error instanceof BilibiliLinkError
+          ? error.message
+          : "下载失败，请检查链接或稍后重新发起请求。",
+      );
       currentInteraction(ctx).aiContext("download", "下载失败。", "failure");
     }
   };
@@ -722,9 +726,11 @@ export async function createApplication(
             }</a>的消息，其中的链接已自动转换\n\n${escapeHtml(converted.bvText)}`,
             {
               parse_mode: "HTML",
-              reply_markup: {
-                inline_keyboard: [[{ text: "下载视频", callback_data: "download:bilibili" }]],
-              },
+              reply_markup: hasBilibiliVideo(converted.bvText)
+                ? {
+                  inline_keyboard: [[{ text: "下载视频", callback_data: "download:bilibili" }]],
+                }
+                : undefined,
             },
           );
           currentInteraction(ctx).aiContext(
@@ -733,11 +739,17 @@ export async function createApplication(
             "success",
             sent.messageId,
           );
-          await telegram.deleteMessage(message.chat.id, message.message_id);
+          try {
+            await telegram.deleteMessage(message.chat.id, message.message_id);
+          } catch (error) {
+            logger("download").warn("bilibili source cleanup failed", error);
+          }
           return;
         }
       } catch (error) {
         logger("download").warn("bilibili conversion failed", error);
+        currentInteraction(ctx).aiContext("bilibili", "B站链接转换失败。", "failure");
+        if (error instanceof BilibiliLinkError) await currentInteraction(ctx).notice(error.message);
       }
     }
     const photo = largestPhoto(message);
@@ -904,7 +916,12 @@ export async function createApplication(
         stats.increment(message.chat.id, "download_video");
       } catch (error) {
         logger("download").warn("callback download failed", error);
-        await replyPrivately(ctx, "下载失败，请检查链接或稍后重新发起请求。");
+        await replyPrivately(
+          ctx,
+          error instanceof BilibiliLinkError
+            ? error.message
+            : "下载失败，请检查链接或稍后重新发起请求。",
+        );
       }
       return;
     }
