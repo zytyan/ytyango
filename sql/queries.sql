@@ -77,3 +77,7 @@ SELECT chat_id,topic_id,group_id,expires_at,photo_only FROM album_index WHERE to
 
 -- name: ImportedAlbumFiles
 SELECT chat_id,topic_id,group_id,msg_id,file_id,file_unique_id,byte_size FROM album_files WHERE topic_id=-1 ORDER BY chat_id,msg_id;
+
+
+-- name: SessionHasMessage
+SELECT 1 AS found FROM ai_session_messages WHERE session_id=? AND chat_id=? AND msg_id=?;

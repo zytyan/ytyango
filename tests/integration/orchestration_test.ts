@@ -138,6 +138,8 @@ Deno.test("Go-compatible bot replies trigger AI after traditional commands; fact
     await app.bot.handleUpdate(update(8, "explain this calculation", sent.at(-1)!));
     assertEquals(modelCalls, 4);
     assertStringIncludes(JSON.stringify(lastBody.contents), "1/3+1/6 = 0.5");
+    const calculationAnswer = sent.at(-1)!;
+    assertStringIncludes(JSON.stringify(lastBody.contents), "/calc 1/3+1/6 @test_bot");
     const albumMessage = (id: number, caption: string) =>
       ({
         message_id: id,
@@ -206,6 +208,11 @@ Deno.test("Go-compatible bot replies trigger AI after traditional commands; fact
     assertEquals(latestSession(), forumSession);
     await app.bot.handleUpdate(update(912, "中".repeat(334), sent.at(-1)!));
     assertEquals(modelCalls, 14);
+    await app.bot.handleUpdate(update(913, "remember the calculation", calculationAnswer));
+    assertEquals(modelCalls, 15);
+    assertStringIncludes(JSON.stringify(lastBody.contents), "/calc 1/3+1/6 @test_bot");
+    assertStringIncludes(JSON.stringify(lastBody.contents), "1/3+1/6 = 0.5");
+    assertEquals(JSON.stringify(lastBody.systemInstruction).includes("1/3+1/6"), false);
     app.flush();
   } finally {
     globalThis.fetch = originalFetch;

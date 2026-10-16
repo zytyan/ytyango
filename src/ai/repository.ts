@@ -208,6 +208,10 @@ ORDER BY s.updated_at DESC,sm.session_id DESC LIMIT 1`,
     }
   }
 
+  hasMessage(sessionId: number, chatId: number, messageId: number): boolean {
+    return this.db.get(SQL.SessionHasMessage, sessionId, chatId, messageId) !== undefined;
+  }
+
   loadMessages(sessionId: number, includeContext = false): StoredAiMessage[] {
     const rows = this.db.all<Record<string, unknown>>(
       `SELECT sm.chat_id,sm.msg_id,sm.role,sm.quote_part,sm.context_only,

@@ -52,7 +52,8 @@ Deno.test("automatic crypto exchange delivers declared UTC+8 date precision and 
       temp.db.get<{ context_text: string }>(
         "SELECT context_text FROM traditional_facts WHERE feature='exchange'",
       )!.context_text,
-      output,
+      `请求文本：2 USDT RMB
+处理结果：${output}`,
     );
     assertEquals(temp.db.get<{ count: number }>("SELECT COUNT(*) AS count FROM ai_runs")!.count, 0);
     app.flush();

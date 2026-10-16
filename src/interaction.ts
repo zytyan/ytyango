@@ -1,6 +1,7 @@
 import type { Context } from "grammy";
 import type { MainDatabase } from "./db/database.ts";
 import { SQL } from "./db/queries.ts";
+import { messageMarkdown } from "./telegram/markdown.ts";
 import { topicId } from "./telegram/topic.ts";
 import { replyPrivately } from "./telegram/ephemeral.ts";
 
@@ -44,7 +45,8 @@ export function interaction(db: MainDatabase, ctx: Context) {
         request_msg_id: message.message_id,
         reply_msg_id: responseId,
         status,
-        context_text: text,
+        context_text: feature === "traditional" ? text : `请求文本：${messageMarkdown(message)}
+处理结果：${text}`,
         created_at: Math.floor(Date.now() / 1000),
       };
       if (!message.ephemeral_message_id) {
@@ -56,7 +58,7 @@ export function interaction(db: MainDatabase, ctx: Context) {
           fact.request_msg_id,
           responseId,
           status,
-          text,
+          fact.context_text,
           fact.created_at,
           responseId === null ? "failed" : "delivered",
         );

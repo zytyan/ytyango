@@ -206,7 +206,8 @@ export class AiService {
     try {
       if (
         !existing && incoming.reply &&
-        !this.repository.findSessionByMessage(incoming.chatId, incoming.reply.messageId)
+        incoming.reply.chatId === incoming.chatId &&
+        !this.repository.hasMessage(session.id, incoming.chatId, incoming.reply.messageId)
       ) {
         pending.push(
           await latencyStage(
@@ -247,7 +248,7 @@ export class AiService {
       try {
         const loaded = await latencyStage(
           "ai.history",
-          () => this.#loadMessages(session.id, pending),
+          () => this.#loadMessages(session.id),
         );
         const drop = Math.max(0, Math.ceil((loaded.length - 200) / 50) * 50);
         const window = loaded.slice(drop);
@@ -424,16 +425,9 @@ export class AiService {
     return { message, mediaObjects, contextOnly };
   }
 
-  async #loadMessages(
-    sessionId: number,
-    pending: readonly PendingAiMessage[],
-  ): Promise<AiMessage[]> {
-    const contextIds = new Set(
-      pending.filter((item) => item.contextOnly).map((item) => item.message.messageId),
-    );
-    const all = this.repository.loadMessages(sessionId, true).filter((item) =>
-      !item.contextOnly || contextIds.has(item.messageId)
-    );
+  async #loadMessages(sessionId: number): Promise<AiMessage[]> {
+    // A selected reply is part of this session, including every subsequent turn.
+    const all = this.repository.loadMessages(sessionId, true);
     const drop = Math.max(0, Math.ceil((all.length - 200) / 50) * 50);
     const stored = all.slice(drop);
     return await Promise.all(stored.map(async (message: StoredAiMessage): Promise<AiMessage> => ({
