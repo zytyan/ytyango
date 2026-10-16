@@ -2,6 +2,7 @@ import { assertEquals, assertRejects } from "@std/assert";
 import {
   latencySnapshot,
   latencyStage,
+  latencySyncStage,
   traceTags,
   traceUpdate,
   updatesReceived,
@@ -93,6 +94,34 @@ Deno.test("latency history is bounded and untraced stages do not create records"
     }
     assertEquals(latencySnapshot().recent.length, 100);
     assertEquals(latencySnapshot().recent.some((t) => t.update_id === 910000), false);
+  } finally {
+    logging.restore();
+  }
+});
+
+Deno.test("latency records stage start offsets and synchronous database work without retaining values", async () => {
+  const logging = installLogging(8);
+  try {
+    const secret = "query-value-not-for-diagnostics";
+    await traceUpdate(920001, "ai", undefined, async () => {
+      const value = latencySyncStage("db.get.RunForRequest", () => secret);
+      assertEquals(value, secret);
+      await latencyStage("ai.reaction", () => Promise.resolve());
+      try {
+        latencySyncStage("db.run.FreezeRunContext", () => {
+          throw new Error(secret);
+        });
+      } catch { /* Preserve the failure marker, without logging the error body. */ }
+    });
+    const trace = latencySnapshot().recent.find((t) => t.update_id === 920001)!;
+    const db = trace.stages["db.get.RunForRequest"]!;
+    const reaction = trace.stages["ai.reaction"]!;
+    assertEquals(db.first_start_ms >= 0, true);
+    assertEquals(db.last_end_ms >= db.first_start_ms, true);
+    assertEquals(reaction.first_start_ms >= db.last_end_ms, true);
+    assertEquals(reaction.last_end_ms >= reaction.first_start_ms, true);
+    assertEquals(trace.stages["db.run.FreezeRunContext"]!.failures, 1);
+    assertEquals(JSON.stringify(trace).includes(secret), false);
   } finally {
     logging.restore();
   }

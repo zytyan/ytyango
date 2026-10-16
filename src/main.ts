@@ -111,6 +111,18 @@ async function main(): Promise<void> {
     await initializeDatabase(path);
     return;
   }
+  if (command === "db-upgrade") {
+    const path = option("--database");
+    if (!path || !await exists(path)) throw new Error("db-upgrade requires an existing --database");
+    const db = new MainDatabase(path);
+    try {
+      db.upgrade();
+      console.log(JSON.stringify({ database: path, ...db.validate() }));
+    } finally {
+      db.close();
+    }
+    return;
+  }
   if (command === "db-check") {
     const path = option("--database");
     if (!path) throw new Error("db-check requires --database <path>");

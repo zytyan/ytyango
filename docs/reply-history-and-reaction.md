@@ -21,3 +21,37 @@ sql/queries.sql 的 SessionHasMessage 查询判断本次会话是否已收录；
 
 临时数据库与拦截 API 回归覆盖：引用首条图片消息后连续两轮、服务对象重建、@new 再次引用同一消息、
 跨群拒绝，以及传统计算器请求与回复结果在后续 AI 轮次保留且不进入 system。
+
+## Reaction 与同步查询
+
+第二片刷新检查 TS `72e3d21c94586e3057846945ba8275c1200c932f`，Go 开发封存 SHA 不变。 三天现有记录共
+218 次 AI 请求，181 次记录了 reaction：中位 212.9 ms、P95 464.7 ms、 最大 1863.3 ms，失败计数
+0。runner 排队中位 0.3 ms、P95 1.9 ms、最大 196.5 ms。 消息时间到接收的最大值 1474 ms（Telegram
+消息时间仅精确到秒，不代表精确传输时间）。 没有发出 reaction 的样本包括关闭该功能的用户，不能算作
+API 丢失。
+
+事件循环另有最高 13947.4 ms 的停顿。stats.flush 当前进程最大约 198 ms，不足以解释全部停顿。 reaction
+前同步调用 RunForRequest，原查询 EXPLAIN QUERY PLAN 为 SCAN ai_runs； 该表保存历史原始响应及
+assistant payload。生产库只读、现有缓存下，不存在请求查找三次为 42.19/44.30/56.72
+ms；这只证明热缓存耗时，不足以证明某次 14 秒暂停的来源。
+
+新增 TS 迁移 003，仅创建 (request_chat_id,request_msg_id,id DESC) 索引，沿用原查询及历史记录
+语义。不能简单按 session.chat_id 缩小查询：只读检查有 24 条保留的历史 Run 不满足该等式，
+因此不通过改变查找语义跳过历史数据。db-upgrade 只接受当前 TS 版本链的完整前缀并验证校验和，
+事务内应用缺失迁移；不自动修改 Go 库，serve 继续严格校验版本。迁移文件是规范源，旧文件不变。
+升级前保留只读来源的数据库快照；新增索引不改历史消息、Run、payload 或 token 汇总。
+
+跟踪新增每个阶段相对处理开始的 first_start_ms / last_end_ms，以及同步数据库操作阶段和 超过 100 ms
+的安全慢查询告警。日志只含操作名、规范查询名及耗时，不含 SQL 参数和用户正文；
+后台汇总也保留最大耗时。Reaction 失败记录清理后的错误类型、Telegram 错误码、retry_after
+及是否达到两秒期限，正常取消不额外告警，不自动重试。明确 AI 触发的消息先进入跟踪和
+即时反馈，随后再做传统功能分类；保留 reaction、typing 并行和模型不等待 reaction 的规则。
+
+这些记录能区分入站/runner 排队、同步 SQL、reaction 开始偏移、Telegram API 耗时及事件循环
+停顿。现有数据无法证明客户端显示时刻，不能把所有“慢”归因于 Google 模型或 Telegram 网络。
+
+升级验收使用从生产库只读取得的约 1.24 GB 快照，再复制为临时目标，由生产服务用户运行新二进制 的
+db-upgrade。升级前后历史 Run/消息/会话条数、token 汇总和 payload/text 长度汇总完全相同。
+同一目标副本上，一次不存在请求查找由 1433.046 ms 降至 0.137 ms，执行计划由 SCAN 改为
+idx_ai_runs_request 索引 SEARCH。该数字是本次副本实验，不能代替线上所有请求的耗时分布。 140
+项测试及生产用户受限编译 smoke 通过，未发送真实 Telegram 验收消息。

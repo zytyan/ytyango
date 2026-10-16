@@ -63,10 +63,15 @@ Deno.test("selected first reply and its media survive continuation, restart, and
     assertEquals(requests[3]!.messages.map((m) => m.messageId), [1, 5]);
     assertEquals(requests[3]!.sessionId === requests[0]!.sessionId, false);
     await service.handle({
-      ...message(6, "@new @bot"),
+      ...message(6, "@new @bot reuse an actual request"),
+      reply: message(2, "@bot explain"),
+    });
+    assertEquals(requests[4]!.messages.map((m) => m.messageId), [2, 6]);
+    await service.handle({
+      ...message(7, "@new @bot"),
       reply: { ...source, chatId: -200 },
     });
-    assertEquals(requests[4]!.messages.map((m) => m.messageId), [6]);
+    assertEquals(requests[5]!.messages.map((m) => m.messageId), [7]);
   } finally {
     await temp.close();
   }

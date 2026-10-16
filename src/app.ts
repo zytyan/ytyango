@@ -303,6 +303,10 @@ export async function createApplication(
     const text = messageText(message);
     const aiTrigger = message && configs.value.aiChats.includes(message.chat.id) &&
       isAiTrigger(text, identity.username, message.reply_to_message?.from?.id === identity.id);
+    // AI feedback starts before automatic-feature classification or its configuration lookup.
+    if (aiTrigger) {
+      return await traceUpdate(ctx.update.update_id, "ai", message.date, next);
+    }
     const possibleAutomatic = message &&
       (message.photo || /b23\.tv|bilibili\.com|bili2233\.cn/i.test(text) || isCalculation(text) ||
         parseExchange(text) || isFish(text));

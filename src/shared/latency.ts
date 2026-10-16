@@ -6,6 +6,8 @@ interface Timing {
   total_ms: number;
   max_ms: number;
   failures: number;
+  first_start_ms: number;
+  last_end_ms: number;
 }
 interface Trace {
   update_id: number;
@@ -94,15 +96,38 @@ export function traceTags(tags: Trace["tags"]): void {
   if (trace) Object.assign(trace.tags, tags);
 }
 
+function beginStage(name: string): ((failed: boolean) => void) | undefined {
+  const trace = scope.getStore();
+  if (!trace) return undefined;
+  const id = trace.next++, start = performance.now();
+  trace.running.set(id, { stage: name, start });
+  return (failed) => {
+    trace.running.delete(id);
+    const end = performance.now();
+    const elapsed = end - start;
+    const previous = trace.stages.get(name) ?? {
+      calls: 0,
+      total_ms: 0,
+      max_ms: 0,
+      failures: 0,
+      first_start_ms: start - trace.start,
+      last_end_ms: 0,
+    };
+    previous.calls++;
+    previous.total_ms += elapsed;
+    previous.max_ms = Math.max(previous.max_ms, elapsed);
+    previous.failures += Number(failed);
+    previous.last_end_ms = Math.max(previous.last_end_ms, end - trace.start);
+    trace.stages.set(name, previous);
+  };
+}
+
 export async function latencyStage<T>(
   name: string,
   operation: () => Promise<T>,
   failedResult?: (value: T) => boolean,
 ): Promise<T> {
-  const trace = scope.getStore();
-  if (!trace) return await operation();
-  const id = trace.next++, start = performance.now();
-  trace.running.set(id, { stage: name, start });
+  const finish = beginStage(name);
   let failed = false;
   try {
     const result = await operation();
@@ -112,14 +137,20 @@ export async function latencyStage<T>(
     failed = true;
     throw error;
   } finally {
-    trace.running.delete(id);
-    const elapsed = performance.now() - start;
-    const previous = trace.stages.get(name) ?? { calls: 0, total_ms: 0, max_ms: 0, failures: 0 };
-    previous.calls++;
-    previous.total_ms += elapsed;
-    previous.max_ms = Math.max(previous.max_ms, elapsed);
-    previous.failures += Number(failed);
-    trace.stages.set(name, previous);
+    finish?.(failed);
+  }
+}
+
+export function latencySyncStage<T>(name: string, operation: () => T): T {
+  const finish = beginStage(name);
+  let failed = false;
+  try {
+    return operation();
+  } catch (error) {
+    failed = true;
+    throw error;
+  } finally {
+    finish?.(failed);
   }
 }
 
@@ -138,6 +169,8 @@ function summary(trace: Trace) {
       ...value,
       total_ms: rounded(value.total_ms),
       max_ms: rounded(value.max_ms),
+      first_start_ms: rounded(value.first_start_ms),
+      last_end_ms: rounded(value.last_end_ms),
     }])),
     waiting: [...trace.running.values()].map((value) => ({
       stage: value.stage,

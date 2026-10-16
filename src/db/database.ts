@@ -1,4 +1,8 @@
 import { DatabaseSync } from "node:sqlite";
+import { SQL } from "./queries.ts";
+import { backgroundTiming, latencySyncStage } from "../shared/latency.ts";
+import { logger } from "../logging.ts";
+
 import {
   CANONICAL_SCHEMA,
   MIGRATIONS,
@@ -6,6 +10,8 @@ import {
   REQUIRED_TABLES,
   REQUIRED_TRIGGERS,
 } from "./schema.ts";
+
+const queryNames = new Map(Object.entries(SQL).map(([name, sql]) => [sql as string, name]));
 
 type SqlValue = null | number | bigint | string | Uint8Array;
 
@@ -46,15 +52,32 @@ export class MainDatabase {
   }
 
   run(sql: string, ...params: SqlValue[]): void {
-    this.raw.prepare(sql).run(...params);
+    this.#execute("run", sql, () => this.raw.prepare(sql).run(...params));
   }
 
   get<T extends object>(sql: string, ...params: SqlValue[]): T | undefined {
-    return this.raw.prepare(sql).get(...params) as T | undefined;
+    return this.#execute("get", sql, () => this.raw.prepare(sql).get(...params)) as T | undefined;
   }
 
   all<T extends object>(sql: string, ...params: SqlValue[]): T[] {
-    return this.raw.prepare(sql).all(...params) as T[];
+    return this.#execute("all", sql, () => this.raw.prepare(sql).all(...params)) as T[];
+  }
+
+  #execute<T>(operation: string, sql: string, query: () => T): T {
+    const name = `db.${operation}.${queryNames.get(sql) ?? "inline"}`;
+    const start = performance.now();
+    try {
+      return backgroundTiming(name, () => latencySyncStage(name, query));
+    } finally {
+      const elapsed = performance.now() - start;
+      if (elapsed >= 100) {
+        // Do not log SQL, parameters, payloads or user text.
+        logger("runtime").warn("slow database operation", {
+          stage: name,
+          elapsed_ms: Math.round(elapsed),
+        });
+      }
+    }
   }
 
   initialize(): void {
@@ -69,6 +92,38 @@ export class MainDatabase {
       );
       for (const migration of MIGRATIONS) {
         insert.run(migration.version, migration.name, migration.checksum);
+      }
+    });
+  }
+
+  /** Apply only unapplied TS migrations; never accept an unknown or altered source history. */
+  upgrade(): void {
+    this.transaction(() => {
+      const applied = this.all<{ version: number; name: string; checksum: string }>(
+        "SELECT version,name,checksum FROM ts_schema_versions ORDER BY version",
+      );
+      if (applied.length === 0 || applied.length > MIGRATIONS.length) {
+        throw new Error("database contains an unknown or incomplete migration set");
+      }
+      for (let i = 0; i < applied.length; i++) {
+        const expected = MIGRATIONS[i]!;
+        const actual = applied[i]!;
+        if (
+          actual.version !== expected.version || actual.name !== expected.name ||
+          actual.checksum !== expected.checksum
+        ) {
+          throw new Error("database migration checksum mismatch or unknown version");
+        }
+      }
+      for (let i = applied.length; i < MIGRATIONS.length; i++) {
+        this.raw.exec(CANONICAL_SCHEMA[i]!);
+        const migration = MIGRATIONS[i]!;
+        this.run(
+          "INSERT INTO ts_schema_versions(version,name,checksum,applied_at) VALUES(?,?,?,unixepoch())",
+          migration.version,
+          migration.name,
+          migration.checksum,
+        );
       }
     });
   }

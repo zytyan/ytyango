@@ -130,13 +130,26 @@ export class AiService {
       : controller.signal;
     const stopTyping = startTyping(this.telegram, message.chatId, message.topicId, signal);
     if (!signal.aborted && this.repository.reactionsEnabled(message.userId)) {
-      void latencyStage("ai.reaction", () =>
-        this.telegram.setReaction(
-          message.chatId,
-          message.messageId,
-          "👀",
-          AbortSignal.any([signal, AbortSignal.timeout(2000)]),
-        )).catch(() => {});
+      const reactionSignal = AbortSignal.any([signal, AbortSignal.timeout(2000)]);
+      void latencyStage(
+        "ai.reaction",
+        () => this.telegram.setReaction(message.chatId, message.messageId, "👀", reactionSignal),
+      )
+        .catch((error: unknown) => {
+          if (signal.aborted) return;
+          const details = error as {
+            error_code?: number;
+            parameters?: { retry_after?: number };
+          } | null;
+          logger("ai").warn("reaction failed", {
+            chat_id: message.chatId,
+            message_id: message.messageId,
+            error_type: error instanceof Error ? error.name : "unknown",
+            error_code: details?.error_code,
+            retry_after: details?.parameters?.retry_after,
+            timed_out: reactionSignal.aborted,
+          });
+        });
     }
     return () => {
       controller.abort();

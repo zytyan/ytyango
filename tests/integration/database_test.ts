@@ -6,7 +6,7 @@ import { temporaryDatabase } from "./helpers.ts";
 Deno.test("TS-owned database contains exact migrations and required objects", async () => {
   const temporary = await temporaryDatabase();
   try {
-    assertEquals(temporary.db.validate().version, 2);
+    assertEquals(temporary.db.validate().version, 3);
     assertEquals(
       temporary.db.all<{ version: number; checksum: string }>(
         "SELECT version,checksum FROM ts_schema_versions ORDER BY version",
@@ -42,5 +42,49 @@ Deno.test("db validation refuses checksum drift", async () => {
   } finally {
     reopened.close();
     await Deno.remove(path.slice(0, path.lastIndexOf("/")), { recursive: true });
+  }
+});
+
+Deno.test("v2 upgrade adds indexed request lookup without rewriting history and refuses altered checksums", async () => {
+  const temp = await temporaryDatabase();
+  try {
+    temp.db.run("DROP INDEX idx_ai_runs_request");
+    temp.db.run("DELETE FROM ts_schema_versions WHERE version=3");
+    temp.db.run(
+      "INSERT INTO ai_sessions(chat_id,topic_id,chat_name,chat_type,provider,model,created_at,updated_at) VALUES(-100,0,'test','supergroup','gemini','test',1,1)",
+    );
+    const before = temp.db.all("SELECT * FROM ai_sessions");
+    const versions = temp.db.all("SELECT * FROM ts_schema_versions");
+    temp.db.run("UPDATE ts_schema_versions SET checksum='changed' WHERE version=1");
+    await assertRejects(
+      () => Promise.resolve().then(() => temp.db.upgrade()),
+      Error,
+      "checksum mismatch",
+    );
+    assertEquals(
+      temp.db.get("SELECT name FROM sqlite_master WHERE name='idx_ai_runs_request'"),
+      undefined,
+    );
+    temp.db.run("UPDATE ts_schema_versions SET checksum=? WHERE version=1", MIGRATIONS[0].checksum);
+    temp.db.upgrade();
+    temp.db.upgrade(); // Re-running an accepted upgrade is harmless.
+    assertEquals(temp.db.validate().version, 3);
+    assertEquals(temp.db.all("SELECT * FROM ai_sessions"), before);
+    assertEquals(temp.db.all("SELECT * FROM ts_schema_versions WHERE version<=2"), versions);
+    const { SQL } = await import("../../src/db/queries.ts");
+    const plan = temp.db.all<{ detail: string }>(
+      "EXPLAIN QUERY PLAN " + SQL.RunForRequest,
+      -100,
+      999999999,
+    );
+    assertEquals(
+      plan.some((row) =>
+        row.detail.includes("SEARCH") && row.detail.includes("idx_ai_runs_request")
+      ),
+      true,
+    );
+    assertEquals(plan.some((row) => row.detail.includes("SCAN ai_runs")), false);
+  } finally {
+    await temp.close();
   }
 });
