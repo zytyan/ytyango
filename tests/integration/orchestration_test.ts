@@ -210,6 +210,30 @@ Deno.test("Go-compatible bot replies trigger AI after traditional commands; fact
     assertEquals(modelCalls, 14);
     await app.bot.handleUpdate(update(913, "remember the calculation", calculationAnswer));
     assertEquals(modelCalls, 15);
+    const probe = latencySnapshot().recent.find((r) => r.update_id === 913)!;
+    assertEquals(probe.measurements.history_messages! >= 4, true);
+    assertEquals(probe.measurements.context_snapshot_chars! > 0, true);
+    assertEquals(probe.measurements.request_body_chars! > 0, true);
+    assertEquals(probe.measurements.response_body_bytes! > 0, true);
+    assertEquals(probe.measurements.assistant_payload_bytes! > 0, true);
+    for (
+      const stage of [
+        "ai.history.sql",
+        "ai.history.media",
+        "ai.snapshot.json",
+        "provider.request.parse",
+        "provider.request.stringify",
+        "provider.history.replay",
+        "provider.history.build",
+        "ai.persist.pending",
+        "ai.persist.generated",
+        "ai.persist.delivered",
+        "provider.response.parse",
+        "provider.payload.encode",
+      ]
+    ) {
+      assertEquals(probe.stages[stage]!.calls, 1);
+    }
     assertStringIncludes(JSON.stringify(lastBody.contents), "/calc 1/3+1/6 @test_bot");
     assertStringIncludes(JSON.stringify(lastBody.contents), "1/3+1/6 = 0.5");
     assertEquals(JSON.stringify(lastBody.systemInstruction).includes("1/3+1/6"), false);

@@ -3,6 +3,8 @@ import {
   latencySnapshot,
   latencyStage,
   latencySyncStage,
+  startLatencyMonitor,
+  traceMeasurements,
   traceTags,
   traceUpdate,
   updatesReceived,
@@ -123,6 +125,44 @@ Deno.test("latency records stage start offsets and synchronous database work wit
     assertEquals(trace.stages["db.run.FreezeRunContext"]!.failures, 1);
     assertEquals(JSON.stringify(trace).includes(secret), false);
   } finally {
+    logging.restore();
+  }
+});
+
+Deno.test("loop stall probe attributes a completed synchronous span and samples CPU/memory under unit permissions", async () => {
+  const logging = installLogging(8);
+  const stop = startLatencyMonitor(10, 5);
+  try {
+    await traceUpdate(930001, "ai", undefined, () => {
+      traceTags({ run_id: 123 });
+      traceMeasurements({ history_messages: 3, context_snapshot_chars: 100 });
+      latencySyncStage("probe.synthetic", () => {
+        const deadline = performance.now() + 70;
+        while (performance.now() < deadline) { /* Deliberately block to exercise the probe. */ }
+      });
+      return Promise.resolve();
+    });
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    const snapshot = latencySnapshot();
+    const span = snapshot.slow_synchronous_spans.find((s) => s.update_id === 930001)!;
+    assertEquals(span.stage, "probe.synthetic");
+    assertEquals(span.run_id, 123);
+    assertEquals(span.elapsed_ms >= 50, true);
+    const stall = snapshot.event_loop_stalls.find((s) =>
+      s.synchronous_spans.some((p) => p.update_id === 930001)
+    )!;
+    assertEquals(stall.lag_ms >= 5, true);
+    assertEquals(stall.sample.cpu_user_ms >= 0, true);
+    assertEquals(stall.sample.heap_used_bytes > 0, true);
+    assertEquals(stall.requests.some((r) => r.update_id === 930001), false);
+    assertEquals(snapshot.recent.find((r) => r.update_id === 930001)!.measurements, {
+      history_messages: 3,
+      context_snapshot_chars: 100,
+    });
+    assertEquals(snapshot.slow_synchronous_spans.length <= 64, true);
+    assertEquals(snapshot.event_loop_stalls.length <= 8, true);
+  } finally {
+    stop();
     logging.restore();
   }
 });

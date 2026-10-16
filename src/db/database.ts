@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
 import { SQL } from "./queries.ts";
 import { backgroundTiming, latencySyncStage } from "../shared/latency.ts";
@@ -11,6 +12,20 @@ import {
   REQUIRED_TRIGGERS,
 } from "./schema.ts";
 
+const inlineQueryNames = new Map<string, string>();
+function queryName(sql: string): string {
+  const known = queryNames.get(sql);
+  if (known) return known;
+  let name = inlineQueryNames.get(sql);
+  if (!name) {
+    name = `inline_${createHash("sha256").update(sql).digest("hex").slice(0, 12)}`;
+    if (inlineQueryNames.size >= 128) {
+      inlineQueryNames.delete(inlineQueryNames.keys().next().value!);
+    }
+    inlineQueryNames.set(sql, name);
+  }
+  return name;
+}
 const queryNames = new Map(Object.entries(SQL).map(([name, sql]) => [sql as string, name]));
 
 type SqlValue = null | number | bigint | string | Uint8Array;
@@ -40,15 +55,18 @@ export class MainDatabase {
   }
 
   transaction<T>(operation: () => T): T {
-    this.raw.exec("BEGIN IMMEDIATE");
-    try {
-      const result = operation();
-      this.raw.exec("COMMIT");
-      return result;
-    } catch (error) {
-      this.raw.exec("ROLLBACK");
-      throw error;
-    }
+    return backgroundTiming("db.transaction", () =>
+      latencySyncStage("db.transaction", () => {
+        this.#execute("begin", "BEGIN IMMEDIATE", () => this.raw.exec("BEGIN IMMEDIATE"));
+        try {
+          const result = operation();
+          this.#execute("commit", "COMMIT", () => this.raw.exec("COMMIT"));
+          return result;
+        } catch (error) {
+          this.#execute("rollback", "ROLLBACK", () => this.raw.exec("ROLLBACK"));
+          throw error;
+        }
+      }));
   }
 
   run(sql: string, ...params: SqlValue[]): void {
@@ -64,7 +82,7 @@ export class MainDatabase {
   }
 
   #execute<T>(operation: string, sql: string, query: () => T): T {
-    const name = `db.${operation}.${queryNames.get(sql) ?? "inline"}`;
+    const name = `db.${operation}.${queryName(sql)}`;
     const start = performance.now();
     try {
       return backgroundTiming(name, () => latencySyncStage(name, query));

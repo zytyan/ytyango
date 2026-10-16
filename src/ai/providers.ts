@@ -20,7 +20,7 @@ import {
 } from "./messages.ts";
 import { explicitCache } from "./google_cache.ts";
 import { systemClock } from "../shared/types.ts";
-import { latencyStage, traceTags } from "../shared/latency.ts";
+import { latencyStage, latencySyncStage, traceMeasurements, traceTags } from "../shared/latency.ts";
 
 const encoder = new TextEncoder();
 const bytes = (value: unknown) => encoder.encode(JSON.stringify(value));
@@ -67,16 +67,25 @@ export function createAiGenerator(
     ): Promise<AiResult> => {
       let raw = new Uint8Array();
       const capture: typeof fetch = async (url, init) => {
-        const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
-        replayLegacy(body, source, mode, request.historyRebuildLossy);
+        const body = latencySyncStage(
+          "provider.request.parse",
+          () => JSON.parse(String(init?.body)),
+        ) as Record<string, unknown>;
+        latencySyncStage(
+          "provider.history.replay",
+          () => replayLegacy(body, source, mode, request.historyRebuildLossy),
+        );
+        const encoded = latencySyncStage("provider.request.stringify", () => JSON.stringify(body));
+        traceMeasurements({ request_body_chars: encoded.length });
         const response = await latencyStage(
           "provider.headers",
-          () => fetcher(url, { ...init, body: JSON.stringify(body) }),
+          () => fetcher(url, { ...init, body: encoded }),
         );
         // Preserve original bytes, including fields the SDK does not understand.
         raw = new Uint8Array(
           await latencyStage("provider.body", () => response.clone().arrayBuffer()),
         );
+        traceMeasurements({ response_body_bytes: raw.byteLength });
         return response;
       };
       const google = createGoogle({
@@ -111,13 +120,14 @@ export function createAiGenerator(
         );
       const result = await generateText({
         model,
-        messages: modelMessages(
-          source,
-          request.provider,
-          request.model,
-          mode,
-          request.historyRebuildLossy,
-        ),
+        messages: latencySyncStage("provider.history.build", () =>
+          modelMessages(
+            source,
+            request.provider,
+            request.model,
+            mode,
+            request.historyRebuildLossy,
+          )),
         system: state.geminiCacheName ? undefined : request.systemPrompt,
         // Retry budget belongs to this request, shared across protocol/state recovery.
         maxRetries: 0,
@@ -163,7 +173,10 @@ export function createAiGenerator(
               },
           },
       });
-      const native = JSON.parse(new TextDecoder().decode(raw)) as Record<string, unknown>;
+      const native = latencySyncStage(
+        "provider.response.parse",
+        () => JSON.parse(new TextDecoder().decode(raw)),
+      ) as Record<string, unknown>;
       const responseModel = native.modelVersion ?? native.model;
       if (typeof responseModel === "string" && /^[\w.-]{1,120}$/.test(responseModel)) {
         traceTags({ response_model: responseModel });
@@ -194,6 +207,14 @@ export function createAiGenerator(
         .find((value) => typeof value === "string");
       const blockReason = (native.promptFeedback as { blockReason?: string } | undefined)
         ?.blockReason;
+      const assistantPayload = latencySyncStage("provider.payload.encode", () =>
+        bytes({
+          provider: request.provider,
+          mode,
+          messages: result.response.messages,
+          native: nativeAssistant,
+        }));
+      traceMeasurements({ assistant_payload_bytes: assistantPayload.byteLength });
       return {
         displayText: deepseekNative && result.sources.length
           ? result.text + "\n\n搜索来源：\n" +
@@ -209,12 +230,7 @@ export function createAiGenerator(
                 : ""
             ).join("\n")
           : result.text,
-        assistantPayload: bytes({
-          provider: request.provider,
-          mode,
-          messages: result.response.messages,
-          native: nativeAssistant,
-        }),
+        assistantPayload,
         assistantPayloadFormat: SDK_PAYLOAD_FORMAT,
         usage: {
           inputTokens: result.usage.inputTokens ?? 0,

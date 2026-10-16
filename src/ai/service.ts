@@ -8,7 +8,7 @@ import { supportsImages } from "./types.ts";
 import { factText, type TraditionalFact } from "../interaction.ts";
 import { logger } from "../logging.ts";
 import { startTyping } from "../telegram/typing.ts";
-import { latencyStage, traceTags } from "../shared/latency.ts";
+import { latencyStage, latencySyncStage, traceMeasurements, traceTags } from "../shared/latency.ts";
 
 export const DEFAULT_SYSTEM_PROMPT = `这里是一个Telegram聊天 type:%CHAT_TYPE%,name:%CHAT_NAME%
 你是一个Telegram机器人，name: %BOT_NAME% username: %BOT_USERNAME%
@@ -248,7 +248,11 @@ export class AiService {
       throw error;
     }
     const now = Math.floor(this.clock.now().getTime() / 1000);
-    const run = existing ?? this.repository.beginRun(session.id, pending, now);
+    const run = existing ??
+      latencySyncStage(
+        "ai.persist.pending",
+        () => this.repository.beginRun(session.id, pending, now),
+      );
     traceTags({ run_id: run.id });
     if (run.status === "delivered") return;
     if (run.status === "model_failed" || run.status === "persistence_failed") {
@@ -268,8 +272,19 @@ export class AiService {
         const promptTemplate =
           this.repository.getSystemPrompt(incoming.chatId, incoming.topicId ?? 0) ??
             DEFAULT_SYSTEM_PROMPT;
-        this.repository.freezeContext(
-          run.id,
+        traceMeasurements({
+          history_messages: window.length,
+          history_assistant_payload_bytes: window.reduce(
+            (sum, m) => sum + (m.assistantPayload?.byteLength ?? 0),
+            0,
+          ),
+          history_media_files: window.reduce((sum, m) => sum + m.media.length, 0),
+          history_media_bytes: window.reduce(
+            (sum, m) => sum + m.media.reduce((n, file) => n + file.bytes.byteLength, 0),
+            0,
+          ),
+        });
+        const snapshot = latencySyncStage("ai.snapshot.json", () =>
           JSON.stringify({
             provider: session.provider,
             model: session.model,
@@ -281,8 +296,9 @@ export class AiService {
                 byteSize: bytes.byteLength,
               })),
             })),
-          }, (_key, value) => value instanceof Uint8Array ? { bytes: Array.from(value) } : value),
-        );
+          }, (_key, value) => value instanceof Uint8Array ? { bytes: Array.from(value) } : value));
+        traceMeasurements({ context_snapshot_chars: snapshot.length });
+        this.repository.freezeContext(run.id, snapshot);
         result = await latencyStage("ai.generate", () =>
           this.generate({
             sessionId: session.id,
@@ -301,7 +317,15 @@ export class AiService {
             state: this.repository.loadProviderState(session.id),
             signal: incoming.signal,
           }));
-        this.repository.completeRun(run.id, result, Math.floor(this.clock.now().getTime() / 1000));
+        latencySyncStage(
+          "ai.persist.generated",
+          () =>
+            this.repository.completeRun(
+              run.id,
+              result,
+              Math.floor(this.clock.now().getTime() / 1000),
+            ),
+        );
         logger("ai").debug("generation completed", {
           runId: run.id,
           provider: session.provider,
@@ -354,24 +378,25 @@ export class AiService {
         "ai.delivery",
         () => this.telegram.sendRichMessage(incoming.chatId, display, options),
       );
-      this.repository.deliverRun(
-        run.id,
-        {
-          chatId: response.chatId,
-          messageId: response.messageId,
-          sentAt: Math.floor(this.clock.now().getTime() / 1000),
-          userId: this.botIdentity.id,
-          username: this.botIdentity.firstName,
-          atableUsername: this.botIdentity.username,
-          role: "model",
-          messageType: "text",
-          text: display,
-          replyToMessageId: incoming.messageId,
-          media: [],
-        },
-        result,
-        Math.floor(this.clock.now().getTime() / 1000),
-      );
+      latencySyncStage("ai.persist.delivered", () =>
+        this.repository.deliverRun(
+          run.id,
+          {
+            chatId: response.chatId,
+            messageId: response.messageId,
+            sentAt: Math.floor(this.clock.now().getTime() / 1000),
+            userId: this.botIdentity.id,
+            username: this.botIdentity.firstName,
+            atableUsername: this.botIdentity.username,
+            role: "model",
+            messageType: "text",
+            text: display,
+            replyToMessageId: incoming.messageId,
+            media: [],
+          },
+          result,
+          Math.floor(this.clock.now().getTime() / 1000),
+        ));
     } catch (error) {
       logger("ai").warn("delivery failed", { runId: run.id });
       this.repository.failRun(
@@ -440,18 +465,25 @@ export class AiService {
 
   async #loadMessages(sessionId: number): Promise<AiMessage[]> {
     // A selected reply is part of this session, including every subsequent turn.
-    const all = this.repository.loadMessages(sessionId, true);
+    const all = latencySyncStage(
+      "ai.history.sql",
+      () => this.repository.loadMessages(sessionId, true),
+    );
     const drop = Math.max(0, Math.ceil((all.length - 200) / 50) * 50);
     const stored = all.slice(drop);
-    return await Promise.all(stored.map(async (message: StoredAiMessage): Promise<AiMessage> => ({
-      ...message,
-      media: await Promise.all(message.mediaObjects.map(async (media) => ({
-        sha256: media.sha256,
-        kind: media.kind,
-        mimeType: media.mimeType,
-        bytes: await this.mediaStore.open(media.sha256),
-      }))),
-    })));
+    return await latencyStage(
+      "ai.history.media",
+      () =>
+        Promise.all(stored.map(async (message: StoredAiMessage): Promise<AiMessage> => ({
+          ...message,
+          media: await Promise.all(message.mediaObjects.map(async (media) => ({
+            sha256: media.sha256,
+            kind: media.kind,
+            mimeType: media.mimeType,
+            bytes: await this.mediaStore.open(media.sha256),
+          }))),
+        }))),
+    );
   }
 
   #renderPrompt(template: string, message: IncomingAiMessage): string {

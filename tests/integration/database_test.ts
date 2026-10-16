@@ -88,3 +88,29 @@ Deno.test("v2 upgrade adds indexed request lookup without rewriting history and 
     await temp.close();
   }
 });
+
+Deno.test("database probes distinguish inline SQL and transaction phases without retaining parameters", async () => {
+  const temp = await temporaryDatabase();
+  const { traceUpdate, latencySnapshot } = await import("../../src/shared/latency.ts");
+  try {
+    await traceUpdate(940001, "command", undefined, () => {
+      temp.db.transaction(() => {
+        temp.db.get("SELECT ? AS value", "secret-query-parameter");
+        temp.db.get("SELECT ? AS value", "another-secret-parameter");
+        temp.db.get("SELECT 42 AS value");
+      });
+      return Promise.resolve();
+    });
+    const trace = latencySnapshot().recent.find((r) => r.update_id === 940001)!;
+    const queries = Object.keys(trace.stages).filter((n) => n.startsWith("db.get.inline_"));
+    assertEquals(queries.length, 2);
+    assertEquals(queries.some((n) => trace.stages[n]!.calls === 2), true);
+    assertEquals(trace.stages["db.transaction"]!.calls, 1);
+    assertEquals(Object.keys(trace.stages).some((n) => n.startsWith("db.begin.")), true);
+    assertEquals(Object.keys(trace.stages).some((n) => n.startsWith("db.commit.")), true);
+    assertEquals(JSON.stringify(trace).includes("secret"), false);
+    assertEquals(JSON.stringify(trace).includes("SELECT"), false);
+  } finally {
+    await temp.close();
+  }
+});
