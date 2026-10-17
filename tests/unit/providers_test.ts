@@ -712,3 +712,125 @@ Deno.test("latest Flash supports images and retired menu slots retain stable cal
   await mock.generate(request([photo], { provider: "deepseek", model: "deepseek-flash" }));
   assert(JSON.stringify(mock.calls[0]!.body.messages).includes('"type":"image"'));
 });
+
+for (const code of ["max_uses_exceeded", "too_many_requests", "unavailable"]) {
+  Deno.test(`DeepSeek search error array ${code} preserves answer, raw bytes, usage and continuation`, async () => {
+    const base = nativeDeepseekResponse();
+    const errorBlock = {
+      type: "web_search_tool_result",
+      tool_use_id: "srvtoolu-error",
+      content: [{ type: "web_search_tool_result_error", error_code: code }],
+    };
+    const response = {
+      ...base,
+      content: [
+        ...base.content.slice(0, -1),
+        {
+          type: "server_tool_use",
+          id: "srvtoolu-error",
+          name: "web_search",
+          input: { query: "more" },
+        },
+        errorBlock,
+        base.content.at(-1),
+      ],
+    };
+    const original = `\n ${JSON.stringify(response, null, 2)}\n`;
+    const mock = intercepted(() =>
+      new Response(original, {
+        headers: {
+          "content-type": "application/json",
+          "content-length": String(encoder.encode(original).length),
+        },
+      })
+    );
+    const first = await mock.generate(
+      request([user()], { provider: "deepseek", model: "deepseek-flash" }),
+    );
+    assertEquals(mock.calls.length, 1);
+    assert(first.displayText.includes("Latest release"));
+    assert(first.displayText.includes("https://example.com/release"));
+    assertEquals(first.usage.inputTokens, 24);
+    assertEquals(first.usage.outputTokens, 6);
+    assertEquals(decoder.decode(first.raw), original);
+    const saved = JSON.parse(decoder.decode(first.assistantPayload));
+    assertEquals(saved.native, response.content);
+    assert(JSON.stringify(saved.messages).includes(code));
+    await mock.generate(request([user(), assistant(first), user({ messageId: 3 })], {
+      provider: "deepseek",
+      model: "deepseek-flash",
+    }));
+    assertEquals(mock.calls.length, 2);
+    const history = JSON.stringify(mock.calls[1]!.body.messages);
+    assert(history.includes("signed-reasoning"));
+    assert(history.includes("opaque"));
+    const blocks = (mock.calls[1]!.body.messages as {
+      content: { type: string; tool_use_id?: string; content?: unknown }[];
+    }[])
+      .flatMap((m) => m.content);
+    assertEquals(
+      blocks.find((b) => b.type === "web_search_tool_result" && b.tool_use_id === "srvtoolu-error")!
+        .content,
+      { type: "web_search_tool_result_error", error_code: code },
+    );
+  });
+}
+
+Deno.test("DeepSeek search errors without display text still retain successful usage and original payload", async () => {
+  const response = {
+    ...nativeDeepseekResponse(),
+    content: [
+      {
+        type: "server_tool_use",
+        id: "srvtoolu-error",
+        name: "web_search",
+        input: { query: "more" },
+      },
+      {
+        type: "web_search_tool_result",
+        tool_use_id: "srvtoolu-error",
+        content: [{ type: "web_search_tool_result_error", error_code: "max_uses_exceeded" }],
+      },
+    ],
+  };
+  const mock = intercepted(() => json(response));
+  const result = await mock.generate(
+    request([user()], { provider: "deepseek", model: "deepseek-flash" }),
+  );
+  assertEquals(result.displayText, "");
+  assertEquals(result.usage.inputTokens, 24);
+  assertEquals(result.usage.outputTokens, 6);
+  assertEquals(JSON.parse(decoder.decode(result.raw)), response);
+  assertEquals(mock.calls.length, 1);
+});
+
+Deno.test("DeepSeek ambiguous mixed search arrays remain invalid rather than discarding results", async () => {
+  const response = nativeDeepseekResponse();
+  const mixed = {
+    ...response,
+    content: [
+      ...response.content.slice(0, -1),
+      {
+        type: "web_search_tool_result",
+        tool_use_id: "srvtoolu-error",
+        content: [
+          { type: "web_search_tool_result_error", error_code: "max_uses_exceeded" },
+          {
+            type: "web_search_result",
+            url: "https://example.com",
+            title: "result",
+            encrypted_content: "opaque",
+          },
+        ],
+      },
+      response.content.at(-1),
+    ],
+  };
+  const mock = intercepted(() => json(mixed));
+  await assertRejects(
+    () => mock.generate(request([user()], { provider: "deepseek", model: "deepseek-flash" })),
+    Error,
+    "Invalid JSON response",
+  );
+  assertEquals(mock.calls.length, 1);
+});

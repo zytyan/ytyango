@@ -141,3 +141,96 @@ Deno.test("SDK result survives Telegram failure; redelivery neither calls model 
     await temporary.close();
   }
 });
+
+Deno.test("DeepSeek search-limit response persists original bytes and usage once across Telegram redelivery", async () => {
+  const temp = await temporaryDatabase();
+  try {
+    const repository = new AiRepository(temp.db);
+    repository.setChatModel(-100, "deepseek", "deepseek-flash", 1);
+    const config = parseConfig(
+      `database-path: ${temp.path}\nai-chats: [-100]\ndeepseek-key: fake\n`,
+    );
+    const wire = `\n${
+      JSON.stringify(
+        {
+          id: "msg-search-limit",
+          type: "message",
+          role: "assistant",
+          model: "deepseek-flash",
+          content: [
+            {
+              type: "server_tool_use",
+              id: "search-limit",
+              name: "web_search",
+              input: { query: "fixture" },
+            },
+            {
+              type: "web_search_tool_result",
+              tool_use_id: "search-limit",
+              content: [{ type: "web_search_tool_result_error", error_code: "max_uses_exceeded" }],
+            },
+            { type: "text", text: "Answer from completed searches." },
+          ],
+          stop_reason: "end_turn",
+          stop_sequence: null,
+          usage: {
+            input_tokens: 20,
+            output_tokens: 6,
+            cache_read_input_tokens: 4,
+            cache_creation_input_tokens: 0,
+          },
+        },
+        null,
+        2,
+      )
+    }\n`;
+    let calls = 0;
+    const generate = createAiGenerator(() => config, () => {
+      calls++;
+      return Promise.resolve(
+        new Response(wire, { headers: { "content-type": "application/json" } }),
+      );
+    });
+    const telegram = new FakeTelegram();
+    const send = telegram.sendRichMessage.bind(telegram);
+    telegram.sendRichMessage = () => Promise.reject(new Error("Telegram unavailable"));
+    const service = new AiService(
+      repository,
+      generate,
+      telegram,
+      new ContentAddressedMediaStore(`${temp.path}.media`),
+      () => config,
+      { id: 99, firstName: "bot", username: "bot" },
+    );
+    const message: IncomingAiMessage = {
+      chatId: -100,
+      chatName: "test",
+      chatType: "supergroup",
+      messageId: 10,
+      sentAt: 2,
+      userId: 7,
+      username: "user",
+      text: "@bot search",
+      media: [],
+    };
+    await assertRejects(() => service.handle(message), Error, "Telegram unavailable");
+    const failed = repository.runForRequest(-100, 10)!;
+    assertEquals(failed.status, "delivery_failed");
+    assertEquals(new TextDecoder().decode(failed.raw_payload!), wire);
+    assertEquals(failed.response_text, "Answer from completed searches.");
+    telegram.sendRichMessage = send;
+    await service.handle(message);
+    await service.handle(message);
+    assertEquals(calls, 1);
+    assertEquals(repository.runForRequest(-100, 10)!.status, "delivered");
+    assertEquals(
+      temp.db.get(
+        "SELECT total_input_tokens,total_output_tokens,total_cached_input_tokens FROM ai_sessions",
+      ),
+      { total_input_tokens: 24, total_output_tokens: 6, total_cached_input_tokens: 4 },
+    );
+    assertEquals(telegram.calls.filter((call) => call.method === "rich").length, 1);
+  } finally {
+    await temp.close();
+  }
+});

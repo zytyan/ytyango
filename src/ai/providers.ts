@@ -18,6 +18,7 @@ import {
   savedPayload,
   SDK_PAYLOAD_FORMAT,
 } from "./messages.ts";
+import { normalizeDeepseekSearchErrors } from "./deepseek_response.ts";
 import { explicitCache } from "./google_cache.ts";
 import { systemClock } from "../shared/types.ts";
 import { latencyStage, latencySyncStage, traceMeasurements, traceTags } from "../shared/latency.ts";
@@ -86,6 +87,31 @@ export function createAiGenerator(
           await latencyStage("provider.body", () => response.clone().arrayBuffer()),
         );
         traceMeasurements({ response_body_bytes: raw.byteLength });
+        if (request.provider === "deepseek" && mode === "deepseek-anthropic" && response.ok) {
+          const normalized = latencySyncStage("provider.response.compatibility", () => {
+            let payload: unknown;
+            try {
+              payload = JSON.parse(new TextDecoder().decode(raw));
+            } catch {
+              // Leave malformed JSON to the SDK's normal error handling.
+              return undefined;
+            }
+            return normalizeDeepseekSearchErrors(payload) ? JSON.stringify(payload) : undefined;
+          });
+          if (normalized !== undefined) {
+            const headers = new Headers(response.headers);
+            // Fetch has already decoded the body; these headers describe the original bytes.
+            for (const name of ["content-length", "content-encoding", "transfer-encoding"]) {
+              headers.delete(name);
+            }
+            await response.body?.cancel();
+            return new Response(normalized, {
+              status: response.status,
+              statusText: response.statusText,
+              headers,
+            });
+          }
+        }
         return response;
       };
       const google = createGoogle({
