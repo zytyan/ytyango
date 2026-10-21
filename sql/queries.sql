@@ -81,3 +81,12 @@ SELECT chat_id,topic_id,group_id,msg_id,file_id,file_unique_id,byte_size FROM al
 
 -- name: SessionHasMessage
 SELECT 1 AS found FROM ai_session_messages WHERE session_id=? AND chat_id=? AND msg_id=?;
+-- name: SetSessionSuspension
+INSERT INTO ai_session_suspensions(session_id,until_at) VALUES(?,?)
+ON CONFLICT(session_id) DO UPDATE SET until_at=excluded.until_at;
+
+-- name: ResumeSession
+DELETE FROM ai_session_suspensions WHERE session_id=?;
+
+-- name: IsSessionSuspended
+SELECT 1 AS found FROM ai_session_suspensions WHERE session_id=? AND (until_at IS NULL OR until_at>?);

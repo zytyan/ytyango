@@ -99,6 +99,7 @@ Deno.test("management replies and input errors are private; successful tools rem
         "/session_id",
         "/session_help",
         "/ai_reaction off",
+        "/suspend",
         "/get_sysprompt",
         "/sysprompt",
         "/sysprompt test prompt",
@@ -163,6 +164,93 @@ Deno.test("management replies and input errors are private; successful tools rem
     assertEquals(f.calls.at(-1)!.payload.ephemeral_message_parameters, undefined);
   } finally {
     f.app.flush();
+    await f.close();
+  }
+});
+
+Deno.test("suspend is owner-only, reply-targeted, durable, and always private in groups", async () => {
+  const f = await fixture();
+  try {
+    const repository = new AiRepository(f.db);
+    const session = repository.createSession({
+      chatId: -100,
+      topicId: 55,
+      chatName: "test",
+      chatType: "supergroup",
+      provider: "gemini",
+      model: "test",
+      now: 1,
+    });
+    repository.beginRun(session.id, [{
+      message: {
+        chatId: -100,
+        messageId: 80,
+        userId: 7,
+        username: "user",
+        role: "user",
+        sentAt: 1,
+        messageType: "text",
+        text: "@bot",
+        media: [],
+      },
+      contextOnly: false,
+      mediaObjects: [],
+    }], 1);
+    const hidden = {
+      message_id: 0,
+      ephemeral_message_id: 42,
+      reply_to_message: { ...f.menu(false), message_id: 80 },
+    };
+    const now = Math.floor(Date.now() / 1000);
+    for (const duration of ["10s", "1m", "2h", "1d", ""]) {
+      await f.app.bot.handleUpdate(f.update(`/suspend ${duration}`, hidden));
+      assertEquals(new AiRepository(f.db).isSessionSuspended(session.id, now), true);
+      assertEquals(f.calls.at(-1)!.payload.ephemeral_message_parameters, { receiver_user_id: 7 });
+      assertEquals(f.calls.at(-1)!.payload.reply_parameters, { ephemeral_message_id: 42 });
+      if (duration) {
+        assertEquals(repository.isSessionSuspended(session.id, now + 86401), false);
+      } else assertEquals(repository.isSessionSuspended(session.id, now + 86401), true);
+    }
+    // Even an administrator cannot resume the owner's suspended session.
+    const beforeTrigger = f.calls.length;
+    await f.app.bot.handleUpdate(f.update("@bot suspended", {
+      reply_to_message: hidden.reply_to_message,
+    }));
+    assertEquals(f.calls.length, beforeTrigger);
+    await f.app.bot.handleUpdate(f.update("/suspend off", {
+      ...hidden,
+      from: { id: 8, first_name: "admin", is_bot: false },
+    }));
+    assertEquals(repository.isSessionSuspended(session.id, now), true);
+    assertStringIncludes(String(f.calls.at(-1)!.payload.text), "仅限");
+    await f.app.bot.handleUpdate(f.update("/suspend off", {
+      ...hidden,
+      date: now - 20,
+    }));
+    assertEquals(repository.isSessionSuspended(session.id, now), true);
+    await f.app.bot.handleUpdate(f.update("/suspend off", {
+      ...hidden,
+      chat: { id: -200, type: "supergroup", title: "other" },
+    }));
+    assertEquals(repository.isSessionSuspended(session.id, now), true);
+    assertStringIncludes(String(f.calls.at(-1)!.payload.text), "请回复");
+    await f.app.bot.handleUpdate(f.update("/suspend off", hidden));
+    assertEquals(repository.isSessionSuspended(session.id, now), false);
+    await f.app.bot.handleUpdate(f.update("/suspend 0s", hidden));
+    assertStringIncludes(String(f.calls.at(-1)!.payload.text), "用法");
+    assertEquals(repository.isSessionSuspended(session.id, now), false);
+    // Normal group commands cannot cause a public fallback when the bot lacks private-send rights.
+    f.setAdmin(false);
+    const before = f.calls.length;
+    await f.app.bot.handleUpdate(
+      f.update("/suspend", { reply_to_message: hidden.reply_to_message }),
+    );
+    assertEquals(f.calls.slice(before).some((c) => c.method.startsWith("send")), false);
+    assertEquals(repository.isSessionSuspended(session.id, now), false);
+    f.app.flush();
+    assertEquals(f.db.all("SELECT * FROM traditional_facts"), []);
+    assertEquals(f.db.all("SELECT * FROM ai_messages WHERE msg_id=0"), []);
+  } finally {
     await f.close();
   }
 });

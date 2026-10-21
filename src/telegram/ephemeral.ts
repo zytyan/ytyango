@@ -12,6 +12,7 @@ export type PrivateReplyOptions = ReplyOptions & {
 };
 
 export const PRIVATE_COMMANDS = new Set([
+  "suspend",
   "session_id",
   "session_help",
   "ai_reaction",
@@ -30,6 +31,7 @@ export function incomingPrivateCommand(message: Message): string {
 }
 
 const commands: readonly (readonly [string, string])[] = [
+  ["suspend", "暂停指定 AI 会话：时长/off，仅所有者可用"],
   ["session_id", "查询 AI 会话 ID"],
   ["session_help", "会话使用帮助"],
   ["new_session", "重置本话题的默认 AI 会话"],

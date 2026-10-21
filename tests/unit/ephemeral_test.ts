@@ -11,7 +11,8 @@ import {
 
 Deno.test("ephemeral command declarations preserve public tools and private chat commands", () => {
   const groups = commandMenu(true), privateChats = commandMenu(false);
-  assertEquals(groups.length, 21);
+  assertEquals(groups.length, 22);
+  assertEquals(groups.find((c) => c.command === "suspend")!.is_ephemeral, true);
   assertEquals(new Set(groups.map((c) => c.command)).size, groups.length);
   for (const name of ["roll", "calc", "ocr", "downloadvideo", "downloadaudio", "getrank"]) {
     assertEquals(groups.find((c) => c.command === name)!.is_ephemeral, false);

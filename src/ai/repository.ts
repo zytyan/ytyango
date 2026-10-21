@@ -70,6 +70,15 @@ function session(row: SessionRow): AiSession {
 export class AiRepository {
   constructor(readonly db: MainDatabase) {}
 
+  setSessionSuspension(sessionId: number, until: number | null | "off"): void {
+    if (until === "off") this.db.run(SQL.ResumeSession, sessionId);
+    else this.db.run(SQL.SetSessionSuspension, sessionId, until);
+  }
+
+  isSessionSuspended(sessionId: number, now: number): boolean {
+    return this.db.get(SQL.IsSessionSuspended, sessionId, now) !== undefined;
+  }
+
   reactionsEnabled(userId: number): boolean {
     return this.db.get<{ reactions_enabled: number }>(SQL.GetReactions, userId)
       ?.reactions_enabled !== 0;

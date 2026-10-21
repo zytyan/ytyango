@@ -34,6 +34,7 @@ import { SQL } from "./db/queries.ts";
 import { installLogging, startInnerHttp } from "./inner_http.ts";
 import { logger } from "./logging.ts";
 import { formatUsage } from "./ai/usage.ts";
+import { parseSuspension } from "./ai/suspend.ts";
 import { isCalculation } from "./features/calculator.ts";
 import { isFish } from "./features/images.ts";
 import { parseExchange } from "./features/tools.ts";
@@ -296,7 +297,7 @@ export async function createApplication(
   const interactions = new WeakMap<Context, Interaction>();
   const currentInteraction = (ctx: Context) => interactions.get(ctx)!;
   const shutdown = new AbortController();
-  const earlyActivity = new WeakSet<Context>();
+  const earlyActivity = new WeakMap<Context, () => void>();
 
   bot.use(async (ctx, next) => {
     const message = ctx.message;
@@ -344,12 +345,13 @@ export async function createApplication(
         identity.username,
         message.reply_to_message?.from?.id === identity.id,
       ) ||
-      repository.runForRequest(message.chat.id, message.message_id)?.status === "delivered"
+      repository.runForRequest(message.chat.id, message.message_id)?.status === "delivered" ||
+      ai.isRequestSuspended(toIncoming(message))
     ) {
       return await next();
     }
-    earlyActivity.add(ctx);
     const stop = ai.startActivity({ ...toIncoming(message), signal: shutdown.signal });
+    earlyActivity.set(ctx, stop);
     try {
       await next();
     } finally {
@@ -411,6 +413,7 @@ export async function createApplication(
       )
       : [];
     const incoming = toIncoming(message);
+    if (ai.isRequestSuspended(incoming)) return;
     if (!repository.runForRequest(message.chat.id, message.message_id)) {
       if (!albums.claim(message)) return;
       try {
@@ -435,7 +438,7 @@ export async function createApplication(
       ...incoming,
       facts: [...replyFacts, ...current.facts],
       signal: shutdown.signal,
-    }, earlyActivity.has(ctx));
+    }, earlyActivity.get(ctx));
   });
 
   bot.use(async (ctx, next) => {
@@ -469,6 +472,42 @@ export async function createApplication(
   );
 
   const automaticTools = toolHandlers(bot, db, telegram, configs, currentInteraction);
+
+  bot.command("suspend", async (ctx) => {
+    const options = await privateReplyOptions(ctx);
+    // This command must never fall back to a public group reply.
+    if (
+      !options || (["group", "supergroup"].includes(ctx.chat.type) &&
+        !options.ephemeral_message_parameters)
+    ) return;
+    const reply = (text: string) => ctx.api.sendMessage(ctx.chat.id, text, options);
+    if (ctx.from?.id !== configs.value.god) return await reply("此命令仅限 Bot 所有者使用。");
+    if (ctx.msg.ephemeral_message_id && Date.now() - ctx.msg.date * 1000 >= 15_000) return;
+    const value = commandArgument(ctx.message);
+    const duration = parseSuspension(value);
+    if (
+      duration === undefined ||
+      (typeof duration === "number" && !Number.isSafeInteger(now() + duration))
+    ) {
+      return await reply(
+        "用法：回复目标会话消息发送 /suspend [10s|1m|2h|1d|off]；留空永久暂停，off 恢复。",
+      );
+    }
+    const replied = ctx.msg.reply_to_message;
+    const session = replied && ai.sessionForMessage(ctx.chat.id, replied.message_id);
+    if (!session) return await reply("请回复目标 AI 会话中的消息使用此命令。");
+    ai.setSessionSuspension(
+      session.id,
+      typeof duration === "number" ? now() + duration : duration,
+    );
+    await reply(
+      duration === "off"
+        ? `会话 #${session.id} 已恢复 AI 回复。`
+        : duration === null
+        ? `会话 #${session.id} 已永久暂停 AI 回复。`
+        : `会话 #${session.id} 已暂停 AI 回复 ${value}，到期自动恢复。`,
+    );
+  });
 
   bot.command("ai_reaction", async (ctx) => {
     const value = commandArgument(ctx.message).toLowerCase();

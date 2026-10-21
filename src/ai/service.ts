@@ -100,6 +100,7 @@ function storedResult(run: RunRow): AiResult {
 export class AiService {
   readonly #current = new Map<string, number>();
   readonly #locks = new KeyedMutex();
+  readonly #active = new Map<number, Set<() => void>>();
 
   constructor(
     readonly repository: AiRepository,
@@ -121,6 +122,28 @@ export class AiService {
 
   sessionForMessage(chatId: number, messageId: number): AiSession | undefined {
     return this.repository.findSessionByMessage(chatId, messageId);
+  }
+
+  setSessionSuspension(sessionId: number, until: number | null | "off"): void {
+    this.repository.setSessionSuspension(sessionId, until);
+    if (until !== "off") {
+      for (const stop of this.#active.get(sessionId) ?? []) stop();
+    }
+  }
+
+  isRequestSuspended(message: IncomingAiMessage): boolean {
+    const previous = this.repository.runForRequest(message.chatId, message.messageId);
+    const target = previous
+      ? this.repository.getSession(previous.session_id)
+      : this.#findSession(message, parseSessionRouting(message.text ?? ""));
+    return target ? this.#isSuspended(target.id) : false;
+  }
+
+  #isSuspended(sessionId: number): boolean {
+    return this.repository.isSessionSuspended(
+      sessionId,
+      Math.floor(this.clock.now().getTime() / 1000),
+    );
   }
 
   startActivity(message: IncomingAiMessage): () => void {
@@ -157,7 +180,7 @@ export class AiService {
     };
   }
 
-  async handle(message: IncomingAiMessage, activityStarted = false): Promise<void> {
+  async handle(message: IncomingAiMessage, stopEarlyActivity?: () => void): Promise<void> {
     if (!this.config().aiChats.includes(message.chatId)) return;
     const routing = parseSessionRouting(message.text ?? "");
     const previous = this.repository.runForRequest(message.chatId, message.messageId);
@@ -165,18 +188,29 @@ export class AiService {
     const target = previous
       ? this.repository.getSession(previous.session_id)!
       : this.#resolveSession(message, routing);
+    if (this.#isSuspended(target.id)) return;
     traceTags({ session_id: target.id, provider: target.provider, model: target.model });
-    const stopActivity = activityStarted ? () => {} : this.startActivity(message);
+    const stopActivity = stopEarlyActivity ?? this.startActivity(message);
+    let suspended = false;
+    const stop = () => {
+      suspended = true;
+      stopActivity();
+    };
+    const active = this.#active.get(target.id) ?? new Set<() => void>();
+    this.#active.set(target.id, active);
+    active.add(stop);
     try {
       await this.#locks.use(String(target.id), async () => {
-        await this.#handleLocked(target, message);
+        await this.#handleLocked(target, message, () => suspended || this.#isSuspended(target.id));
       }, "queue.ai_session");
     } finally {
+      active.delete(stop);
+      if (!active.size) this.#active.delete(target.id);
       stopActivity();
     }
   }
 
-  #resolveSession(message: IncomingAiMessage, routing: SessionRouting): AiSession {
+  #findSession(message: IncomingAiMessage, routing: SessionRouting): AiSession | undefined {
     let target: AiSession | undefined;
     if (!routing.createNew && routing.explicitSessionId) {
       const explicit = this.repository.getSession(routing.explicitSessionId);
@@ -190,6 +224,11 @@ export class AiService {
       const id = this.#current.get(topicKey(message));
       if (id) target = this.repository.getSession(id);
     }
+    return target;
+  }
+
+  #resolveSession(message: IncomingAiMessage, routing: SessionRouting): AiSession {
+    let target = this.#findSession(message, routing);
     if (!target) {
       const selection = this.repository.getSelection(message.chatId);
       target = this.repository.createSession({
@@ -206,7 +245,12 @@ export class AiService {
     return target;
   }
 
-  async #handleLocked(initialSession: AiSession, incoming: IncomingAiMessage): Promise<void> {
+  async #handleLocked(
+    initialSession: AiSession,
+    incoming: IncomingAiMessage,
+    suspended: () => boolean,
+  ): Promise<void> {
+    if (suspended()) return;
     const session = this.repository.getSession(initialSession.id) ?? initialSession;
     traceTags({ provider: session.provider, model: session.model });
     const existing = this.repository.getRunByRequest(
@@ -238,6 +282,7 @@ export class AiService {
         );
       }
     } catch (error) {
+      if (suspended()) return;
       await this.telegram.sendMessage(
         incoming.chatId,
         "无法完整读取请求中的媒体，本次未调用模型。",
@@ -247,6 +292,7 @@ export class AiService {
       );
       throw error;
     }
+    if (suspended()) return;
     const now = Math.floor(this.clock.now().getTime() / 1000);
     const run = existing ??
       latencySyncStage(
@@ -267,6 +313,7 @@ export class AiService {
           "ai.history",
           () => this.#loadMessages(session.id),
         );
+        if (suspended()) return;
         const drop = Math.max(0, Math.ceil((loaded.length - 200) / 50) * 50);
         const window = loaded.slice(drop);
         const promptTemplate =
@@ -343,6 +390,7 @@ export class AiService {
           error,
           Math.floor(this.clock.now().getTime() / 1000),
         );
+        if (suspended()) return;
         try {
           if (this.repository.reactionsEnabled(incoming.userId)) {
             await this.telegram.setReaction(
@@ -355,12 +403,14 @@ export class AiService {
         } catch {
           // Best effort.
         }
+        if (suspended()) return;
         await this.telegram.sendMessage(incoming.chatId, "AI 请求失败，请稍后重新发起请求。", {
           reply_parameters: { message_id: incoming.messageId },
         });
         throw error;
       }
     }
+    if (suspended()) return;
     let display = result.displayText;
     if (!display) {
       display = `模型没有返回任何信息${result.feedback ? `，原因: ${result.feedback}` : ""}`;
