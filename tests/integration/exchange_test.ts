@@ -4,6 +4,78 @@ import { ConfigStore, parseConfig } from "../../src/config.ts";
 import { StatsService } from "../../src/stats/service.ts";
 import { temporaryDatabase } from "./helpers.ts";
 
+Deno.test("unknown source/target currencies are silent and persist no facts; outages still report failure", async () => {
+  const temp = await temporaryDatabase();
+  const original = globalThis.fetch;
+  const methods: string[] = [];
+  const chat = { id: -100, type: "supergroup", title: "test" } as const;
+  let mode: "unknown-base" | "missing-target" | "legacy-unknown" | "outage" = "unknown-base";
+  let requests = 0;
+  globalThis.fetch = (input) => {
+    requests++;
+    const legacy = String(input).includes("open.er-api.com");
+    if (mode === "outage") return Promise.reject(new TypeError("network unavailable"));
+    if (mode === "unknown-base" || mode === "legacy-unknown") {
+      return Promise.resolve(
+        legacy
+          ? Response.json({ result: "error", "error-type": "unsupported-code" })
+          : new Response(null, { status: mode === "legacy-unknown" ? 503 : 404 }),
+      );
+    }
+    return Promise.resolve(
+      legacy
+        ? Response.json({ result: "success", time_last_update_unix: 1791849600, rates: { CNY: 5 } })
+        : Response.json({ date: "2026-10-23", cad: { cny: 5 } }),
+    );
+  };
+  try {
+    new StatsService(temp.db).setConfigField(-100, "auto_exchange", true);
+    const config = parseConfig(`database-path: ${temp.path}\nbot-token: fake\n`);
+    const app = await createApplication(temp.db, new ConfigStore(config, "unused"), (bot) => {
+      bot.api.config.use((_previous, method) => {
+        methods.push(method);
+        const result = method === "getMe"
+          ? { id: 99, is_bot: true, first_name: "bot", username: "test_bot" }
+          : method === "getChatMember"
+          ? { status: "administrator" }
+          : method === "sendMessage"
+          ? { chat, message_id: 100, date: 1 }
+          : true;
+        return Promise.resolve({ ok: true, result } as Awaited<ReturnType<typeof _previous>>);
+      });
+    });
+    const send = (id: number, text: string) =>
+      app.bot.handleUpdate({
+        update_id: 990000 + id,
+        message: {
+          chat,
+          message_id: id,
+          date: 1,
+          from: { id: 7, is_bot: false, first_name: "user" },
+          text,
+        },
+      });
+    methods.length = 0;
+    await send(1, "2 ZZZ CNY");
+    mode = "missing-target";
+    await send(2, "2 CAD ZZZ");
+    mode = "legacy-unknown";
+    await send(3, "2 ZZX CNY");
+    assertEquals(requests, 9);
+    assertEquals(methods, []);
+    assertEquals(temp.db.all("SELECT * FROM traditional_facts"), []);
+    assertEquals(temp.db.all("SELECT * FROM ai_runs"), []);
+    mode = "outage";
+    await send(4, "2 AUD CNY");
+    assertEquals(methods.filter((m) => m === "sendMessage").length, 1);
+    assertEquals(temp.db.all("SELECT * FROM traditional_facts WHERE status='failure'").length, 1);
+    app.flush();
+  } finally {
+    globalThis.fetch = original;
+    await temp.close();
+  }
+});
+
 Deno.test("automatic crypto exchange delivers declared UTC+8 date precision and persists the same explicit fact", async () => {
   const temp = await temporaryDatabase();
   const original = globalThis.fetch;

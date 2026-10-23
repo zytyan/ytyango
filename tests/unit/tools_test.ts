@@ -1,6 +1,12 @@
 import { assertEquals, assertRejects, assertThrows } from "@std/assert";
 import { calculate, formatCalculation, isCalculation } from "../../src/features/calculator.ts";
-import { exchange, formatExchangeUpdate, ocr, parseExchange } from "../../src/features/tools.ts";
+import {
+  exchange,
+  formatExchangeUpdate,
+  ocr,
+  parseExchange,
+  UnsupportedCurrencyError,
+} from "../../src/features/tools.ts";
 import { parseConfig } from "../../src/config.ts";
 
 Deno.test("calculator preserves rational precedence, Go operators and small number formatting", () => {
@@ -55,7 +61,22 @@ Deno.test("exchange validates aliases, serializes concurrent fetches and rejects
   assertEquals(results[0]!.result, 10.5);
   assertEquals(results[0]!.updated, { precision: "day", date: "2026-10-12" });
   assertEquals((await exchange({ ...request, to: "USDT" }, fetcher)).result, 1.5);
-  await assertRejects(() => exchange({ ...request, to: "XYZ" }, fetcher));
+  await assertRejects(() => exchange({ ...request, to: "XYZ" }, fetcher), UnsupportedCurrencyError);
+});
+
+Deno.test("an unsupported base at one source still permits a successful fallback", async () => {
+  let calls = 0;
+  const fetcher: typeof fetch = () => {
+    calls++;
+    return Promise.resolve(
+      calls === 1
+        ? new Response(null, { status: 404 })
+        : Response.json({ date: "2026-10-23", doge: { cny: 1.2 } }),
+    );
+  };
+  const result = await exchange({ amount: 2, from: "DOGE", to: "CNY" }, fetcher);
+  assertEquals(result.result, 2.4);
+  assertEquals(calls, 2);
 });
 
 Deno.test("exchange falls back to Cloudflare after a network failure without replacing the declared date", async () => {

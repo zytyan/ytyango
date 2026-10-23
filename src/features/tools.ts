@@ -39,6 +39,12 @@ interface ExchangeRates {
 const rateCache = new BoundedCache<string, ExchangeRates>(20, 3600_000);
 const locks = new KeyedMutex();
 const sources = ["cdn", "cloudflare", "legacy"] as const;
+export class UnsupportedCurrencyError extends Error {
+  constructor() {
+    super("不支持该币种");
+    this.name = "UnsupportedCurrencyError";
+  }
+}
 async function exchangeRates(
   source: typeof sources[number],
   from: string,
@@ -57,11 +63,15 @@ async function exchangeRates(
     const response = await fetcher(url, { signal: AbortSignal.timeout(10_000) });
     if (!response.ok) {
       await response.body?.cancel();
+      if (response.status === 404) throw new UnsupportedCurrencyError();
       throw new Error("汇率服务暂时不可用");
     }
     const body = await response.json() as Record<string, unknown>;
     let updated: ExchangeUpdate;
     if (source === "legacy") {
+      if (body.result === "error" && body["error-type"] === "unsupported-code") {
+        throw new UnsupportedCurrencyError();
+      }
       const unix = body.time_last_update_unix;
       if (
         body.result !== "success" || typeof unix !== "number" || unix <= 0 ||
@@ -102,20 +112,26 @@ export async function exchange(
   if (request.from === request.to) {
     return { ...request, result: request.amount, updated: undefined };
   }
+  let unsupported = false;
   for (const source of sources) {
     let data: ExchangeRates;
     try {
       data = await exchangeRates(source, request.from, fetcher);
-    } catch {
+    } catch (error) {
+      if (error instanceof UnsupportedCurrencyError) unsupported = true;
       continue;
     }
     const rate = data.rates[request.to];
-    if (rate === undefined) continue;
+    if (rate === undefined) {
+      unsupported = true;
+      continue;
+    }
     const result = request.amount * rate;
     if (!Number.isFinite(result)) throw new Error("金额过大");
     return { ...request, result, updated: data.updated };
   }
-  throw new Error("不支持该币种或汇率服务暂时不可用");
+  if (unsupported) throw new UnsupportedCurrencyError();
+  throw new Error("汇率服务暂时不可用");
 }
 export async function ocr(
   bytes: Uint8Array,

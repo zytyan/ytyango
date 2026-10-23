@@ -7,7 +7,13 @@ import { BoundedCache, KeyedMutex, Semaphore } from "../shared/concurrency.ts";
 import type { TelegramPort } from "../shared/types.ts";
 import { calculate, formatCalculation, isCalculation } from "./calculator.ts";
 import { fish, isFish, prpr, webpToPng } from "./images.ts";
-import { exchange, formatExchangeUpdate, ocr, parseExchange } from "./tools.ts";
+import {
+  exchange,
+  formatExchangeUpdate,
+  ocr,
+  parseExchange,
+  UnsupportedCurrencyError,
+} from "./tools.ts";
 
 export function toolHandlers(
   bot: Bot,
@@ -55,7 +61,8 @@ export function toolHandlers(
       const reply = [output, formatExchangeUpdate(result.updated)].filter(Boolean).join("\n");
       await current(ctx).reply(reply);
       current(ctx).aiContext("exchange", reply);
-    } catch {
+    } catch (error) {
+      if (error instanceof UnsupportedCurrencyError) return;
       await current(ctx).notice("汇率查询失败，请检查币种或稍后重试。");
       current(ctx).aiContext("exchange", "汇率查询失败。", "failure");
     }

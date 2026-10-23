@@ -9,6 +9,14 @@
 串行首次加载避免并发重复请求。成功结果缓存，即使所查目标币种缺失也可用于其他目标。
 全部来源失败时返回原有失败提示，不伪造汇率或更新时间。
 
+2026-10-23：未知币种静默忽略，不发错误提示、不注入失败事实。基础币种接口返回 404、 旧接口明确返回
+`unsupported-code`，或有效汇率表缺少目标币种时，仍先尝试后续来源；
+没有来源能完成转换才静默结束。纯网络、服务或响应格式故障继续使用原失败提示。 刷新分支后检查 TS
+`origin/codex/retain-features` 的 `3f22a879eec4c06e22262b8bff6521f6d050a0fc`、`origin/master` 的
+`ac67c5f7651d3e2a4a2225ae4bd3f3a9f455e979`，以及 Go 保留主线 `origin/archive/go/20261013/master` 的
+`8f5de9b9161d64d813e85c68a95258f879aa0dd8`。 检查 Go `handlers/exchangerate.go` 与
+`helpers/exchange/exchangerate.go` 的未知币种静默处理， 保留当前 TS 多来源与更新时间行为。
+
 输入支持 2–12 位字母数字代码，包括 USDT、TONCOIN、1INCH，保留旧三字母紧邻输入及 RMB/NTD/SKW
 别名。纯数字代码、非有限金额和路径字符不接受。较长代码之间用空格分隔。
 
