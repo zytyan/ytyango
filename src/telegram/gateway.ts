@@ -47,7 +47,12 @@ export class GrammyTelegramGateway implements TelegramPort {
     video: UploadSource,
     options: Record<string, unknown> = {},
   ): Promise<SentMessage> {
-    return sent(await this.bot.api.sendVideo(chatId, this.#input(video), options));
+    return sent(
+      await this.bot.api.sendVideo(chatId, this.#input(video), {
+        supports_streaming: true,
+        ...options,
+      }),
+    );
   }
 
   async sendAudio(

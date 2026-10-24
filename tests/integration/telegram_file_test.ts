@@ -49,6 +49,7 @@ Deno.test("local disk media uses JSON file URIs; remote uploads stream actual mu
     payload?: Record<string, unknown>;
     filename?: string;
     bytes?: Uint8Array;
+    supportsStreaming?: FormDataEntryValue | null;
   }[] = [];
   try {
     await Deno.writeFile(path, bytes);
@@ -65,6 +66,7 @@ Deno.test("local disk media uses JSON file URIs; remote uploads stream actual mu
           method,
           filename: file.name,
           bytes: new Uint8Array(await file.arrayBuffer()),
+          supportsStreaming: data.get("supports_streaming"),
         });
       }
       return Response.json({
@@ -77,6 +79,7 @@ Deno.test("local disk media uses JSON file URIs; remote uploads stream actual mu
       const bot = new Bot("fake", { client: { apiRoot, fetch: fetcher as never } });
       const gateway = new GrammyTelegramGateway(bot, "fake", apiRoot);
       await gateway.sendVideo(1, { path });
+      assertEquals(requests.at(-1)!.payload!.supports_streaming, true);
       await gateway.sendAudio(1, { path });
       await gateway.sendPhoto(1, { path });
       for (const request of requests.slice(-3)) {
@@ -88,6 +91,7 @@ Deno.test("local disk media uses JSON file URIs; remote uploads stream actual mu
       }
       await gateway.sendVideo(1, "existing-file-id");
       assertEquals(requests.at(-1)!.payload!.video, "existing-file-id");
+      assertEquals(requests.at(-1)!.payload!.supports_streaming, true);
     }
     const apiRoot = "https://api.telegram.org";
     const bot = new Bot("fake", { client: { apiRoot, fetch: fetcher as never } });
@@ -95,6 +99,7 @@ Deno.test("local disk media uses JSON file URIs; remote uploads stream actual mu
     await remote.sendVideo(1, { path });
     assertEquals(requests.at(-1)!.filename, "video #100% 中文.mp4");
     assertEquals(requests.at(-1)!.bytes, bytes);
+    assertEquals(requests.at(-1)!.supportsStreaming, "true");
     await remote.sendAudio(1, bytes);
     assertEquals(requests.at(-1)!.bytes, bytes);
   } finally {
